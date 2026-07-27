@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title id="pageTitle">AZRET MANAGE PLAN — Sign In</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#1E4DB7">
+<link rel="icon" id="faviconLink" href="{{ url_for('static', filename='icons/icon-192.png') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="auth-body">
+
+  <div class="auth-bg">
+    <div class="auth-blob blob-1"></div>
+    <div class="auth-blob blob-2"></div>
+    <div class="auth-blob blob-3"></div>
+  </div>
+
+  <main class="auth-card glass">
+    <div class="auth-brand">
+      <div class="brand-mark">
+        <div class="brand-mark-inner" id="loginLogo">
+          <img src="{{ url_for('static', filename='icons/logo-mark.png') }}" alt="AZRET MANAGE PLAN logo">
+        </div>
+      </div>
+      <h1 id="loginBrandTitle">AZRET <span>MANAGE PLAN</span></h1>
+      <p class="auth-tagline">Your private, online-first finance command centre.</p>
+    </div>
+
+    <form id="loginForm" class="auth-form" autocomplete="off">
+      <label for="username">Username</label>
+      <input type="text" id="username" name="username" placeholder="Enter your username" required autofocus autocomplete="username">
+
+      <label for="password">Access Password</label>
+      <div class="password-field">
+        <input type="password" id="password" name="password" placeholder="Enter your password" required autocomplete="current-password">
+        <button type="button" id="togglePassword" class="icon-btn" aria-label="Show password">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+        </button>
+      </div>
+      <p id="loginError" class="form-error" style="display:none;"></p>
+      <button type="submit" class="btn-primary btn-block">
+        <span>Unlock Dashboard</span>
+      </button>
+    </form>
+
+    <p class="auth-powered">Powered by AZRET · 100% Local &amp; Private</p>
+  </main>
+
+<script>
+document.getElementById('togglePassword').addEventListener('click', function () {
+  const input = document.getElementById('password');
+  input.type = input.type === 'password' ? 'text' : 'password';
+});
+
+document.getElementById('loginForm').addEventListener('submit', async function (e) {
+  e.preventDefault();
+  const username = document.getElementById('username').value;
+  const password = document.getElementById('password').value;
+  const errEl = document.getElementById('loginError');
+  const btn = e.target.querySelector('button[type="submit"]');
+  btn.classList.add('loading');
+  try {
+    const res = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+    const data = await res.json();
+    if (data.success) {
+      window.location.href = '/splash';
+    } else {
+      errEl.textContent = data.error || 'Incorrect username or password';
+      errEl.style.display = 'block';
+      btn.classList.remove('loading');
+    }
+  } catch (err) {
+    errEl.textContent = 'Unable to reach server.';
+    errEl.style.display = 'block';
+    btn.classList.remove('loading');
+  }
+});
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/service-worker.js').catch(() => {});
+  });
+}
+
+(async function applyBranding() {
+  try {
+    const res = await fetch('/api/branding');
+    const data = await res.json();
+    if (data.logo_url) {
+      document.getElementById('loginLogo').innerHTML = `<img src="${data.logo_url}" alt="Logo">`;
+      const fav = document.getElementById('faviconLink');
+      if (fav) fav.href = data.logo_url;
+    }
+  } catch (e) { /* offline: keep default branding */ }
+})();
+</script>
+</body>
+</html>

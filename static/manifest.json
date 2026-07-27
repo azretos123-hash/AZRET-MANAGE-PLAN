@@ -1,0 +1,25 @@
+{
+  "name": "AZRET MANAGE PLAN",
+  "short_name": "AZRET",
+  "description": "Private, offline-first personal finance management dashboard.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#F3F6FD",
+  "theme_color": "#1E4DB7",
+  "icons": [
+    {
+      "src": "/static/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/static/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

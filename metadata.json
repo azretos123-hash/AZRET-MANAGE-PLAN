@@ -1,0 +1,6 @@
+{
+  "name": "AZRET MANAGE PLAN",
+  "description": "A private, premium personal finance dashboard.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

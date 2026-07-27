@@ -1,0 +1,1352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>AZRET MANAGE PLAN</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#1E4DB7">
+<link rel="icon" id="faviconLink" href="{{ url_for('static', filename='icons/icon-192.png') }}">
+<link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/icon-192.png') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body data-theme="light">
+<script>window.START_SPLASH = {{ start_splash|tojson }};</script>
+
+<div id="themeVideoLayer" class="theme-video-layer" style="display:none;position:fixed;inset:0;overflow:hidden;z-index:-2;">
+  <video id="themeVideoBg" muted loop playsinline style="width:100%;height:100%;object-fit:cover;"></video>
+</div>
+<div id="themeBgLayer" class="theme-bg-layer"></div>
+
+<div id="appLoader" class="app-loader">
+  <div class="loader-video-wrap" id="splashVideoWrap">
+    <video id="splashVideo" autoplay muted playsinline
+           poster="{{ url_for('static', filename='icons/logo-mark.png') }}">
+    </video>
+  </div>
+  <div class="loader-mark" id="splashLogo" style="display:none;">
+    <img src="{{ url_for('static', filename='icons/logo-mark.png') }}" alt="AZRET MANAGE PLAN logo">
+  </div>
+  <p id="splashAppName">Loading AZRET MANAGE PLAN…</p>
+</div>
+
+<div class="app-shell">
+
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-logo-wrap" id="sidebarLogo">
+        <img src="{{ url_for('static', filename='icons/logo-mark.png') }}" alt="AZRET MANAGE PLAN logo">
+      </div>
+      <div class="sidebar-brand-text">
+        <strong>AZRET</strong>
+        <span>MANAGE PLAN</span>
+      </div>
+      <button id="themeToggle" class="icon-btn brand-theme-toggle" aria-label="Toggle theme">
+        <svg id="themeIconSun" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+        <svg id="themeIconMoon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M21 12.8A9 9 0 1111.2 3 7 7 0 0021 12.8z"/></svg>
+      </button>
+      <button id="sidebarClose" class="icon-btn sidebar-close" aria-label="Close menu">✕</button>
+    </div>
+
+    <nav class="sidebar-nav">
+      <button class="nav-item active" data-page="dashboard">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+        <span>Dashboard</span>
+      </button>
+      <button class="nav-item" data-page="salary-planner">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 012-2h13a1 1 0 011 1v3M3 7v11a2 2 0 002 2h15a1 1 0 001-1v-6a1 1 0 00-1-1h-4a2 2 0 000 4h5"/><path d="M18 4l1 2 2 1-2 1-1 2-1-2-2-1 2-1z"/></svg>
+        <span>Salary Planner</span>
+      </button>
+      <button class="nav-item" data-page="income">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+        <span>Income</span>
+      </button>
+      <button class="nav-item" data-page="expenses">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+        <span>Expenses</span>
+      </button>
+      <button class="nav-item" data-page="savings">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M4 8c0-2 2-3 8-3s8 1 8 3-2 3-8 3-8 1-8 3 2 3 8 3 8 1 8 3-2 3-8 3-8-1-8-3"/></svg>
+        <span>Savings</span>
+      </button>
+      <button class="nav-item" data-page="shopping">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1.4"/><circle cx="18" cy="21" r="1.4"/><path d="M2.5 3h2.5l2.6 12.2a2 2 0 002 1.6h8.1a2 2 0 002-1.6L21 7H6"/></svg>
+        <span>Shopping Planner</span>
+      </button>
+      <button class="nav-item" data-page="family">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="7" r="3"/><circle cx="17" cy="7" r="3"/><path d="M2 21v-2a5 5 0 015-5h4M14 12a5 5 0 015 5v4"/></svg>
+        <span>Family Transfer</span>
+      </button>
+      <button class="nav-item" data-page="emi">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="13" rx="2"/><path d="M2 10h20M6 15h4"/></svg>
+        <span>EMI</span>
+      </button>
+      <button class="nav-item" data-page="debt">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 12h6M12 9v6"/></svg>
+        <span>Debt</span>
+      </button>
+      <button class="nav-item" data-page="reports">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 21V9M12 21V3M20 21v-6"/></svg>
+        <span>Reports</span>
+      </button>
+      <button class="nav-item" data-page="notes">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h5"/></svg>
+        <span>Notes</span>
+      </button>
+      <button class="nav-item" data-page="calculator">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8M8 11h1M12 11h1M16 11h1M8 15h1M12 15h1M16 15h1M8 19h1M12 19h1"/></svg>
+        <span>Calculator</span>
+      </button>
+      <button class="nav-item" data-page="about">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01"/></svg>
+        <span>About</span>
+      </button>
+      <button class="nav-item" data-page="settings">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.34 1.87l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.7 1.7 0 00-1.87-.34 1.7 1.7 0 00-1 1.55V21a2 2 0 01-4 0v-.09A1.7 1.7 0 009 19.4a1.7 1.7 0 00-1.87.34l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.7 1.7 0 004.6 15a1.7 1.7 0 00-1.55-1H3a2 2 0 010-4h.09A1.7 1.7 0 004.6 9a1.7 1.7 0 00-.34-1.87l-.06-.06a2 2 0 112.83-2.83l.06.06A1.7 1.7 0 009 4.6a1.7 1.7 0 001-1.55V3a2 2 0 014 0v.09a1.7 1.7 0 001 1.55 1.7 1.7 0 001.87-.34l.06-.06a2 2 0 112.83 2.83l-.06.06A1.7 1.7 0 0019.4 9c.24.62.82 1 1.55 1H21a2 2 0 010 4h-.09a1.7 1.7 0 00-1.51 1z"/></svg>
+        <span>Settings</span>
+      </button>
+    </nav>
+
+    <button id="logoutBtn" class="sidebar-logout">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+      <span>Sign Out</span>
+    </button>
+  </aside>
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+  <!-- Main -->
+  <div class="main-area">
+    <header class="topbar glass">
+      <button id="menuToggle" class="icon-btn menu-toggle" aria-label="Open menu">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+      </button>
+
+      <div class="topbar-search">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <input type="text" id="globalSearch" placeholder="Search everything…">
+        <div id="globalSearchResults" class="global-search-results"></div>
+      </div>
+
+      <div class="topbar-greetclock">
+        <div class="greet-text greet-text-centered">
+          <span class="greet-line"><span id="greetingText">Good Evening</span>, <span class="greet-name" id="greetingName">Ijas</span></span>
+        </div>
+        <div class="greet-divider"></div>
+        <div class="live-clock">
+          <span class="clock-time" id="clockTime">--:--:--</span>
+          <span class="clock-date" id="clockDate">—</span>
+        </div>
+      </div>
+
+      <div class="topbar-actions">
+        <div class="currency-switch" id="currencySwitch">
+          <button class="cur-opt active" data-currency="AED">AED</button>
+          <button class="cur-opt" data-currency="INR">INR</button>
+        </div>
+        <button id="assistantBtn" class="icon-btn assistant-btn" aria-label="Talk to AZRET" title="Ask AZRET for help">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 1.5a4.5 4.5 0 00-4.5 4.5v3a4.5 4.5 0 009 0V6a4.5 4.5 0 00-4.5-4.5z"/>
+            <path d="M5.5 10.5A6.5 6.5 0 0012 17a6.5 6.5 0 006.5-6.5"/>
+            <path d="M8 21h8"/>
+            <path d="M12 17v4"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <main class="content" id="content">
+
+      <!-- ============ DASHBOARD ============ -->
+      <section class="page active" id="page-dashboard">
+        <div class="page-head">
+          <div>
+            <p class="page-eyebrow">Overview</p>
+            <h2>Dashboard</h2>
+          </div>
+          <div class="rate-card glass">
+            <div class="rate-label">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+              AED → INR
+            </div>
+            <div class="rate-value" id="rateValue">—</div>
+            <button id="refreshRate" class="icon-btn small" aria-label="Refresh rate">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="salary-countdown-card glass" id="salaryCountdownCard">
+          <div class="countdown-main-row">
+            <div class="countdown-ring-wrap">
+              <svg class="countdown-ring" viewBox="0 0 120 120">
+                <circle class="countdown-ring-bg" cx="60" cy="60" r="52"></circle>
+                <circle class="countdown-ring-fill" id="countdownRingFill" cx="60" cy="60" r="52"></circle>
+              </svg>
+              <div class="countdown-days-wrap">
+                <span class="countdown-days" id="countdownDays">--</span>
+                <span class="countdown-days-label">days</span>
+              </div>
+            </div>
+            <div class="countdown-details">
+              <div class="countdown-time-grid">
+                <div><span id="countdownHours">--</span><small>hrs</small></div>
+                <div><span id="countdownMinutes">--</span><small>mins</small></div>
+                <div><span id="countdownSeconds">--</span><small>secs</small></div>
+              </div>
+              <div class="countdown-info">
+                <p class="countdown-eyebrow">Salary Credited Date</p>
+                <h3 class="countdown-title">Until the <span id="countdownDayOfMonth">27th</span></h3>
+                <p class="countdown-date" id="countdownDate">—</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Daily rotating Islamic reminder + visual, refreshed once per day -->
+          <div class="countdown-daily-reminder" id="dailyReminderRow">
+            <div class="daily-reminder-visual" id="dailyReminderVisual" aria-hidden="true">
+              <svg viewBox="0 0 48 48" width="26" height="26" fill="none" stroke="#fff" stroke-width="1.6">
+                <path d="M24 4l4.6 12.2L41 21l-12.4 4.8L24 38l-4.6-12.2L7 21l12.4-4.8L24 4z" stroke-linejoin="round" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <div class="daily-reminder-text">
+              <p class="daily-reminder-label">Daily Reflection</p>
+              <p class="daily-reminder-quote" id="dailyReminderQuote">Ease follows hardship — trust the process and keep moving forward with patience.</p>
+            </div>
+          </div>
+
+          <div class="countdown-glow"></div>
+        </div>
+
+        <div class="stat-grid" id="statGrid"></div>
+
+        <div class="chart-grid">
+          <div class="card glass chart-card">
+            <h3>Income vs Expense</h3>
+            <canvas id="chartIncomeExpense" height="220"></canvas>
+          </div>
+          <div class="card glass chart-card">
+            <h3>Savings Growth</h3>
+            <canvas id="chartSavingsGrowth" height="220"></canvas>
+          </div>
+        </div>
+        <div class="chart-grid">
+          <div class="card glass chart-card">
+            <h3>Expense Categories</h3>
+            <canvas id="chartCategories" height="220"></canvas>
+          </div>
+          <div class="card glass chart-card">
+            <h3>Quick Summary</h3>
+            <div id="quickSummary" class="quick-summary"></div>
+          </div>
+        </div>
+        <div class="chart-grid">
+          <div class="card glass chart-card">
+            <h3>AI Voice Assistant</h3>
+            <div class="voice-summary-widget">
+              <div class="currency-switch lang-switch" id="voiceLangToggle">
+                <button type="button" class="cur-opt active" data-lang="en">EN</button>
+                <button type="button" class="cur-opt" data-lang="ml">ML</button>
+              </div>
+              <p id="voiceSummaryText">Read your financial overview out loud in English or Malayalam.</p>
+              <button id="voiceSpeakBtn" class="btn-primary">Speak Summary</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ SMART SALARY PLANNER ============ -->
+      <section class="page" id="page-salary-planner">
+        <div class="page-head">
+          <div>
+            <p class="page-eyebrow">Smart Planning</p>
+            <h2>Smart Salary Planner</h2>
+          </div>
+        </div>
+
+        <div class="module-grid salary-planner-grid">
+          <div class="card glass form-card">
+            <h3>Income &amp; Commitment Profile</h3>
+            <p class="profile-hint">Save your verified income and fixed commitments once — the Smart Plan
+              stays locked until this is on file, then re-analyzes your EMI &amp; debt commitments every
+              time you regenerate it.</p>
+            <form id="income-profile-form">
+              <label>Verified Monthly Income (<span class="cur-unit">AED</span>)</label>
+              <div class="currency-pair">
+                <input type="number" id="incomeprofile-monthly_income" step="0.01" min="0" required placeholder="e.g. 10000">
+                <div class="currency-box" id="incomeprofile-monthly_income-box">
+                  <span class="currency-box-tag" id="incomeprofile-monthly_income-tag">≈ INR</span>
+                  <span class="currency-box-value" id="incomeprofile-monthly_income-value">0.00</span>
+                </div>
+              </div>
+              <label>Other / Side Income (<span class="cur-unit">AED</span>) <span class="opt-tag">optional</span></label>
+              <div class="currency-pair">
+                <input type="number" id="incomeprofile-other_income" step="0.01" min="0" placeholder="0">
+                <div class="currency-box" id="incomeprofile-other_income-box">
+                  <span class="currency-box-tag" id="incomeprofile-other_income-tag">≈ INR</span>
+                  <span class="currency-box-value" id="incomeprofile-other_income-value">0.00</span>
+                </div>
+              </div>
+              <div class="field-row">
+                <div>
+                  <label>Extra Fixed EMI (<span class="cur-unit">AED</span>) <span class="opt-tag">optional</span></label>
+                  <div class="currency-pair">
+                    <input type="number" id="incomeprofile-fixed_emi_commitment" step="0.01" min="0" placeholder="0">
+                    <div class="currency-box" id="incomeprofile-fixed_emi_commitment-box">
+                      <span class="currency-box-tag" id="incomeprofile-fixed_emi_commitment-tag">≈ INR</span>
+                      <span class="currency-box-value" id="incomeprofile-fixed_emi_commitment-value">0.00</span>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <label>Extra Fixed Debt (<span class="cur-unit">AED</span>) <span class="opt-tag">optional</span></label>
+                  <div class="currency-pair">
+                    <input type="number" id="incomeprofile-fixed_debt_commitment" step="0.01" min="0" placeholder="0">
+                    <div class="currency-box" id="incomeprofile-fixed_debt_commitment-box">
+                      <span class="currency-box-tag" id="incomeprofile-fixed_debt_commitment-tag">≈ INR</span>
+                      <span class="currency-box-value" id="incomeprofile-fixed_debt_commitment-value">0.00</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <label>Notes <span class="opt-tag">optional</span></label>
+              <textarea id="incomeprofile-notes" rows="2" placeholder="Any income/commitment context worth remembering"></textarea>
+              <div class="form-actions">
+                <button type="submit" class="btn-primary">Save Profile</button>
+              </div>
+            </form>
+            <div class="profile-status" id="incomeProfileStatus">
+              <span class="profile-status-dot" id="incomeProfileDot"></span>
+              <span id="incomeProfileStatusText">Profile not saved yet — save it to unlock the Smart Plan.</span>
+            </div>
+          </div>
+
+          <div class="card glass form-card" id="salaryPlanGate">
+            <div class="gate-locked" id="salaryPlanLocked">
+              <div class="gate-lock-icon">🔒</div>
+              <h3>Smart Plan Locked</h3>
+              <p>Save your Income &amp; Commitment Profile on the left to unlock EMI &amp; income-aware
+                budget allocations.</p>
+            </div>
+
+            <div id="salaryPlanUnlocked" style="display:none">
+              <h3>Generate Smart Plan</h3>
+              <form id="salary-plan-form">
+                <label>Plan Amount (<span class="cur-unit">AED</span>)</label>
+                <div class="currency-pair">
+                  <input type="number" id="salaryplan-amount" step="0.01" min="0" required placeholder="e.g. 10000">
+                  <div class="currency-box" id="salaryplan-amount-box">
+                    <span class="currency-box-tag" id="salaryplan-amount-tag">≈ INR</span>
+                    <span class="currency-box-value" id="salaryplan-amount-value">0.00</span>
+                  </div>
+                </div>
+                <p class="profile-hint" id="salaryPlanVerifiedHint"></p>
+                <div class="form-actions">
+                  <button type="submit" class="btn-primary">Generate Smart Plan</button>
+                </div>
+              </form>
+
+              <div class="salary-health-block" id="salaryHealthBlock" style="display:none">
+                <div class="goal-progress-label"><span>Budget Health Score</span></div>
+                <div class="health-score-row">
+                  <div class="health-score-ring" id="healthScoreRing">
+                    <span id="healthScoreValue">0</span>
+                  </div>
+                  <div>
+                    <div class="health-badge" id="salaryHealthBadge">—</div>
+                    <p class="motivational-text" id="salarySavingsRateText"></p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card glass chart-card">
+            <h3>Allocation Breakdown</h3>
+            <canvas id="chartSalaryPie" height="220"></canvas>
+            <div id="salaryAllocationList" class="salary-allocation-list"></div>
+          </div>
+
+          <div class="card glass chart-card">
+            <h3>Income vs Commitments</h3>
+            <canvas id="chartIncomeCommitments" height="220"></canvas>
+            <p class="motivational-text" id="salaryCommitmentText"></p>
+          </div>
+        </div>
+
+        <div class="chart-grid">
+          <div class="card glass about-card">
+            <h3>AI Smart Advice</h3>
+            <ul id="salarySuggestionsList" class="tips-list salary-empty-hint">
+              <li>Save your Income &amp; Commitment Profile and generate a plan to see personalised advice.</li>
+            </ul>
+          </div>
+          <div class="card glass about-card">
+            <h3>Money Tips</h3>
+            <ul id="salaryMoneyTipsList" class="tips-list salary-empty-hint">
+              <li>Your smart plan will surface a few relevant money tips here.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ INCOME ============ -->
+      <section class="page" id="page-income">
+        <div class="page-head"><h2>Income</h2></div>
+        <div class="module-grid">
+          <div class="card glass form-card">
+            <h3 id="income-form-title">Add Income</h3>
+            <form id="income-form">
+              <input type="hidden" id="income-id">
+              <label>Income Type</label>
+              <select id="income-type" required>
+                <option value="Salary">Monthly Salary</option>
+                <option value="Bonus">Bonus Income</option>
+                <option value="Other">Other Income</option>
+              </select>
+              <label>Amount (<span class="cur-unit">AED</span>)</label>
+              <div class="dual-currency-toggle" data-field="income-amount">
+                <button type="button" class="dc-btn active" data-cur="AED">AED</button>
+                <button type="button" class="dc-btn" data-cur="INR">INR</button>
+              </div>
+              <div class="currency-pair">
+                <input type="number" id="income-amount" step="0.01" min="0" required>
+                <div class="currency-box" id="income-amount-box">
+                  <span class="currency-box-tag" id="income-amount-tag">≈ INR</span>
+                  <span class="currency-box-value" id="income-amount-value">0.00</span>
+                </div>
+              </div>
+              <div class="field-row">
+                <div><label>Date</label><input type="date" id="income-date" required></div>
+                <div><label>Time</label><input type="time" id="income-time"></div>
+              </div>
+              <label>Notes</label>
+              <textarea id="income-notes" rows="2" placeholder="Optional notes"></textarea>
+              <div class="form-actions">
+                <button type="submit" class="btn-primary">Save</button>
+                <button type="button" class="btn-ghost" id="income-cancel" style="display:none">Cancel Edit</button>
+              </div>
+            </form>
+          </div>
+          <div class="card glass table-card">
+            <div class="table-card-head">
+              <h3>Income History</h3>
+              <input type="search" class="table-search" id="income-search" placeholder="Search…">
+            </div>
+            <div class="running-total">Running Total: <strong id="income-total">AED 0.00</strong></div>
+            <div class="table-wrap">
+              <table><thead><tr><th>Type</th><th>Amount</th><th>Date</th><th>Notes</th><th></th></tr></thead>
+              <tbody id="income-tbody"></tbody></table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ EXPENSES ============ -->
+      <section class="page" id="page-expenses">
+        <div class="page-head"><h2>Expenses</h2></div>
+        <div class="module-grid">
+          <div class="card glass form-card">
+            <h3 id="expenses-form-title">Add Expense</h3>
+            <form id="expenses-form">
+              <input type="hidden" id="expenses-id">
+              <label>Shopping Link (Amazon, Noon, Temu) <span class="opt-tag">optional</span></label>
+              <div class="field-row">
+                <input type="url" id="expenses-product_url" placeholder="Paste a product link to auto-fill title and price">
+                <button type="button" id="expenses-fetch-product" class="btn-secondary">Fetch Details</button>
+              </div>
+              <label>Expense Name</label>
+              <input type="text" id="expenses-name" required placeholder="e.g. Groceries">
+              <label>Category</label>
+              <select id="expenses-category" required>
+                <option>Food</option><option>Transport</option><option>Rent</option>
+                <option>Utilities</option><option>Shopping</option><option>Health</option>
+                <option>Entertainment</option><option>Education</option><option>Other</option>
+              </select>
+              <label>Amount (<span class="cur-unit">AED</span>)</label>
+              <div class="dual-currency-toggle" data-field="expenses-amount">
+                <button type="button" class="dc-btn active" data-cur="AED">AED</button>
+                <button type="button" class="dc-btn" data-cur="INR">INR</button>
+              </div>
+              <div class="currency-pair">
+                <input type="number" id="expenses-amount" step="0.01" min="0" required>
+                <div class="currency-box" id="expenses-amount-box">
+                  <span class="currency-box-tag" id="expenses-amount-tag">≈ INR</span>
+                  <span class="currency-box-value" id="expenses-amount-value">0.00</span>
+                </div>
+              </div>
+              <div class="field-row">
+                <div><label>Date</label><input type="date" id="expenses-date" required></div>
+                <div><label>Time</label><input type="time" id="expenses-time"></div>
+              </div>
+              <label>Notes</label>
+              <textarea id="expenses-notes" rows="2" placeholder="Optional notes"></textarea>
+              <div class="form-actions">
+                <button type="submit" class="btn-primary">Save</button>
+                <button type="button" class="btn-ghost" id="expenses-cancel" style="display:none">Cancel Edit</button>
+              </div>
+            </form>
+          </div>
+          <div class="card glass table-card">
+            <div class="table-card-head">
+              <h3>Expense History</h3>
+              <input type="search" class="table-search" id="expenses-search" placeholder="Search…">
+            </div>
+            <div class="running-total">Running Total: <strong id="expenses-total">AED 0.00</strong></div>
+            <div class="table-wrap">
+              <table><thead><tr><th>Name</th><th>Category</th><th>Amount</th><th>Date</th><th></th></tr></thead>
+              <tbody id="expenses-tbody"></tbody></table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ SAVINGS ============ -->
+      <section class="page" id="page-savings">
+        <div class="page-head"><h2>Savings</h2></div>
+        <div class="module-grid">
+          <div class="card glass form-card">
+            <h3 id="savings-form-title">Add Savings</h3>
+            <form id="savings-form">
+              <input type="hidden" id="savings-id">
+              <label>Savings Type</label>
+              <select id="savings-type" required>
+                <option value="Cash">Cash Savings</option>
+                <option value="Gold">Gold Savings</option>
+              </select>
+              <label>Amount (<span class="cur-unit">AED</span>)</label>
+              <div class="dual-currency-toggle" data-field="savings-amount">
+                <button type="button" class="dc-btn active" data-cur="AED">AED</button>
+                <button type="button" class="dc-btn" data-cur="INR">INR</button>
+              </div>
+              <div class="currency-pair">
+                <input type="number" id="savings-amount" step="0.01" min="0" required>
+                <div class="currency-box" id="savings-amount-box">
+                  <span class="currency-box-tag" id="savings-amount-tag">≈ INR</span>
+                  <span class="currency-box-value" id="savings-amount-value">0.00</span>
+                </div>
+              </div>
+              <label>Savings Goal (<span class="cur-unit">AED</span>, optional)</label>
+              <div class="dual-currency-toggle" data-field="savings-goal">
+                <button type="button" class="dc-btn active" data-cur="AED">AED</button>
+                <button type="button" class="dc-btn" data-cur="INR">INR</button>
+              </div>
+              <div class="currency-pair">
+                <input type="number" id="savings-goal" step="0.01" min="0">
+                <div class="currency-box" id="savings-goal-box">
+                  <span class="currency-box-tag" id="savings-goal-tag">≈ INR</span>
+                  <span class="currency-box-value" id="savings-goal-value">0.00</span>
+                </div>
+              </div>
+              <div class="field-row">
+                <div><label>Date</label><input type="date" id="savings-date" required></div>
+                <div><label>Time</label><input type="time" id="savings-time"></div>
+              </div>
+              <label>Notes</label>
+              <textarea id="savings-notes" rows="2"></textarea>
+              <div class="form-actions">
+                <button type="submit" class="btn-primary">Save</button>
+                <button type="button" class="btn-ghost" id="savings-cancel" style="display:none">Cancel Edit</button>
+              </div>
+            </form>
+          </div>
+          <div class="card glass table-card">
+            <div class="table-card-head">
+              <h3>Savings Records</h3>
+              <input type="search" class="table-search" id="savings-search" placeholder="Search…">
+            </div>
+            <div class="running-total">
+              Running Total: <strong id="savings-total">AED 0.00</strong>
+            </div>
+            <div class="goal-progress">
+              <div class="goal-progress-label"><span>Goal Progress</span><span id="savings-goal-pct">0%</span></div>
+              <div class="progress-bar"><div class="progress-fill" id="savings-goal-fill"></div></div>
+            </div>
+            <div class="table-wrap">
+              <table><thead><tr><th>Type</th><th>Amount</th><th>Date</th><th>Notes</th><th></th></tr></thead>
+              <tbody id="savings-tbody"></tbody></table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ SHOPPING PLANNER ============ -->
+      <section class="page" id="page-shopping">
+        <div class="page-head"><h2>Shopping Planner</h2></div>
+        <div class="module-grid">
+          <div class="card glass form-card">
+            <h3 id="shopping-form-title">Add Shopping Item</h3>
+            <form id="shopping-form">
+              <input type="hidden" id="shopping-id">
+              <label>Shopping Link (Amazon, Noon, Temu) <span class="opt-tag">optional</span></label>
+              <div class="field-row">
+                <input type="url" id="shopping-product_url" placeholder="Paste a shopping link to auto-fill product details">
+                <button type="button" id="shopping-fetch-product" class="btn-secondary">Fetch Details</button>
+              </div>
+              <label>Product Name</label>
+              <input type="text" id="shopping-product_name" required placeholder="e.g. Air Fryer">
+              <label>Category</label>
+              <input type="text" id="shopping-category" required placeholder="e.g. Electronics">
+              <label>Quantity</label>
+              <input type="number" id="shopping-quantity" step="1" min="1" value="1" required>
+              <label>Price (<span class="cur-unit">AED</span>)</label>
+              <div class="dual-currency-toggle" data-field="shopping-price">
+                <button type="button" class="dc-btn active" data-cur="AED">AED</button>
+                <button type="button" class="dc-btn" data-cur="INR">INR</button>
+              </div>
+              <div class="currency-pair">
+                <input type="number" id="shopping-price" step="0.01" min="0" required>
+                <div class="currency-box" id="shopping-price-box">
+                  <span class="currency-box-tag" id="shopping-price-tag">≈ INR</span>
+                  <span class="currency-box-value" id="shopping-price-value">0.00</span>
+                </div>
+              </div>
+              <label>Priority</label>
+              <select id="shopping-priority">
+                <option value="Low">Low</option>
+                <option value="Medium" selected>Medium</option>
+                <option value="High">High</option>
+                <option value="Urgent">Urgent</option>
+              </select>
+              <div class="field-row">
+                <div><label>Date</label><input type="date" id="shopping-date" required></div>
+                <div><label>Time</label><input type="time" id="shopping-time"></div>
+              </div>
+              <label>Notes</label>
+              <textarea id="shopping-notes" rows="2"></textarea>
+              <div class="form-actions">
+                <button type="submit" class="btn-primary">Save</button>
+                <button type="button" class="btn-ghost" id="shopping-cancel" style="display:none">Cancel Edit</button>
+              </div>
+            </form>
+          </div>
+          <div class="card glass table-card">
+            <div class="table-card-head">
+              <h3>Shopping List</h3>
+              <input type="search" class="table-search" id="shopping-search" placeholder="Search…">
+            </div>
+            <div class="running-total-row">
+              <div>Items: <strong id="shopping-count">0</strong></div>
+              <div>Running Total: <strong id="shopping-total"><span class="cur-unit">AED</span> 0.00</strong></div>
+            </div>
+            <div class="budget-bar">
+              <label class="budget-bar-label">Shopping Budget (<span class="cur-unit">AED</span>, 0 = no limit)</label>
+              <div class="budget-bar-row">
+                <input type="number" id="shopping-budget-input" step="0.01" min="0" placeholder="0.00">
+                <button type="button" class="btn-ghost" id="shopping-budget-save">Set Budget</button>
+              </div>
+              <div class="progress-bar"><div class="progress-fill" id="shopping-budget-fill"></div></div>
+              <div class="budget-warning" id="shopping-budget-warning" style="display:none"></div>
+            </div>
+            <div class="table-wrap">
+              <table><thead><tr><th>Product</th><th>Category</th><th>Qty</th><th>Price</th><th>Total</th><th>Priority</th><th>Date</th><th></th></tr></thead>
+              <tbody id="shopping-tbody"></tbody></table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ FAMILY TRANSFER ============ -->
+      <section class="page" id="page-family">
+        <div class="page-head"><h2>Family Transfer</h2></div>
+        <div class="module-grid">
+          <div class="card glass form-card">
+            <h3 id="family-form-title">Add Transfer</h3>
+            <form id="family_transfers-form">
+              <input type="hidden" id="family_transfers-id">
+              <label>Amount (<span class="cur-unit">AED</span>)</label>
+              <div class="dual-currency-toggle" data-field="family_transfers-amount">
+                <button type="button" class="dc-btn active" data-cur="AED">AED</button>
+                <button type="button" class="dc-btn" data-cur="INR">INR</button>
+              </div>
+              <div class="currency-pair">
+                <input type="number" id="family_transfers-amount" step="0.01" min="0" required>
+                <div class="currency-box" id="family_transfers-amount-box">
+                  <span class="currency-box-tag" id="family_transfers-amount-tag">≈ INR</span>
+                  <span class="currency-box-value" id="family_transfers-amount-value">0.00</span>
+                </div>
+              </div>
+              <label>Receiver</label>
+              <input type="text" id="family_transfers-receiver" required placeholder="Receiver name">
+              <div class="field-row">
+                <div><label>Date</label><input type="date" id="family_transfers-date" required></div>
+                <div><label>Time</label><input type="time" id="family_transfers-time"></div>
+              </div>
+              <label>Notes</label>
+              <textarea id="family_transfers-notes" rows="2"></textarea>
+              <div class="form-actions">
+                <button type="submit" class="btn-primary">Save</button>
+                <button type="button" class="btn-ghost" id="family_transfers-cancel" style="display:none">Cancel Edit</button>
+              </div>
+            </form>
+          </div>
+          <div class="card glass table-card">
+            <div class="table-card-head">
+              <h3>Transfer History</h3>
+              <input type="search" class="table-search" id="family_transfers-search" placeholder="Search…">
+            </div>
+            <div class="running-total">Total Sent: <strong id="family_transfers-total">AED 0.00</strong></div>
+            <div class="table-wrap">
+              <table><thead><tr><th>Receiver</th><th>Amount</th><th>Date</th><th>Notes</th><th></th></tr></thead>
+              <tbody id="family_transfers-tbody"></tbody></table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ EMI ============ -->
+      <section class="page" id="page-emi">
+        <div class="page-head"><h2>EMI</h2></div>
+        <div class="module-grid">
+          <div class="form-card-stack">
+            <div class="card glass form-card">
+              <h3 id="emi-form-title">Add New EMI</h3>
+              <form id="emi-form">
+                <input type="hidden" id="emi-id">
+                <label>EMI Name</label>
+                <div class="autosuggest-wrap">
+                  <input type="text" id="emi-name" required placeholder="e.g. Car Loan" autocomplete="off">
+                  <div class="autosuggest-dropdown" id="emi-name-suggestions"></div>
+                </div>
+                <div class="prev-record-panel" id="emi-prev-panel" style="display:none"></div>
+
+                <label>Category</label>
+                <select id="emi-category-select">
+                  <option value="Vehicle">Vehicle</option>
+                  <option value="Mobile">Mobile</option>
+                  <option value="Home">Home</option>
+                  <option value="Custom">Custom</option>
+                </select>
+                <input type="text" id="emi-category-custom" class="custom-category-input" style="display:none" placeholder="Enter custom category">
+                <input type="hidden" id="emi-category">
+
+                <label>Total Amount (<span id="emi-amount-unit">AED</span>)</label>
+                <div class="dual-currency-toggle" data-field="emi-amount">
+                  <button type="button" class="dc-btn active" data-cur="AED">AED</button>
+                  <button type="button" class="dc-btn" data-cur="INR">INR</button>
+                </div>
+                <div class="currency-pair">
+                  <input type="number" id="emi-amount" step="0.01" min="0" required>
+                  <div class="currency-box" id="emi-amount-box">
+                    <span class="currency-box-tag" id="emi-amount-tag">≈ INR</span>
+                    <span class="currency-box-value" id="emi-amount-value">0.00</span>
+                  </div>
+                </div>
+
+                <label>Already Paid (<span id="emi-paid-unit">AED</span>)</label>
+                <div class="dual-currency-toggle" data-field="emi-paid">
+                  <button type="button" class="dc-btn active" data-cur="AED">AED</button>
+                  <button type="button" class="dc-btn" data-cur="INR">INR</button>
+                </div>
+                <div class="currency-pair">
+                  <input type="number" id="emi-paid" step="0.01" min="0" value="0">
+                  <div class="currency-box" id="emi-paid-box">
+                    <span class="currency-box-tag" id="emi-paid-tag">≈ INR</span>
+                    <span class="currency-box-value" id="emi-paid-value">0.00</span>
+                  </div>
+                </div>
+
+                <label>Monthly Installment / Monthly Paid Amount (<span id="emi-monthly_payment-unit">AED</span>)</label>
+                <div class="dual-currency-toggle" data-field="emi-monthly_payment">
+                  <button type="button" class="dc-btn active" data-cur="AED">AED</button>
+                  <button type="button" class="dc-btn" data-cur="INR">INR</button>
+                </div>
+                <div class="currency-pair">
+                  <input type="number" id="emi-monthly_payment" step="0.01" min="0" value="0" placeholder="e.g. 500" required>
+                  <div class="currency-box" id="emi-monthly_payment-box">
+                    <span class="currency-box-tag" id="emi-monthly_payment-tag">≈ INR</span>
+                    <span class="currency-box-value" id="emi-monthly_payment-value">0.00</span>
+                  </div>
+                </div>
+                <p class="field-hint">This is the amount actually due each month — used by the Salary Planner &amp; Allocation Breakdown instead of the full EMI amount.</p>
+
+                <div class="field-row">
+                  <div><label>Date</label><input type="date" id="emi-date" required></div>
+                  <div><label>Time</label><input type="time" id="emi-time"></div>
+                </div>
+                <label>Notes</label>
+                <textarea id="emi-notes" rows="2"></textarea>
+                <div class="form-actions">
+                  <button type="submit" class="btn-primary">Save</button>
+                  <button type="button" class="btn-ghost" id="emi-cancel" style="display:none">Cancel Edit</button>
+                </div>
+              </form>
+            </div>
+
+            <div class="card glass form-card">
+              <h3>Log a Payment</h3>
+              <form id="emi-payment-form">
+                <label>EMI Name</label>
+                <div class="autosuggest-wrap">
+                  <input type="text" id="emi-payment-name" placeholder="Start typing to find a saved EMI…" autocomplete="off" required>
+                  <div class="autosuggest-dropdown" id="emi-payment-suggestions"></div>
+                </div>
+                <input type="hidden" id="emi-payment-record-id">
+                <div class="prev-record-panel" id="emi-payment-prev-panel" style="display:none"></div>
+
+                <label>Payment Amount (<span id="emi-payment-amount-unit">AED</span>)</label>
+                <div class="dual-currency-toggle" data-field="emi-payment-amount">
+                  <button type="button" class="dc-btn active" data-cur="AED">AED</button>
+                  <button type="button" class="dc-btn" data-cur="INR">INR</button>
+                </div>
+                <div class="currency-pair">
+                  <input type="number" id="emi-payment-amount" step="0.01" min="0" required>
+                  <div class="currency-box" id="emi-payment-amount-box">
+                    <span class="currency-box-tag" id="emi-payment-amount-tag">≈ INR</span>
+                    <span class="currency-box-value" id="emi-payment-amount-value">0.00</span>
+                  </div>
+                </div>
+                <div class="field-row">
+                  <div><label>Date</label><input type="date" id="emi-payment-date" required></div>
+                  <div><label>Time</label><input type="time" id="emi-payment-time"></div>
+                </div>
+                <label>Notes</label>
+                <textarea id="emi-payment-notes" rows="2"></textarea>
+                <div class="form-actions">
+                  <button type="submit" class="btn-primary" id="emi-payment-submit" disabled>Log Payment</button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <div class="card glass table-card">
+            <div class="table-card-head">
+              <h3>EMI Records</h3>
+              <input type="search" class="table-search" id="emi-search" placeholder="Search…">
+            </div>
+            <div class="running-total-row">
+              <div>Total Paid: <strong id="emi-total-paid">AED 0.00</strong></div>
+              <div>Pending: <strong id="emi-total-pending">AED 0.00</strong></div>
+            </div>
+            <div class="table-wrap">
+              <table><thead><tr><th>Name</th><th>Category</th><th>Total Amount</th><th>Paid Amount</th><th>Pending Amount</th><th>Monthly Payment</th><th>Date</th><th></th></tr></thead>
+              <tbody id="emi-tbody"></tbody></table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ DEBT ============ -->
+      <section class="page" id="page-debt">
+        <div class="page-head"><h2>Debt / Outstanding</h2></div>
+        <div class="module-grid">
+          <div class="form-card-stack">
+            <div class="card glass form-card">
+              <h3 id="debt-form-title">Add Debt Record</h3>
+              <form id="debts-form">
+                <input type="hidden" id="debts-id">
+                <label>Person Name</label>
+                <div class="autosuggest-wrap">
+                  <input type="text" id="debts-person" required autocomplete="off">
+                  <div class="autosuggest-dropdown" id="debts-person-suggestions"></div>
+                </div>
+                <div class="prev-record-panel" id="debts-prev-panel" style="display:none"></div>
+
+                <label>Description</label>
+                <input type="text" id="debts-description" placeholder="Optional description">
+
+                <label>Total Amount (<span id="debts-total_amount-unit">AED</span>)</label>
+                <div class="dual-currency-toggle" data-field="debts-total_amount">
+                  <button type="button" class="dc-btn active" data-cur="AED">AED</button>
+                  <button type="button" class="dc-btn" data-cur="INR">INR</button>
+                </div>
+                <div class="currency-pair">
+                  <input type="number" id="debts-total_amount" step="0.01" min="0" required>
+                  <div class="currency-box" id="debts-total_amount-box">
+                    <span class="currency-box-tag" id="debts-total_amount-tag">≈ INR</span>
+                    <span class="currency-box-value" id="debts-total_amount-value">0.00</span>
+                  </div>
+                </div>
+
+                <label>Already Paid (<span id="debts-paid_amount-unit">AED</span>)</label>
+                <div class="dual-currency-toggle" data-field="debts-paid_amount">
+                  <button type="button" class="dc-btn active" data-cur="AED">AED</button>
+                  <button type="button" class="dc-btn" data-cur="INR">INR</button>
+                </div>
+                <div class="currency-pair">
+                  <input type="number" id="debts-paid_amount" step="0.01" min="0" value="0">
+                  <div class="currency-box" id="debts-paid_amount-box">
+                    <span class="currency-box-tag" id="debts-paid_amount-tag">≈ INR</span>
+                    <span class="currency-box-value" id="debts-paid_amount-value">0.00</span>
+                  </div>
+                </div>
+
+                <label>Monthly Installment / Monthly Paid Amount (<span id="debts-monthly_payment-unit">AED</span>)</label>
+                <div class="dual-currency-toggle" data-field="debts-monthly_payment">
+                  <button type="button" class="dc-btn active" data-cur="AED">AED</button>
+                  <button type="button" class="dc-btn" data-cur="INR">INR</button>
+                </div>
+                <div class="currency-pair">
+                  <input type="number" id="debts-monthly_payment" step="0.01" min="0" value="0" placeholder="e.g. 500" required>
+                  <div class="currency-box" id="debts-monthly_payment-box">
+                    <span class="currency-box-tag" id="debts-monthly_payment-tag">≈ INR</span>
+                    <span class="currency-box-value" id="debts-monthly_payment-value">0.00</span>
+                  </div>
+                </div>
+                <p class="field-hint">This is the amount actually due each month — used by the Salary Planner &amp; Allocation Breakdown instead of the full debt amount.</p>
+
+                <label>Due Date</label>
+                <input type="date" id="debts-due_date">
+                <div class="field-row">
+                  <div><label>Date</label><input type="date" id="debts-date" required></div>
+                  <div><label>Time</label><input type="time" id="debts-time"></div>
+                </div>
+                <label>Notes</label>
+                <textarea id="debts-notes" rows="2"></textarea>
+                <div class="form-actions">
+                  <button type="submit" class="btn-primary">Save</button>
+                  <button type="button" class="btn-ghost" id="debts-cancel" style="display:none">Cancel Edit</button>
+                </div>
+              </form>
+            </div>
+
+            <div class="card glass form-card">
+              <h3>Log a Payment</h3>
+              <form id="debts-payment-form">
+                <label>Person Name</label>
+                <div class="autosuggest-wrap">
+                  <input type="text" id="debts-payment-name" placeholder="Start typing to find a saved debt…" autocomplete="off" required>
+                  <div class="autosuggest-dropdown" id="debts-payment-suggestions"></div>
+                </div>
+                <input type="hidden" id="debts-payment-record-id">
+                <div class="prev-record-panel" id="debts-payment-prev-panel" style="display:none"></div>
+
+                <label>Payment Amount (<span id="debts-payment-amount-unit">AED</span>)</label>
+                <div class="dual-currency-toggle" data-field="debts-payment-amount">
+                  <button type="button" class="dc-btn active" data-cur="AED">AED</button>
+                  <button type="button" class="dc-btn" data-cur="INR">INR</button>
+                </div>
+                <div class="currency-pair">
+                  <input type="number" id="debts-payment-amount" step="0.01" min="0" required>
+                  <div class="currency-box" id="debts-payment-amount-box">
+                    <span class="currency-box-tag" id="debts-payment-amount-tag">≈ INR</span>
+                    <span class="currency-box-value" id="debts-payment-amount-value">0.00</span>
+                  </div>
+                </div>
+                <div class="field-row">
+                  <div><label>Date</label><input type="date" id="debts-payment-date" required></div>
+                  <div><label>Time</label><input type="time" id="debts-payment-time"></div>
+                </div>
+                <label>Notes</label>
+                <textarea id="debts-payment-notes" rows="2"></textarea>
+                <div class="form-actions">
+                  <button type="submit" class="btn-primary" id="debts-payment-submit" disabled>Log Payment</button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <div class="card glass table-card">
+            <div class="table-card-head">
+              <h3>Outstanding Records</h3>
+              <input type="search" class="table-search" id="debts-search" placeholder="Search…">
+            </div>
+            <div class="running-total">Total Outstanding: <strong id="debts-total">AED 0.00</strong></div>
+            <div class="table-wrap">
+              <table><thead><tr><th>Person</th><th>Total Amount</th><th>Paid Amount</th><th>Pending Amount</th><th>Monthly Payment</th><th>Due</th><th></th></tr></thead>
+              <tbody id="debts-tbody"></tbody></table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ REPORTS ============ -->
+      <section class="page" id="page-reports">
+        <div class="page-head"><h2>Reports</h2></div>
+        <div class="report-grid">
+          <div class="card glass report-card">
+            <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 21V9M12 21V3M20 21v-6"/></svg>
+            <h3>Monthly Report</h3>
+            <p>Full breakdown of this month's income, expenses and balances.</p>
+            <button class="btn-primary" data-report="monthly">Generate PDF</button>
+          </div>
+          <div class="card glass report-card">
+            <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>
+            <h3>Yearly Report</h3>
+            <p>Complete annual summary across every module.</p>
+            <button class="btn-primary" data-report="yearly">Generate PDF</button>
+          </div>
+          <div class="card glass report-card">
+            <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.9 6.6L22 9.3l-5 4.8L18.2 21 12 17.3 5.8 21 7 14.1 2 9.3l7.1-.7z"/></svg>
+            <h3>Complete Report</h3>
+            <p>Everything ever recorded, in one master document.</p>
+            <button class="btn-primary" data-report="complete">Generate PDF</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ NOTES ============ -->
+      <section class="page" id="page-notes">
+        <div class="page-head"><h2>Notes</h2></div>
+        <div class="module-grid">
+          <div class="card glass form-card">
+            <h3 id="notes-form-title">Add Note</h3>
+            <form id="notes-form">
+              <input type="hidden" id="notes-id">
+              <label>Title</label>
+              <input type="text" id="notes-title" required>
+              <label>Content</label>
+              <textarea id="notes-content" rows="5"></textarea>
+              <div class="field-row">
+                <div><label>Date</label><input type="date" id="notes-date" required></div>
+                <div><label>Time</label><input type="time" id="notes-time"></div>
+              </div>
+              <div class="form-actions">
+                <button type="submit" class="btn-primary">Save</button>
+                <button type="button" class="btn-ghost" id="notes-cancel" style="display:none">Cancel Edit</button>
+              </div>
+            </form>
+          </div>
+          <div class="card glass table-card">
+            <div class="table-card-head">
+              <h3>All Notes</h3>
+              <input type="search" class="table-search" id="notes-search" placeholder="Search…">
+            </div>
+            <div id="notes-list" class="notes-list"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ CALCULATOR ============ -->
+      <section class="page" id="page-calculator">
+        <div class="page-head"><h2>Calculator</h2></div>
+        <div class="calc-grid">
+          <div class="card glass calc-card">
+            <h3>Simple Calculator</h3>
+            <div class="calc-display" id="calcDisplay">0</div>
+            <div class="calc-buttons" id="calcButtons"></div>
+          </div>
+
+          <div class="card glass calc-card">
+            <h3>AED ↔ INR Calculator</h3>
+            <label>Amount</label>
+            <input type="number" id="convAmount" value="100" step="0.01">
+            <label>From</label>
+            <select id="convFrom"><option value="AED">AED</option><option value="INR">INR</option></select>
+            <label>To</label>
+            <select id="convTo"><option value="INR">INR</option><option value="AED">AED</option></select>
+            <div class="calc-result" id="convResult">—</div>
+          </div>
+
+          <div class="card glass calc-card">
+            <h3>Savings Calculator</h3>
+            <label>Monthly Contribution</label>
+            <input type="number" id="savCalcMonthly" value="500" step="0.01">
+            <label>Months</label>
+            <input type="number" id="savCalcMonths" value="12" step="1">
+            <label>Annual Interest % (optional)</label>
+            <input type="number" id="savCalcRate" value="0" step="0.01">
+            <div class="calc-result" id="savCalcResult">—</div>
+          </div>
+
+          <div class="card glass calc-card">
+            <h3>EMI Calculator</h3>
+            <label>Loan Amount</label>
+            <input type="number" id="emiCalcPrincipal" value="10000" step="0.01">
+            <label>Annual Interest %</label>
+            <input type="number" id="emiCalcRate" value="5" step="0.01">
+            <label>Tenure (months)</label>
+            <input type="number" id="emiCalcMonths" value="12" step="1">
+            <div class="calc-result" id="emiCalcResult">—</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ ABOUT ============ -->
+      <section class="page" id="page-about">
+        <div class="page-head"><h2>About &amp; Financial Advice</h2></div>
+        <div class="about-grid">
+          <div class="card glass about-card">
+            <h3>Financial Health</h3>
+            <div class="health-badge" id="healthBadge">—</div>
+            <p id="motivationalText" class="motivational-text"></p>
+          </div>
+          <div class="card glass about-card">
+            <h3>Smart Tips</h3>
+            <ul id="tipsList" class="tips-list"></ul>
+          </div>
+          <div class="card glass about-card">
+            <h3>About AZRET MANAGE PLAN</h3>
+            <p>AZRET MANAGE PLAN is a private, offline-first personal finance dashboard built for a single household. All data stays in a local SQLite database on this device — nothing is sent anywhere.</p>
+            <p class="footer-credit">Powered by AZRET</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ SETTINGS ============ -->
+      <section class="page" id="page-settings">
+        <div class="page-head"><h2>Settings</h2></div>
+        <div class="settings-grid">
+          <div class="card glass">
+            <h3>Branding</h3>
+            <div class="branding-row">
+              <div class="branding-preview" id="brandingPreview">
+                <img src="{{ url_for('static', filename='icons/logo-mark.png') }}" alt="AZRET MANAGE PLAN logo">
+              </div>
+              <div class="branding-actions">
+                <label class="btn-secondary file-label">Upload Custom Logo
+                  <input type="file" id="logoFile" accept=".png,.jpg,.jpeg,.svg,.webp" hidden>
+                </label>
+                <button class="btn-ghost" id="btnResetLogo">Reset to Default</button>
+                <p class="branding-hint">PNG, JPG, SVG or WEBP · up to 2MB · applies to header, splash &amp; favicon</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="card glass">
+            <h3>Splash Screen Video</h3>
+            <div class="branding-row">
+              <div class="branding-preview branding-preview-video" id="splashVideoPreviewWrap">
+                <video id="splashVideoPreview" muted loop autoplay playsinline></video>
+              </div>
+              <div class="branding-actions">
+                <label class="btn-secondary file-label">Upload Custom Video
+                  <input type="file" id="splashVideoFile" accept=".mp4,.webm,.mov" hidden>
+                </label>
+                <button class="btn-ghost" id="btnResetSplashVideo">Reset to Default</button>
+                <p class="branding-hint">MP4, WEBM or MOV · up to 30MB · plays on launch, before the dashboard</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="card glass">
+            <h3>Appearance</h3>
+            <div class="settings-row">
+              <span>Theme</span>
+              <div class="segmented" id="settingsThemeSwitch">
+                <button data-theme="light" class="active">Light</button>
+                <button data-theme="dark">Dark</button>
+              </div>
+            </div>
+            <div class="settings-row">
+              <span>Default Currency</span>
+              <div class="segmented" id="settingsCurrencySwitch">
+                <button data-currency="AED" class="active">AED</button>
+                <button data-currency="INR">INR</button>
+              </div>
+            </div>
+            <div class="branding-row theme-image-row">
+              <div class="branding-preview branding-preview-theme" id="themeImagePreviewWrap">
+                <span id="themeImagePreviewEmpty">No image set</span>
+              </div>
+              <div class="branding-actions">
+                <label class="btn-secondary file-label">Upload Background Theme Image
+                  <input type="file" id="themeImageFile" accept=".png,.jpg,.jpeg,.webp" hidden>
+                </label>
+                <button class="btn-ghost" id="btnResetThemeImage">Remove Background</button>
+                <p class="branding-hint">PNG, JPG or WEBP · up to 8MB · applies behind the whole dashboard</p>
+              </div>
+            </div>
+            <div class="branding-row theme-video-row">
+              <div class="branding-preview branding-preview-theme" id="themeVideoPreviewWrap">
+                <span id="themeVideoPreviewEmpty">No video set</span>
+                <video id="themeVideoPreview" muted loop autoplay playsinline style="max-width:100%;max-height:156px;display:block;margin-top:0.5rem;"></video>
+              </div>
+              <div class="branding-actions">
+                <label class="btn-secondary file-label">Upload Background Theme Video
+                  <input type="file" id="themeVideoFile" accept=".mp4,.webm" hidden>
+                </label>
+                <button class="btn-ghost" id="btnResetThemeVideo">Remove Video</button>
+                <p class="branding-hint">MP4 or WEBM · up to 30MB · plays behind the whole dashboard</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="card glass">
+            <h3>Data Management</h3>
+            <div class="settings-actions">
+              <button class="btn-secondary" id="btnBackup">Backup Database</button>
+              <label class="btn-secondary file-label">Restore Database
+                <input type="file" id="restoreFile" accept=".db" hidden>
+              </label>
+              <button class="btn-secondary" id="btnExport">Export Data (JSON)</button>
+              <label class="btn-secondary file-label">Import Data
+                <input type="file" id="importFile" accept=".json" hidden>
+              </label>
+              <button class="btn-danger" id="btnClearAll">Clear All Data</button>
+            </div>
+          </div>
+
+          <div class="card glass">
+            <h3>Profile</h3>
+            <form id="usernameForm">
+              <label>Username</label>
+              <input type="text" id="profileUsername" maxlength="40" required placeholder="e.g. Ijas">
+              <div class="form-actions">
+                <button type="submit" class="btn-primary">Save Username</button>
+              </div>
+              <p id="usernameMsg" class="form-error" style="display:none;"></p>
+            </form>
+          </div>
+
+          <div class="card glass">
+            <h3>Change Password</h3>
+            <form id="passwordForm">
+              <label>Current Password</label>
+              <input type="password" id="currentPassword" required>
+              <label>New Password</label>
+              <input type="password" id="newPassword" required minlength="4">
+              <div class="form-actions">
+                <button type="submit" class="btn-primary">Update Password</button>
+              </div>
+              <p id="passwordMsg" class="form-error" style="display:none;"></p>
+            </form>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <footer class="app-footer">
+      <span>AZRET MANAGE PLAN</span> · <span id="footerYear"></span> · Powered by AZRET · 100% Local &amp; Private
+    </footer>
+  </div>
+</div>
+
+<!-- Phase 3: shared Payment History modal (EMI + Debt) -->
+<div id="payment-history-modal" class="ph-modal-overlay" style="display:none">
+  <div class="ph-modal card glass">
+    <div class="ph-modal-head">
+      <h3 id="ph-modal-title">Payment History</h3>
+      <button type="button" class="ph-modal-close" id="ph-modal-close" aria-label="Close">&times;</button>
+    </div>
+    <div class="ph-modal-summary" id="ph-modal-summary"></div>
+    <div class="ph-modal-list" id="ph-modal-list"></div>
+  </div>
+</div>
+
+<!-- Gemini AI Assistant Modal: Chat & Live Voice Call -->
+<div id="voiceAssistantModal" class="ai-modal-overlay" style="display:none">
+  <div class="ai-modal card glass gemini-assistant-modal">
+    <div class="ai-modal-head">
+      <div class="ai-modal-head-left">
+        <img src="/static/icons/logo-mark.png" alt="AZRET Gemini" style="width:34px;height:34px;margin-right:10px;vertical-align:middle">
+        <div style="display:inline-block;vertical-align:middle">
+          <h3 style="margin:0;font-size:16px;display:flex;align-items:center;gap:6px;">
+            zuooi Ai <span class="gemini-badge">Gemini AI</span>
+          </h3>
+        </div>
+      </div>
+      
+      <div class="ai-modal-mode-selector">
+        <button type="button" class="gemini-mode-btn active" id="modeChatBtn" data-mode="chat">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+          <span>Chat</span>
+        </button>
+        <button type="button" class="gemini-mode-btn" id="modeLiveBtn" data-mode="live">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z"/></svg>
+          <span>Live Call</span>
+        </button>
+      </div>
+
+      <div class="ai-modal-head-right">
+        <div class="currency-switch lang-switch" id="voiceAssistantLangToggle" title="Switch Language">
+          <button type="button" class="cur-opt active" data-lang="en">EN</button>
+          <button type="button" class="cur-opt" data-lang="ml">ML</button>
+        </div>
+        <button type="button" class="ph-modal-close" id="voiceAssistantClose" aria-label="Close">&times;</button>
+      </div>
+    </div>
+
+    <!-- Mode 1: Gemini Chat View -->
+    <div id="geminiChatView" class="gemini-view-container">
+      <div id="geminiChatMessages" class="gemini-chat-messages">
+        <div class="gemini-msg bot">
+          <div class="gemini-avatar">✨</div>
+          <div class="gemini-bubble">
+            <p id="geminiWelcomeText">Hello! I am zuooi Ai, your Gemini AI Assistant &amp; Financial Advisor. Ask me anything in English or Malayalam — about your finances, budget, or general questions!</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="gemini-suggestions">
+        <button type="button" class="suggest-chip" data-query="What is my current net balance?">💰 Net Balance</button>
+        <button type="button" class="suggest-chip" data-query="Summary of my pending EMIs and debts">📊 EMI &amp; Debts</button>
+        <button type="button" class="suggest-chip" data-query="എന്റെ മാസത്തെ വരുമാനവും ചിലവും എത്രയാണ്?">Malayalam Status</button>
+        <button type="button" class="suggest-chip" data-query="How can I save more this month?">💡 Budget Advice</button>
+      </div>
+
+      <form id="geminiChatForm" class="gemini-chat-input-row">
+        <button type="button" id="geminiMicBtn" class="icon-btn chat-mic-btn" title="Speak message">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 1.5a4.5 4.5 0 00-4.5 4.5v3a4.5 4.5 0 009 0V6a4.5 4.5 0 00-4.5-4.5z"/>
+            <path d="M5.5 10.5A6.5 6.5 0 0012 17a6.5 6.5 0 006.5-6.5"/>
+            <path d="M12 17v4M8 21h8"/>
+          </svg>
+        </button>
+        <input type="text" id="geminiChatInput" placeholder="Ask Gemini about your finances… (Malayalam/English)" autocomplete="off">
+        <button type="submit" id="geminiSendBtn" class="btn-primary chat-send-btn">
+          <span>Send</span>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+        </button>
+      </form>
+    </div>
+
+    <!-- Mode 2: Gemini Live Voice Call View -->
+    <div id="geminiLiveView" class="gemini-view-container" style="display:none">
+      <div class="live-call-body">
+        <div class="live-orb-wrapper">
+          <div id="liveOrb" class="live-orb">
+            <div class="live-orb-core">
+              <svg viewBox="0 0 24 24" width="38" height="38" fill="none" stroke="#ffffff" stroke-width="2">
+                <path d="M12 2a10 10 0 100 20 10 10 0 000-20z"/>
+                <path d="M12 6v12M6 12h12"/>
+              </svg>
+            </div>
+            <div class="live-wave-ring r1"></div>
+            <div class="live-wave-ring r2"></div>
+            <div class="live-wave-ring r3"></div>
+          </div>
+        </div>
+
+        <div class="live-status-wrap">
+          <div id="liveCallStatus" class="live-status-title">Live Call Standby</div>
+          <div id="liveCallTimer" class="live-call-timer">00:00</div>
+        </div>
+
+        <div id="liveTranscriptBox" class="live-transcript-box">
+          <p id="liveTranscriptText">Tap "Start Call" to talk directly with AZRET Gemini Advisor in real time.</p>
+        </div>
+
+        <div class="live-call-controls">
+          <button type="button" id="liveMuteBtn" class="live-ctrl-btn" title="Toggle Mute Mic">
+            <svg id="iconMicOn" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2M12 19v3M8 22h8"/></svg>
+            <svg id="iconMicOff" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M1 1l22 22M9 9v3a3 3 0 005.12 2.12M15 9.34V4a3 3 0 00-5.94-.6M17 11a5 5 0 01-1.8 3.82M12 19v3M8 22h8"/></svg>
+          </button>
+
+          <button type="button" id="liveMainCallBtn" class="live-ctrl-btn main-call-btn start">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z"/></svg>
+            <span id="liveCallBtnLabel">Start Call</span>
+          </button>
+
+          <button type="button" id="liveSpeakerBtn" class="live-ctrl-btn active" title="Toggle Speaker Sound">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 010 14.14M15.54 8.46a5 5 0 010 7.07"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Floating 27th Day Salary Notification Banner -->
+<div id="salary27Notification" class="salary-27-toast" style="display:none;">
+  <div class="s27-content">
+    <div class="s27-icon">💰</div>
+    <div class="s27-text">
+      <strong>Salary Notification / സാലറി നോട്ടിഫിക്കേഷൻ</strong>
+      <p>Today is the 27th! Did you receive your salary today? / ഇന്ന് 27-ാം തീയതിയാണ്, ശമ്പളം ലഭിച്ചോ?</p>
+    </div>
+  </div>
+  <div class="s27-actions">
+    <button type="button" id="s27YesBtn" class="btn-primary s27-btn">Yes / ലഭിച്ചു</button>
+    <button type="button" id="s27NoBtn" class="btn-ghost s27-btn">No / ലഭിച്ചില്ല</button>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+<script src="/static/js/app.js?v=2.1"></script>
+</body>
+</html>

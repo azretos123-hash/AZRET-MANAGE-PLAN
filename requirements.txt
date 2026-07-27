@@ -1,0 +1,8 @@
+Flask==3.0.3
+Flask-Session==0.8.0
+Werkzeug==3.0.3
+gunicorn==22.0.0
+google-genai
+fpdf==1.7.2
+requests==2.31.0
+python-dotenv==1.0.1
