@@ -2,6 +2,22 @@
    AZRET MANAGE PLAN — Application Logic
    ========================================================================== */
 
+/* Security: attach CSRF token to every same-origin state-changing fetch. */
+const AZRET_CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+const _azretFetch = window.fetch.bind(window);
+window.fetch = function(input, init = {}) {
+  const requestUrl = typeof input === 'string' ? input : (input && input.url) || '';
+  let sameOrigin = true;
+  try { sameOrigin = new URL(requestUrl, window.location.href).origin === window.location.origin; } catch (_) {}
+  const method = String(init.method || (typeof input !== 'string' && input && input.method) || 'GET').toUpperCase();
+  if (sameOrigin && ['POST','PUT','PATCH','DELETE'].includes(method)) {
+    const headers = new Headers(init.headers || (typeof input !== 'string' && input && input.headers) || undefined);
+    if (AZRET_CSRF_TOKEN) headers.set('X-CSRF-Token', AZRET_CSRF_TOKEN);
+    init = { ...init, headers };
+  }
+  return _azretFetch(input, init);
+};
+
 const state = {
   currency: localStorage.getItem('azret_currency') || 'AED',
   theme: localStorage.getItem('azret_theme') || 'light',
@@ -17,7 +33,8 @@ const state = {
   aiListening: false,      // true while SpeechRecognition is actively listening
   aiRecognition: null,     // the active SpeechRecognition instance, if any
   emiFullyPaidAlertShown: false,
-  username: 'Ijas',        // display name, kept in sync with the users table
+  username: 'User',        // display name, kept in sync with the users table
+  userId: null,             // authenticated account id; used to namespace device-local preferences
 };
 
 /** Same palette as AzretCharts, kept in sync so the allocation list
@@ -94,7 +111,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupDailyReminder();
   setupVoiceSynthesis();
   setupVoiceAssistant();
-  check27thSalaryNotification();
 
   document.getElementById('footerYear').textContent = new Date().getFullYear();
   updateGreetingClock();
@@ -102,6 +118,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   await loadServerSettings();
   await loadProfile();
+  check27thSalaryNotification();
   await loadBranding();
   await refreshExchangeRate(true);
 
@@ -170,12 +187,15 @@ async function loadProfile() {
   try {
     const res = await fetch('/api/profile');
     const data = await res.json();
+    if (data.user_id != null) state.userId = String(data.user_id);
     if (data.username) {
       state.username = data.username;
       updateGreetingClock();
       const input = document.getElementById('profileUsername');
       if (input && document.activeElement !== input) input.value = data.username;
     }
+    const emailInput = document.getElementById('profileEmail');
+    if (emailInput && data.email && document.activeElement !== emailInput) emailInput.value = data.email;
   } catch (e) { /* offline: keep local/default username */ }
 }
 
@@ -207,6 +227,22 @@ function setupSidebar() {
     });
   });
 
+  // Mobile bottom navigation: quick access to the most-used finance pages.
+  document.querySelectorAll('.mobile-nav-item[data-mobile-page]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const page = btn.dataset.mobilePage;
+      document.querySelectorAll('.nav-item').forEach(b => b.classList.toggle('active', b.dataset.page === page));
+      loadPage(page);
+      closeSidebar();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  });
+  const mobileMoreBtn = document.getElementById('mobileMoreBtn');
+  if (mobileMoreBtn) mobileMoreBtn.addEventListener('click', () => {
+    sidebar.classList.add('open');
+    overlay.classList.add('show');
+  });
+
   document.getElementById('logoutBtn').addEventListener('click', async () => {
     await fetch('/api/logout', { method: 'POST' });
     window.location.href = '/login';
@@ -218,6 +254,7 @@ function setupSidebar() {
 }
 
 async function loadPage(page) {
+  document.querySelectorAll('.mobile-nav-item[data-mobile-page]').forEach(b => b.classList.toggle('active', b.dataset.mobilePage === page));
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   const target = document.getElementById('page-' + page);
   if (target) target.classList.add('active');
@@ -276,7 +313,7 @@ async function runGlobalSearch(q) {
         const amount = item.amount !== undefined ? fmt(item.amount) :
                         item.total_amount !== undefined ? fmt(item.total_amount) :
                         item.total !== undefined ? fmt(item.total) : '';
-        return `<div class="gsr-item"><div class="gsr-mod">${item.module.replace('_', ' ')}</div>${label} ${amount ? '· ' + amount : ''}</div>`;
+        return `<div class="gsr-item"><div class="gsr-mod">${escapeHtml(String(item.module || '').replace('_', ' '))}</div>${escapeHtml(String(label))} ${amount ? '· ' + escapeHtml(String(amount)) : ''}</div>`;
       }).join('');
     }
     resultsBox.classList.add('show');
@@ -301,14 +338,16 @@ function applyBranding(logoUrl) {
   const targets = ['sidebarLogo', 'splashLogo', 'brandingPreview'];
   targets.forEach(id => {
     const el = document.getElementById(id);
-    if (!el) return;
-    if (logoUrl) {
-      el.innerHTML = `<img src="${logoUrl}" alt="Logo">`;
-    }
+    if (!el || !logoUrl) return;
+    el.textContent = '';
+    const img = document.createElement('img');
+    img.src = String(logoUrl);
+    img.alt = 'Logo';
+    el.appendChild(img);
   });
   if (logoUrl) {
     const fav = document.getElementById('faviconLink');
-    if (fav) fav.href = logoUrl;
+    if (fav) fav.href = String(logoUrl);
   }
 }
 
@@ -808,6 +847,9 @@ let liveSpeakerOn = true;
 let liveCallTimerInterval = null;
 let liveCallSeconds = 0;
 let geminiCurrentMode = 'chat'; // 'chat' or 'live'
+let geminiHistoryLoaded = false;
+let geminiRequestInFlight = false;
+let liveTurnSerial = 0;
 
 function setupVoiceAssistant() {
   const openBtn = document.getElementById('assistantBtn');
@@ -816,8 +858,10 @@ function setupVoiceAssistant() {
   const langToggle = document.getElementById('voiceAssistantLangToggle');
   const modeChatBtn = document.getElementById('modeChatBtn');
   const modeLiveBtn = document.getElementById('modeLiveBtn');
+  const clearBtn = document.getElementById('clearGeminiChatBtn');
 
   if (openBtn) openBtn.addEventListener('click', openGeminiModal);
+  if (clearBtn) clearBtn.addEventListener('click', clearGeminiConversation);
   if (closeBtn) closeBtn.addEventListener('click', closeGeminiModal);
   if (modal) {
     modal.addEventListener('click', (e) => {
@@ -844,9 +888,9 @@ function setupVoiceAssistant() {
         const welcomeEl = document.getElementById('geminiWelcomeText');
         if (welcomeEl) {
           if (state.voiceLanguage === 'ml-IN') {
-            welcomeEl.textContent = 'നമസ്കാരം! ഞാൻ നിങ്ങളുടെ അസ്രെറ്റ് ജമിനി ഫിനാൻഷ്യൽ അഡ്വൈസർ ആണ്. നിങ്ങളുടെ ബാലൻസ്, ഇ.എം.ഐ, ചിലവുകൾ, അല്ലെങ്കിൽ ബജറ്റ് പ്ലാനിംഗ് എന്നിവയെ കുറിച്ച് ചോദിക്കാം.';
+            welcomeEl.textContent = 'നമസ്കാരം! ഞാൻ zuooi Ai ആണ്. ഫിനാൻസ് ഉൾപ്പെടെ സാധാരണ ചോദ്യങ്ങളും ടെക്‌നോളജി, യാത്ര, ആശയങ്ങൾ, കണക്കുകൾ തുടങ്ങിയ കാര്യങ്ങളും ചോദിക്കാം.';
           } else {
-            welcomeEl.textContent = 'Hello! I am your AZRET Gemini Financial Advisor. Ask me anything about your net balance, EMIs, expenses, savings goals, or budget planning in English or Malayalam.';
+            welcomeEl.textContent = 'Hello! I am zuooi Ai, powered by Gemini. Ask me general questions or questions about your AZRET finances in English or Malayalam.';
           }
         }
       });
@@ -883,6 +927,7 @@ function openGeminiModal() {
   if (!modal) return;
   modal.style.display = 'flex';
   document.body.classList.add('modal-open');
+  loadGeminiHistory();
 }
 
 function closeGeminiModal() {
@@ -930,6 +975,48 @@ function getAssistantLanguageKey(languageCode) {
 /* ---------------------------------------------------------------------- */
 /* Gemini Chat Logic                                                      */
 /* ---------------------------------------------------------------------- */
+async function loadGeminiHistory(force = false) {
+  if (geminiHistoryLoaded && !force) return;
+  try {
+    const res = await fetch('/api/ai-history', { cache: 'no-store' });
+    if (!res.ok) return;
+    const data = await res.json();
+    const history = Array.isArray(data.history) ? data.history : [];
+    const container = document.getElementById('geminiChatMessages');
+    if (!container) return;
+    if (history.length) {
+      container.innerHTML = '';
+      history.forEach(item => {
+        appendGeminiChatMessage(item.role === 'assistant' ? 'bot' : 'user', item.content || '');
+      });
+    }
+    geminiHistoryLoaded = true;
+  } catch (e) {
+    console.warn('Could not load Gemini history', e);
+  }
+}
+
+async function clearGeminiConversation() {
+  speechSynthesis.cancel();
+  stopVoiceAssistantListening();
+  try {
+    const res = await fetch('/api/ai-history', { method: 'DELETE' });
+    if (!res.ok) throw new Error('Clear failed');
+    const container = document.getElementById('geminiChatMessages');
+    if (container) {
+      container.innerHTML = '';
+      appendGeminiChatMessage('bot', state.voiceLanguage === 'ml-IN'
+        ? 'സംഭാഷണ മെമ്മറി ക്ലിയർ ചെയ്തു. പുതിയതായി ചോദിക്കാം.'
+        : 'Conversation memory cleared. You can start a new topic.');
+    }
+    updateLiveTranscript(state.voiceLanguage === 'ml-IN' ? 'സംഭാഷണം ക്ലിയർ ചെയ്തു.' : 'Conversation cleared.');
+    geminiHistoryLoaded = true;
+    toast('Gemini conversation cleared', 'success');
+  } catch (e) {
+    toast('Could not clear Gemini conversation', 'error');
+  }
+}
+
 function setupGeminiChat() {
   const form = document.getElementById('geminiChatForm');
   const input = document.getElementById('geminiChatInput');
@@ -965,23 +1052,38 @@ function setupGeminiChat() {
   });
 }
 
-function sendGeminiChatMessage(text) {
-  appendGeminiChatMessage('user', text);
-  const botMsgId = appendGeminiChatMessage('bot', '✨ Thinking…');
+async function sendGeminiChatMessage(text) {
+  const cleanText = String(text || '').trim();
+  if (!cleanText || geminiRequestInFlight) return;
 
-  fetch('/api/ai-assistant', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query: text, language: getAssistantLanguageKey(state.voiceLanguage), mode: 'chat' }),
-  })
-    .then(res => res.json())
-    .then(data => {
-      const reply = data.response || data.reply || "Sorry, I couldn't process that.";
-      updateGeminiChatMessage(botMsgId, reply, data.language || state.voiceLanguage);
-    })
-    .catch(() => {
-      updateGeminiChatMessage(botMsgId, "Could not connect to Gemini AI server. Please check your network connection.");
+  appendGeminiChatMessage('user', cleanText);
+  const botMsgId = appendGeminiChatMessage('bot', '✨ Thinking…');
+  geminiRequestInFlight = true;
+  const sendBtn = document.getElementById('geminiSendBtn');
+  if (sendBtn) sendBtn.disabled = true;
+
+  try {
+    const res = await fetch('/api/ai-assistant', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: cleanText, language: getAssistantLanguageKey(state.voiceLanguage), mode: 'chat' }),
     });
+    let data = {};
+    try { data = await res.json(); } catch (e) {}
+    if (!res.ok) {
+      const detail = data.hint ? `${data.error || 'Gemini error'}\n${data.hint}` : (data.error || `Gemini request failed (${res.status})`);
+      updateGeminiChatMessage(botMsgId, detail, state.voiceLanguage);
+      return;
+    }
+    const reply = data.response || data.reply;
+    if (!reply) throw new Error('Gemini returned an empty response');
+    updateGeminiChatMessage(botMsgId, reply, data.language || state.voiceLanguage);
+  } catch (err) {
+    updateGeminiChatMessage(botMsgId, `Could not connect to Gemini AI: ${err.message || 'network error'}`, state.voiceLanguage);
+  } finally {
+    geminiRequestInFlight = false;
+    if (sendBtn) sendBtn.disabled = false;
+  }
 }
 
 function appendGeminiChatMessage(role, text) {
@@ -1146,7 +1248,7 @@ function startLiveCall() {
     updateLiveStatus('Live Connected 🟢');
     const welcome = state.voiceLanguage === 'ml-IN'
       ? 'നമസ്കാരം! അസ്രെറ്റ് ലൈവ് കോളിലേക്ക് സ്വാഗതം. നിങ്ങളുടെ ചോദ്യം ചോദിക്കാം.'
-      : "Hello! Connected to AZRET Gemini Live Voice Advisor. Go ahead, ask me anything about your finances.";
+      : "Hello! Connected to AZRET Gemini voice chat. Ask me anything, including follow-up questions.";
     
     updateLiveTranscript(`AZRET: ${welcome}`);
     if (liveSpeakerOn) {
@@ -1161,6 +1263,7 @@ function startLiveCall() {
 
 function endLiveCall() {
   liveCallActive = false;
+  liveTurnSerial++;
   clearInterval(liveCallTimerInterval);
   liveCallSeconds = 0;
   updateLiveTimerDisplay();
@@ -1208,6 +1311,8 @@ function startLiveCallTurn() {
   }
 
   speechSynthesis.cancel();
+  stopVoiceAssistantListening();
+  const myTurn = ++liveTurnSerial;
   const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   const recognition = new Recognition();
   recognition.continuous = false;
@@ -1219,8 +1324,18 @@ function startLiveCallTurn() {
   if (orb) orb.classList.add('active');
 
   let finalTranscript = '';
+  let hadError = false;
+  let retryScheduled = false;
+  const scheduleRetry = (delay) => {
+    if (retryScheduled || myTurn !== liveTurnSerial || !liveCallActive || liveCallMuted) return;
+    retryScheduled = true;
+    setTimeout(() => {
+      if (myTurn === liveTurnSerial && liveCallActive && !liveCallMuted) startLiveCallTurn();
+    }, delay);
+  };
 
   recognition.onresult = (e) => {
+    if (myTurn !== liveTurnSerial) return;
     let interim = '';
     for (let i = e.resultIndex; i < e.results.length; i++) {
       if (e.results[i].isFinal) finalTranscript += e.results[i][0].transcript;
@@ -1231,44 +1346,56 @@ function startLiveCallTurn() {
   };
 
   recognition.onerror = () => {
-    if (liveCallActive && !liveCallMuted) {
-      setTimeout(startLiveCallTurn, 1500);
-    }
+    hadError = true;
+    if (state.aiRecognition === recognition) state.aiRecognition = null;
+    scheduleRetry(1500);
   };
 
   recognition.onend = () => {
+    if (state.aiRecognition === recognition) state.aiRecognition = null;
+    if (myTurn !== liveTurnSerial || hadError) return;
     const text = finalTranscript.trim();
     if (text) {
       updateLiveStatus('AZRET Thinking… 🧠');
       if (orb) orb.classList.add('speaking');
-      
+
       fetch('/api/ai-assistant', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: text, language: getAssistantLanguageKey(state.voiceLanguage), mode: 'voice' }),
       })
-        .then(res => res.json())
+        .then(async res => {
+          let data = {};
+          try { data = await res.json(); } catch (e) {}
+          if (!res.ok) throw new Error(data.error || data.hint || `Gemini request failed (${res.status})`);
+          return data;
+        })
         .then(data => {
-          const reply = data.response || data.reply || "I am ready for your question.";
+          if (myTurn !== liveTurnSerial || !liveCallActive) return;
+          const reply = data.response || data.reply;
+          if (!reply) throw new Error('Empty Gemini response');
           updateLiveTranscript(`AZRET: ${reply}`);
           if (liveSpeakerOn) {
             updateLiveStatus('AZRET Speaking… 🔊');
             speakVoiceAssistantReply(reply, data.language || state.voiceLanguage, () => {
+              if (myTurn !== liveTurnSerial) return;
               if (orb) orb.classList.remove('speaking');
-              if (liveCallActive && !liveCallMuted) setTimeout(startLiveCallTurn, 600);
+              scheduleRetry(600);
             });
           } else {
             if (orb) orb.classList.remove('speaking');
-            if (liveCallActive && !liveCallMuted) setTimeout(startLiveCallTurn, 1000);
+            scheduleRetry(1000);
           }
         })
-        .catch(() => {
-          updateLiveTranscript("AZRET: Connection error.");
+        .catch((err) => {
+          if (myTurn !== liveTurnSerial || !liveCallActive) return;
+          updateLiveTranscript(`AZRET: ${err.message || 'Gemini connection error.'}`);
+          updateLiveStatus('Gemini connection problem');
           if (orb) orb.classList.remove('speaking');
-          if (liveCallActive && !liveCallMuted) setTimeout(startLiveCallTurn, 2000);
+          scheduleRetry(2500);
         });
-    } else if (liveCallActive && !liveCallMuted) {
-      setTimeout(startLiveCallTurn, 1000);
+    } else {
+      scheduleRetry(1000);
     }
   };
 
@@ -1276,7 +1403,8 @@ function startLiveCallTurn() {
     recognition.start();
     state.aiRecognition = recognition;
   } catch (e) {
-    if (liveCallActive && !liveCallMuted) setTimeout(startLiveCallTurn, 2000);
+    hadError = true;
+    scheduleRetry(2000);
   }
 }
 
@@ -1335,7 +1463,8 @@ function check27thSalaryNotification() {
   if (dayOfMonth !== 27) return;
 
   const dateStr = today.toISOString().slice(0, 10);
-  const answered = localStorage.getItem('salary_asked_' + dateStr);
+  const salaryStorageKey = `salary_asked_${state.userId || state.username || 'account'}_${dateStr}`;
+  const answered = localStorage.getItem(salaryStorageKey);
   if (answered) return;
 
   const notifEl = document.getElementById('salary27Notification');
@@ -1348,7 +1477,7 @@ function check27thSalaryNotification() {
 
   if (yesBtn) {
     yesBtn.onclick = () => {
-      localStorage.setItem('salary_asked_' + dateStr, 'yes');
+      localStorage.setItem(salaryStorageKey, 'yes');
       notifEl.style.display = 'none';
       toast('Great! Opening Income page to log your salary.', 'success');
       loadPage('income');
@@ -1361,7 +1490,7 @@ function check27thSalaryNotification() {
 
   if (noBtn) {
     noBtn.onclick = () => {
-      localStorage.setItem('salary_asked_' + dateStr, 'no');
+      localStorage.setItem(salaryStorageKey, 'no');
       notifEl.style.display = 'none';
       toast('Noted. You can log your salary anytime from Income page.', 'info');
     };
@@ -1527,24 +1656,24 @@ function rowHtml(table, r) {
 
   switch (table) {
     case 'income':
-      return `<tr><td>${r.type}</td><td>${fmt(r.amount)}</td><td>${r.date}</td><td>${escapeHtml(r.notes || '')}</td><td>${actions}</td></tr>`;
+      return `<tr><td>${escapeHtml(r.type || '')}</td><td>${fmt(r.amount)}</td><td>${escapeHtml(r.date || '')}</td><td>${escapeHtml(r.notes || '')}</td><td>${actions}</td></tr>`;
     case 'expenses':
-      return `<tr><td>${escapeHtml(r.name)}</td><td>${escapeHtml(r.category)}</td><td>${fmt(r.amount)}</td><td>${r.date}</td><td>${actions}</td></tr>`;
+      return `<tr><td>${escapeHtml(r.name)}</td><td>${escapeHtml(r.category)}</td><td>${fmt(r.amount)}</td><td>${escapeHtml(r.date || '')}</td><td>${actions}</td></tr>`;
     case 'savings':
-      return `<tr><td>${r.type}</td><td>${fmt(r.amount)}</td><td>${r.date}</td><td>${escapeHtml(r.notes || '')}</td><td>${actions}</td></tr>`;
+      return `<tr><td>${escapeHtml(r.type || '')}</td><td>${fmt(r.amount)}</td><td>${escapeHtml(r.date || '')}</td><td>${escapeHtml(r.notes || '')}</td><td>${actions}</td></tr>`;
     case 'family_transfers':
-      return `<tr><td>${escapeHtml(r.receiver)}</td><td>${fmt(r.amount)}</td><td>${r.date}</td><td>${escapeHtml(r.notes || '')}</td><td>${actions}</td></tr>`;
+      return `<tr><td>${escapeHtml(r.receiver)}</td><td>${fmt(r.amount)}</td><td>${escapeHtml(r.date || '')}</td><td>${escapeHtml(r.notes || '')}</td><td>${actions}</td></tr>`;
     case 'emi': {
       const pending = Math.max(0, (r.amount || 0) - (r.paid || 0));
-      return `<tr><td>${escapeHtml(r.name)}</td><td>${escapeHtml(r.category)}</td><td>${fmt(r.amount)}</td><td>${fmt(r.paid)}</td><td>${fmt(pending)}</td><td>${fmt(r.monthly_payment)}</td><td>${r.date}</td><td>${actions}</td></tr>`;
+      return `<tr><td>${escapeHtml(r.name)}</td><td>${escapeHtml(r.category)}</td><td>${fmt(r.amount)}</td><td>${fmt(r.paid)}</td><td>${fmt(pending)}</td><td>${fmt(r.monthly_payment)}</td><td>${escapeHtml(r.date || '')}</td><td>${actions}</td></tr>`;
     }
     case 'debts': {
       const remaining = Math.max(0, (r.total_amount || 0) - (r.paid_amount || 0));
-      return `<tr><td>${escapeHtml(r.person)}</td><td>${fmt(r.total_amount)}</td><td>${fmt(r.paid_amount)}</td><td>${fmt(remaining)}</td><td>${fmt(r.monthly_payment)}</td><td>${r.due_date || '—'}</td><td>${actions}</td></tr>`;
+      return `<tr><td>${escapeHtml(r.person)}</td><td>${fmt(r.total_amount)}</td><td>${fmt(r.paid_amount)}</td><td>${fmt(remaining)}</td><td>${fmt(r.monthly_payment)}</td><td>${escapeHtml(r.due_date || '—')}</td><td>${actions}</td></tr>`;
     }
     case 'shopping': {
       const prioClass = { Low: 'low', Medium: 'medium', High: 'high', Urgent: 'urgent' }[r.priority] || 'medium';
-      return `<tr><td>${escapeHtml(r.product_name)}</td><td>${escapeHtml(r.category)}</td><td>${Number(r.quantity) || 0}</td><td>${fmt(r.price)}</td><td>${fmt(r.total)}</td><td><span class="priority-badge ${prioClass}">${escapeHtml(r.priority || 'Medium')}</span></td><td>${r.date}</td><td>${actions}</td></tr>`;
+      return `<tr><td>${escapeHtml(r.product_name)}</td><td>${escapeHtml(r.category)}</td><td>${Number(r.quantity) || 0}</td><td>${fmt(r.price)}</td><td>${fmt(r.total)}</td><td><span class="priority-badge ${prioClass}">${escapeHtml(r.priority || 'Medium')}</span></td><td>${escapeHtml(r.date || '')}</td><td>${actions}</td></tr>`;
     }
     default: return '';
   }
@@ -1653,7 +1782,7 @@ function renderNotes(rows) {
       <h4>${escapeHtml(r.title)}</h4>
       <p>${escapeHtml(r.content || '')}</p>
       <div class="note-meta">
-        <span>${r.date} ${r.time || ''}</span>
+        <span>${escapeHtml(r.date || '')} ${escapeHtml(r.time || '')}</span>
         <div class="row-actions">
           <button data-edit="${r.id}" aria-label="Edit"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg></button>
           <button data-del="${r.id}" class="del-btn" aria-label="Delete"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14z"/></svg></button>
@@ -2387,7 +2516,7 @@ function setupSettingsPage() {
   });
 
   document.getElementById('btnBackup').addEventListener('click', () => {
-    window.open('/api/backup', '_blank');
+    window.open('/api/export', '_blank');
   });
   document.getElementById('btnExport').addEventListener('click', () => {
     window.open('/api/export', '_blank');
@@ -2396,8 +2525,16 @@ function setupSettingsPage() {
   document.getElementById('restoreFile').addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    if (!confirm('Restoring will replace your current database. Continue?')) return;
-    toast('Restore requires replacing instance/azret.db manually — see README for steps.', 'error');
+    if (!confirm('Import this backup into your account? Existing records are kept.')) return;
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+      const res = await fetch('/api/import', { method: 'POST', body: formData });
+      const data = await res.json();
+      if (data.success) { toast('Account backup imported', 'success'); await loadDashboard(); }
+      else toast(data.error || 'Restore failed', 'error');
+    } catch (err) { toast('Restore failed', 'error'); }
+    e.target.value = '';
   });
 
   document.getElementById('importFile').addEventListener('change', async (e) => {
@@ -2458,6 +2595,24 @@ function setupSettingsPage() {
       msg.textContent = 'Network error';
       msg.style.display = 'block';
     }
+  });
+
+
+
+  const emailForm = document.getElementById('emailForm');
+  if (emailForm) emailForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = document.getElementById('profileEmail').value.trim();
+    const msg = document.getElementById('emailMsg');
+    try {
+      const res = await fetch('/api/update-email', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      });
+      const data = await res.json();
+      if (data.success) { msg.style.display = 'none'; toast('Email updated', 'success'); }
+      else { msg.textContent = data.error || 'Could not update email'; msg.style.display = 'block'; }
+    } catch (err) { msg.textContent = 'Network error'; msg.style.display = 'block'; }
   });
 
   document.getElementById('passwordForm').addEventListener('submit', async (e) => {
@@ -2794,7 +2949,7 @@ async function openPaymentHistory(table, id) {
           <div class="ph-payment-item">
             <div>
               <div>${fmt(p.amount)}</div>
-              <div class="ph-date">${p.date} ${p.time || ''}${p.notes ? ' · ' + escapeHtml(p.notes) : ''}</div>
+              <div class="ph-date">${escapeHtml(p.date || '')} ${escapeHtml(p.time || '')}${p.notes ? ' · ' + escapeHtml(p.notes) : ''}</div>
             </div>
           </div>
         `).join('');

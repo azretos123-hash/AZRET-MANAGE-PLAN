@@ -1,7 +1,7 @@
 {
   "name": "azret-manage-plan",
   "version": "1.0.0",
-  "description": "AZRET MANAGE PLAN - Private, offline-first personal finance dashboard",
+  "description": "AZRET MANAGE PLAN - Public multi-user personal finance platform",
   "scripts": {
     "dev": "python3 app.py",
     "build": "python3 -c 'import app'",

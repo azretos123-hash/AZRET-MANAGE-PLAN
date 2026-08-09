@@ -1,7 +1,7 @@
 {
   "name": "AZRET MANAGE PLAN",
   "short_name": "AZRET",
-  "description": "Private, offline-first personal finance management dashboard.",
+  "description": "Public multi-user personal finance management platform.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

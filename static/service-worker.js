@@ -1,25 +1,28 @@
 /* AZRET MANAGE PLAN — Service Worker
-   Caches the app shell so the interface loads instantly and works even
-   without an internet connection. API calls (/api/*) always go to the
-   local Flask server on this device — no internet is required for that
-   either, since the server runs locally.
+   Public multi-user safe caching policy:
+   - Never cache authenticated HTML/navigation responses.
+   - Never cache API responses.
+   - Cache only static app assets.
+   This avoids stale login/dashboard screens and prevents one signed-in view
+   from being replayed after logout on the same device.
 */
 
-const CACHE_NAME = 'azret-shell-v2';
-const APP_SHELL = [
-  '/',
-  '/login',
+const CACHE_NAME = 'azret-static-v9-final';
+const STATIC_ASSETS = [
   '/manifest.json',
   '/static/css/style.css',
   '/static/js/app.js',
   '/static/js/charts.js',
   '/static/icons/icon-192.png',
   '/static/icons/icon-512.png',
+  '/static/icons/logo-mark.png'
 ];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)).catch(() => {})
+    caches.open(CACHE_NAME)
+      .then((cache) => cache.addAll(STATIC_ASSETS))
+      .catch(() => {})
   );
   self.skipWaiting();
 });
@@ -34,32 +37,38 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  const url = new URL(event.request.url);
+  const request = event.request;
+  const url = new URL(request.url);
 
-  // Never cache API calls or exchange-rate lookups — always go live.
-  if (url.pathname.startsWith('/api/') || url.hostname.includes('er-api.com')) {
-    event.respondWith(
-      fetch(event.request).catch(() => new Response(
-        JSON.stringify({ error: 'offline' }),
-        { headers: { 'Content-Type': 'application/json' } }
-      ))
-    );
+  if (request.method !== 'GET') return;
+
+  // Authentication/private data and navigation must always come from server.
+  if (
+    request.mode === 'navigate' ||
+    url.pathname === '/' ||
+    url.pathname === '/login' ||
+    url.pathname === '/splash' ||
+    url.pathname.startsWith('/api/')
+  ) {
+    event.respondWith(fetch(request));
     return;
   }
 
-  // App shell: cache-first, falling back to network, then to cache on failure.
-  event.respondWith(
-    caches.match(event.request).then((cached) => {
-      const networkFetch = fetch(event.request)
+  // Do not interfere with third-party online wallpaper/exchange-rate requests.
+  if (url.origin !== self.location.origin) return;
+
+  // Cache only our static assets. Network-first keeps deployments fresh.
+  if (url.pathname.startsWith('/static/') || url.pathname === '/manifest.json') {
+    event.respondWith(
+      fetch(request)
         .then((response) => {
-          if (response && response.status === 200) {
+          if (response && response.ok) {
             const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
           }
           return response;
         })
-        .catch(() => cached);
-      return cached || networkFetch;
-    })
-  );
+        .catch(() => caches.match(request))
+    );
+  }
 });

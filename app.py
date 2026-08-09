@@ -4,9 +4,15 @@ import json
 import re
 import io
 import time
+import math
+import mimetypes
+import threading
+import secrets
+import hmac
+from collections import defaultdict, deque
 from datetime import datetime
-from flask import Flask, render_template, request, jsonify, redirect, url_for, session, send_file
-from flask_session import Session
+from flask import Flask, render_template, request, jsonify, redirect, url_for, session, send_file, send_from_directory
+from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 import requests
@@ -14,14 +20,46 @@ from fpdf import FPDF
 import database as db
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "azret-manage-plan-secret-key-2026")
-app.config["SESSION_TYPE"] = "filesystem"
+# Render terminates HTTPS at its proxy. ProxyFix lets Flask correctly understand
+# the original scheme/host while still serving behind Gunicorn.
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+_secret = os.environ.get("SECRET_KEY") or os.environ.get("AZRET_SECRET_KEY")
+if os.environ.get("RENDER") and not _secret:
+    raise RuntimeError("SECRET_KEY must be set in Render environment variables")
+app.secret_key = _secret or "local-development-only-change-me"
 app.config["SESSION_PERMANENT"] = True
-app.config["PERMANENT_SESSION_LIFETIME"] = 30 * 24 * 60 * 60  # 30 days
-Session(app)
+app.config["PERMANENT_SESSION_LIFETIME"] = 30 * 24 * 60 * 60
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["SESSION_COOKIE_SECURE"] = bool(os.environ.get("RENDER") or os.environ.get("RENDER_SERVICE_ID")) or os.environ.get("SESSION_COOKIE_SECURE", "0") == "1"
+app.config["MAX_CONTENT_LENGTH"] = 25 * 1024 * 1024
 
 # Initialize database
 db.init_db()
+
+
+def _get_csrf_token():
+    token = session.get('_csrf_token')
+    if not token:
+        token = secrets.token_urlsafe(32)
+        session['_csrf_token'] = token
+    return token
+
+@app.before_request
+def csrf_protect_api_writes():
+    """Require a per-session CSRF token for every state-changing API request.
+
+    SameSite=Lax already blocks most cross-site cookie submission, but an
+    explicit token also protects against same-site/subdomain CSRF and future
+    browser-policy changes. The token is injected into the app/login pages and
+    sent in X-CSRF-Token by the frontend.
+    """
+    if request.path.startswith('/api/') and request.method in {'POST', 'PUT', 'PATCH', 'DELETE'}:
+        expected = _get_csrf_token()
+        supplied = request.headers.get('X-CSRF-Token', '')
+        if not supplied or not hmac.compare_digest(str(supplied), str(expected)):
+            return jsonify({'success': False, 'error': 'Invalid or missing CSRF token'}), 403
+
 
 UPLOAD_FOLDER = os.path.join('static', 'uploads')
 VIDEO_UPLOAD_FOLDER = os.path.join(UPLOAD_FOLDER, 'video')
@@ -31,15 +69,67 @@ THEME_VIDEO_UPLOAD_FOLDER = os.path.join(UPLOAD_FOLDER, 'theme_video')
 for folder in [UPLOAD_FOLDER, VIDEO_UPLOAD_FOLDER, THEME_UPLOAD_FOLDER, THEME_VIDEO_UPLOAD_FOLDER]:
     os.makedirs(folder, exist_ok=True)
 
-ALLOWED_IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'ico'}
+ALLOWED_IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'ico'}
 ALLOWED_VIDEO_EXTENSIONS = {'mp4', 'webm', 'ogg', 'mov', 'm4v'}
 
 def allowed_file(filename, allowed_set):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in allowed_set
 
+ASSET_LIMITS = {
+    'logo': 2 * 1024 * 1024,
+    'theme_image': 5 * 1024 * 1024,
+    'splash_video': 15 * 1024 * 1024,
+    'theme_video': 15 * 1024 * 1024,
+}
+
+# Lightweight abuse protection for a public deployment. This is intentionally
+# in-process because Render is configured for one Gunicorn worker. If the app is
+# later scaled to multiple workers/instances, replace this with a shared limiter.
+_rate_lock = threading.Lock()
+_rate_buckets = defaultdict(deque)
+
+def _rate_limit(bucket, key, limit, window_seconds):
+    now = time.time()
+    token = (bucket, str(key or 'unknown'))
+    with _rate_lock:
+        q = _rate_buckets[token]
+        cutoff = now - window_seconds
+        while q and q[0] <= cutoff:
+            q.popleft()
+        if len(q) >= limit:
+            retry_after = max(1, int(window_seconds - (now - q[0])))
+            return retry_after
+        q.append(now)
+    return 0
+
+def _client_ip():
+    return request.remote_addr or 'unknown'
+
+def _asset_mime(filename):
+    ext = filename.rsplit('.', 1)[1].lower() if '.' in filename else ''
+    mapping = {
+        'png':'image/png','jpg':'image/jpeg','jpeg':'image/jpeg','gif':'image/gif',
+        'webp':'image/webp','ico':'image/x-icon','mp4':'video/mp4','webm':'video/webm',
+        'ogg':'video/ogg','mov':'video/quicktime','m4v':'video/x-m4v'
+    }
+    return mapping.get(ext, 'application/octet-stream')
+
+def _save_asset_upload(file, kind, allowed_extensions):
+    if not file or not file.filename or not allowed_file(file.filename, allowed_extensions):
+        return None, ('Invalid file type', 400)
+    raw = file.read(ASSET_LIMITS[kind] + 1)
+    if len(raw) > ASSET_LIMITS[kind]:
+        return None, (f'File is too large for {kind.replace("_", " ")}', 413)
+    if not raw:
+        return None, ('File is empty', 400)
+    mime = _asset_mime(file.filename)
+    db.save_user_asset(session['user_id'], kind, mime, raw)
+    url = f"/api/assets/{kind}?v={int(time.time())}"
+    return url, None
+
 def login_required(f):
     def wrapper(*args, **kwargs):
-        if not session.get('logged_in'):
+        if not session.get('user_id'):
             if request.path.startswith('/api/'):
                 return jsonify({'error': 'unauthorized'}), 401
             return redirect(url_for('login'))
@@ -47,86 +137,195 @@ def login_required(f):
     wrapper.__name__ = f.__name__
     return wrapper
 
+@app.after_request
+def add_security_headers(response):
+    response.headers.setdefault('X-Content-Type-Options', 'nosniff')
+    response.headers.setdefault('X-Frame-Options', 'SAMEORIGIN')
+    response.headers.setdefault('Referrer-Policy', 'strict-origin-when-cross-origin')
+    response.headers.setdefault('Permissions-Policy', 'camera=(), microphone=(self), geolocation=()')
+    # Never let browsers/shared proxies cache authenticated finance/API responses.
+    # Static assets and the manifest retain their normal cache policy.
+    if request.path.startswith('/api/') or request.path in {'/', '/login', '/splash'}:
+        response.headers['Cache-Control'] = 'no-store, private, max-age=0'
+        response.headers['Pragma'] = 'no-cache'
+    if app.config.get('SESSION_COOKIE_SECURE'):
+        response.headers.setdefault('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
+    return response
+
+
+
+
+@app.route('/manifest.json')
+def manifest_file():
+    response = send_from_directory('static', 'manifest.json', mimetype='application/manifest+json')
+    response.headers['Cache-Control'] = 'public, max-age=3600'
+    return response
+
+
+@app.route('/service-worker.js')
+def service_worker_file():
+    response = send_from_directory('static', 'service-worker.js', mimetype='application/javascript')
+    # Service workers must be revalidated so deployments pick up fixes quickly.
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Service-Worker-Allowed'] = '/'
+    return response
+
+@app.route('/health')
+def health():
+    # Lightweight DB check used by Render health checks.
+    try:
+        conn = db.get_db()
+        cur = conn.cursor()
+        cur.execute('SELECT 1')
+        cur.fetchone()
+        conn.close()
+        info = db.storage_backend_info()
+        return jsonify({'status': 'ok', **info}), 200
+    except Exception as exc:
+        app.logger.error("Database health check failed: %s", exc)
+        return jsonify({'status': 'database_unavailable'}), 503
+
+
 @app.route('/')
 def index():
-    if session.get('logged_in'):
-        return render_template('index.html', start_splash=False)
-    return render_template('login.html')
+    if session.get('user_id'):
+        return render_template('index.html', start_splash=False, csrf_token=_get_csrf_token())
+    return render_template('login.html', csrf_token=_get_csrf_token())
 
 @app.route('/splash')
 @login_required
 def splash():
-    return render_template('index.html', start_splash=True)
+    return render_template('index.html', start_splash=True, csrf_token=_get_csrf_token())
 
 @app.route('/login')
 def login():
-    if session.get('logged_in'):
+    if session.get('user_id'):
         return redirect(url_for('index'))
-    return render_template('login.html')
+    return render_template('login.html', csrf_token=_get_csrf_token())
+
+@app.route('/api/register', methods=['POST'])
+def api_register():
+    retry_after = _rate_limit('register', _client_ip(), 5, 600)
+    if retry_after:
+        return jsonify({'success': False, 'error': 'Too many registration attempts. Please try again later.'}), 429, {'Retry-After': str(retry_after)}
+    data = request.get_json() or {}
+    username = str(data.get('username', '')).strip()
+    email = str(data.get('email', '')).strip().lower()
+    password = str(data.get('password', ''))
+    confirm_password = str(data.get('confirm_password', ''))
+
+    if not (3 <= len(username) <= 40):
+        return jsonify({'success': False, 'error': 'Username must be 3 to 40 characters'}), 400
+    if not re.fullmatch(r"[A-Za-z0-9_.-]+", username):
+        return jsonify({'success': False, 'error': 'Username can contain letters, numbers, dot, dash and underscore only'}), 400
+    if not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", email):
+        return jsonify({'success': False, 'error': 'Enter a valid email address'}), 400
+    if len(email) > 254:
+        return jsonify({'success': False, 'error': 'Email address is too long'}), 400
+    if len(password) < 8:
+        return jsonify({'success': False, 'error': 'Password must be at least 8 characters'}), 400
+    if len(password) > 256:
+        return jsonify({'success': False, 'error': 'Password is too long'}), 400
+    if password != confirm_password:
+        return jsonify({'success': False, 'error': 'Passwords do not match'}), 400
+    if db.get_user_by_username(username):
+        return jsonify({'success': False, 'error': 'Username is already taken'}), 409
+    if db.get_user_by_email(email):
+        return jsonify({'success': False, 'error': 'Email is already registered'}), 409
+
+    user_id = db.create_user(username, email, password)
+    if not user_id:
+        return jsonify({'success': False, 'error': 'Unable to create account'}), 400
+
+    session.clear()
+    session.permanent = True
+    session['user_id'] = user_id
+    session['username'] = username
+    return jsonify({'success': True, 'redirect': url_for('splash')})
+
 
 @app.route('/api/login', methods=['POST'])
 def api_login():
+    retry_after = _rate_limit('login', _client_ip(), 12, 60)
+    if retry_after:
+        return jsonify({'success': False, 'error': 'Too many login attempts. Please wait and try again.'}), 429, {'Retry-After': str(retry_after)}
     data = request.get_json() or {}
-    username = data.get('username', '').strip()
-    password = data.get('password', '')
+    login_value = str(data.get('username', data.get('login', ''))).strip()
+    password = str(data.get('password', ''))
+    if not login_value or len(login_value) > 254 or len(password) > 256:
+        return jsonify({'success': False, 'error': 'Incorrect username/email or password'}), 401
 
-    user = db.get_user_by_username(username)
+    user = db.get_user_by_login(login_value)
     if user and check_password_hash(user['password_hash'], password):
-        session['logged_in'] = True
+        session.clear()
+        session.permanent = True
+        session['user_id'] = user['id']
         session['username'] = user['username']
         return jsonify({'success': True, 'redirect': url_for('splash')})
 
-    return jsonify({'success': False, 'error': 'Incorrect username or password'}), 401
+    return jsonify({'success': False, 'error': 'Incorrect username/email or password'}), 401
+
 
 @app.route('/api/logout', methods=['POST'])
 def api_logout():
     session.clear()
     return jsonify({'success': True})
 
+
 @app.route('/api/profile', methods=['GET'])
 @login_required
 def get_profile():
-    user = db.get_user_by_username(session.get('username', 'Ijas'))
-    return jsonify({'username': user['username'] if user else 'Ijas'})
+    user = db.get_user_by_id(session['user_id'])
+    if not user:
+        session.clear()
+        return jsonify({'error': 'unauthorized'}), 401
+    return jsonify({'user_id': user['id'], 'username': user['username'], 'email': user.get('email', '')})
+
 
 @app.route('/api/update-username', methods=['POST'])
 @login_required
 def update_username():
     data = request.get_json() or {}
-    new_username = data.get('username', '').strip()
-
-    if not new_username:
-        return jsonify({'success': False, 'error': 'Username cannot be empty'}), 400
-
-    if len(new_username) > 40:
-        return jsonify({'success': False, 'error': 'Username is too long (max 40 characters)'}), 400
-
-    current_username = session.get('username', 'Ijas')
-    success = db.update_username(current_username, new_username)
-
+    new_username = str(data.get('username', '')).strip()
+    if not (3 <= len(new_username) <= 40):
+        return jsonify({'success': False, 'error': 'Username must be 3 to 40 characters'}), 400
+    if not re.fullmatch(r"[A-Za-z0-9_.-]+", new_username):
+        return jsonify({'success': False, 'error': 'Username contains unsupported characters'}), 400
+    success = db.update_username(session['user_id'], new_username)
     if success:
         session['username'] = new_username
         return jsonify({'success': True, 'username': new_username})
-
     return jsonify({'success': False, 'error': 'Username already taken or invalid'}), 400
+
+
+@app.route('/api/update-email', methods=['POST'])
+@login_required
+def update_email():
+    data = request.get_json() or {}
+    email = str(data.get('email', '')).strip().lower()
+    if not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", email):
+        return jsonify({'success': False, 'error': 'Enter a valid email address'}), 400
+    if len(email) > 254:
+        return jsonify({'success': False, 'error': 'Email address is too long'}), 400
+    if db.update_email(session['user_id'], email):
+        return jsonify({'success': True, 'email': email})
+    return jsonify({'success': False, 'error': 'Email is already registered'}), 409
+
 
 @app.route('/api/change-password', methods=['POST'])
 @login_required
 def change_password():
     data = request.get_json() or {}
-    current_password = data.get('current_password', '')
-    new_password = data.get('new_password', '')
-
-    username = session.get('username', 'Ijas')
-    user = db.get_user_by_username(username)
-
-    if not user or not check_password_hash(user['password_hash'], current_password):
+    current_password = str(data.get('current_password', ''))
+    new_password = str(data.get('new_password', ''))
+    user = db.get_user_by_login(session.get('username', ''))
+    if not user or user['id'] != session['user_id'] or not check_password_hash(user['password_hash'], current_password):
         return jsonify({'success': False, 'error': 'Current password is incorrect'}), 400
-
-    if len(new_password) < 4:
-        return jsonify({'success': False, 'error': 'New password must be at least 4 characters'}), 400
-
-    db.update_password(username, new_password)
+    if len(new_password) < 8:
+        return jsonify({'success': False, 'error': 'New password must be at least 8 characters'}), 400
+    if len(new_password) > 256:
+        return jsonify({'success': False, 'error': 'New password is too long'}), 400
+    db.update_password(session['user_id'], new_password)
     return jsonify({'success': True})
 
 # Generic CRUD endpoints
@@ -167,9 +366,80 @@ TABLE_CONFIGS = {
 
 NUMERIC_FIELDS = {'amount', 'paid', 'goal', 'total_amount', 'paid_amount', 'monthly_payment', 'quantity', 'price', 'total'}
 
+MAX_FINANCE_VALUE = 1_000_000_000_000_000.0
+TEXT_FIELD_LIMITS = {
+    'type': 120, 'name': 200, 'category': 120, 'receiver': 200,
+    'person': 200, 'description': 2000, 'title': 300, 'content': 12000,
+    'product_name': 500, 'priority': 40, 'notes': 12000,
+}
+
+def _valid_date(value):
+    if value in (None, ''):
+        return True
+    try:
+        datetime.strptime(str(value), '%Y-%m-%d')
+        return True
+    except (ValueError, TypeError):
+        return False
+
+def _valid_time(value):
+    if value in (None, ''):
+        return True
+    text = str(value)
+    for fmt in ('%H:%M', '%H:%M:%S'):
+        try:
+            datetime.strptime(text, fmt)
+            return True
+        except (ValueError, TypeError):
+            pass
+    return False
+
+def _validate_text_dates(payload):
+    for field, limit in TEXT_FIELD_LIMITS.items():
+        if field in payload and payload[field] is not None and len(str(payload[field])) > limit:
+            return f"'{field}' is too long"
+    for field in ('date', 'due_date'):
+        if field in payload and not _valid_date(payload.get(field)):
+            return f"'{field}' must be YYYY-MM-DD"
+    if 'time' in payload and not _valid_time(payload.get('time')):
+        return "'time' must be HH:MM or HH:MM:SS"
+    return None
+
 def get_now_date_time():
     now = datetime.now()
     return now.strftime('%Y-%m-%d'), now.strftime('%H:%M')
+
+
+def _validate_record_integrity(table_name, payload, existing=None):
+    """Normalize derived values and reject financially inconsistent records.
+
+    `payload` contains already parsed values. For updates, `existing` is merged
+    only for cross-field checks; ownership remains enforced separately.
+    """
+    combined = dict(existing or {})
+    combined.update(payload)
+
+    if table_name == 'shopping':
+        qty = float(combined.get('quantity') or 0)
+        price = float(combined.get('price') or 0)
+        if qty <= 0:
+            return "'quantity' must be greater than zero"
+        # Never trust a browser-supplied total; derive it from quantity × price.
+        payload['total'] = round(qty * price, 2)
+
+    if table_name == 'emi':
+        total = float(combined.get('amount') or 0)
+        paid = float(combined.get('paid') or 0)
+        if paid > total + 1e-9:
+            return "'paid' cannot be greater than EMI amount"
+
+    if table_name == 'debts':
+        total = float(combined.get('total_amount') or 0)
+        paid = float(combined.get('paid_amount') or 0)
+        if paid > total + 1e-9:
+            return "'paid_amount' cannot be greater than total debt"
+
+    return None
 
 @app.route('/api/<table_name>', methods=['GET'])
 @login_required
@@ -181,7 +451,7 @@ def get_records(table_name):
     month = request.args.get('month', '').strip()
     year = request.args.get('year', '').strip()
 
-    records = db.fetch_all(table_name, search=search, month=month, year=year)
+    records = db.fetch_all(table_name, session['user_id'], search=search, month=month, year=year)
     return jsonify(records)
 
 @app.route('/api/<table_name>', methods=['POST'])
@@ -207,14 +477,27 @@ def create_record(table_name):
         if field in NUMERIC_FIELDS:
             try:
                 val = float(val) if val is not None else 0.0
-            except ValueError:
-                val = 0.0
+            except (ValueError, TypeError):
+                return jsonify({'error': f"'{field}' must be a valid number"}), 400
+            if not math.isfinite(val) or val < 0:
+                return jsonify({'error': f"'{field}' must be zero or greater"}), 400
+            if val > MAX_FINANCE_VALUE:
+                return jsonify({'error': f"'{field}' is too large"}), 400
+            if field == 'quantity' and val <= 0:
+                return jsonify({'error': "'quantity' must be greater than zero"}), 400
         elif val is None:
             val = ''
         insert_data[field] = val
 
-    new_id = db.insert_record(table_name, insert_data)
-    new_record = db.fetch_one(table_name, new_id)
+    field_error = _validate_text_dates(insert_data)
+    if field_error:
+        return jsonify({'error': field_error}), 400
+    integrity_error = _validate_record_integrity(table_name, insert_data)
+    if integrity_error:
+        return jsonify({'error': integrity_error}), 400
+
+    new_id = db.insert_record(table_name, insert_data, session['user_id'])
+    new_record = db.fetch_one(table_name, new_id, session['user_id'])
     return jsonify(new_record), 201
 
 @app.route('/api/<table_name>/<int:record_id>', methods=['PUT'])
@@ -223,7 +506,7 @@ def update_record_route(table_name, record_id):
     if table_name not in TABLE_CONFIGS:
         return jsonify({'error': 'unknown table'}), 404
 
-    existing = db.fetch_one(table_name, record_id)
+    existing = db.fetch_one(table_name, record_id, session['user_id'])
     if not existing:
         return jsonify({'error': 'not found'}), 404
 
@@ -237,16 +520,27 @@ def update_record_route(table_name, record_id):
             if field in NUMERIC_FIELDS:
                 try:
                     val = float(val) if val is not None else 0.0
-                except ValueError:
-                    val = 0.0
+                except (ValueError, TypeError):
+                    return jsonify({'error': f"'{field}' must be a valid number"}), 400
+                if not math.isfinite(val) or val < 0:
+                    return jsonify({'error': f"'{field}' must be zero or greater"}), 400
+                if field == 'quantity' and val <= 0:
+                    return jsonify({'error': "'quantity' must be greater than zero"}), 400
             elif val is None:
                 val = ''
             update_data[field] = val
 
-    if update_data:
-        db.update_record(table_name, record_id, update_data)
+    field_error = _validate_text_dates(update_data)
+    if field_error:
+        return jsonify({'error': field_error}), 400
+    integrity_error = _validate_record_integrity(table_name, update_data, existing)
+    if integrity_error:
+        return jsonify({'error': integrity_error}), 400
 
-    updated = db.fetch_one(table_name, record_id)
+    if update_data:
+        db.update_record(table_name, record_id, update_data, session['user_id'])
+
+    updated = db.fetch_one(table_name, record_id, session['user_id'])
     return jsonify(updated)
 
 @app.route('/api/<table_name>/<int:record_id>', methods=['DELETE'])
@@ -255,7 +549,8 @@ def delete_record_route(table_name, record_id):
     if table_name not in TABLE_CONFIGS:
         return jsonify({'error': 'unknown table'}), 404
 
-    db.delete_record(table_name, record_id)
+    if not db.delete_record(table_name, record_id, session['user_id']):
+        return jsonify({'error': 'not found'}), 404
     return jsonify({'success': True})
 
 # Smart EMI / Debt tracking
@@ -294,13 +589,13 @@ def suggest_smart_records(table_name):
         return jsonify({'error': 'unknown table'}), 404
 
     cfg = SMART_TRACKING_CONFIG[table_name]
-    q = request.args.get('q', '').strip()
+    q = request.args.get('q', '').strip()[:200]
     if not q:
         return jsonify([])
 
     conn = db.get_db()
     cursor = conn.cursor()
-    cursor.execute(f"SELECT * FROM {cfg['header_table']} WHERE {cfg['name_field']} LIKE ? ORDER BY date DESC, time DESC, id DESC LIMIT 8", (f"%{q}%",))
+    cursor.execute(f"SELECT * FROM {cfg['header_table']} WHERE user_id = ? AND {cfg['name_field']} LIKE ? ORDER BY date DESC, time DESC, id DESC LIMIT 8", (session['user_id'], f"%{q}%"))
     rows = cursor.fetchall()
     conn.close()
 
@@ -313,13 +608,13 @@ def get_smart_payments(table_name, record_id):
         return jsonify({'error': 'unknown table'}), 404
 
     cfg = SMART_TRACKING_CONFIG[table_name]
-    header = db.fetch_one(cfg['header_table'], record_id)
+    header = db.fetch_one(cfg['header_table'], record_id, session['user_id'])
     if not header:
         return jsonify({'error': 'not found'}), 404
 
     conn = db.get_db()
     cursor = conn.cursor()
-    cursor.execute(f"SELECT * FROM {cfg['payments_table']} WHERE {cfg['fk_field']} = ? ORDER BY date DESC, time DESC, id DESC", (record_id,))
+    cursor.execute(f"SELECT * FROM {cfg['payments_table']} WHERE user_id = ? AND {cfg['fk_field']} = ? ORDER BY date DESC, time DESC, id DESC", (session['user_id'], record_id))
     payments = [dict(r) for r in cursor.fetchall()]
     conn.close()
 
@@ -335,39 +630,65 @@ def add_smart_payment(table_name, record_id):
         return jsonify({'error': 'unknown table'}), 404
 
     cfg = SMART_TRACKING_CONFIG[table_name]
-    header = db.fetch_one(cfg['header_table'], record_id)
+    header = db.fetch_one(cfg['header_table'], record_id, session['user_id'])
     if not header:
         return jsonify({'error': 'not found'}), 404
 
     data = request.get_json() or {}
     try:
         amount = float(data.get('amount', 0))
-    except ValueError:
+    except (ValueError, TypeError):
         amount = 0.0
 
-    if amount <= 0:
+    if not math.isfinite(amount) or amount <= 0:
         return jsonify({'error': "'amount' must be a positive number"}), 400
+    if amount > MAX_FINANCE_VALUE:
+        return jsonify({'error': "'amount' is too large"}), 400
+
+    # Prevent overpayments from pushing paid totals beyond the original balance.
+    total_amount = float(header.get(cfg['total_field']) or 0)
+    current_paid = float(header.get(cfg['paid_field']) or 0)
+    remaining = max(0.0, total_amount - current_paid)
+    if remaining <= 0:
+        return jsonify({'error': 'This balance is already fully paid'}), 400
+    if amount > remaining + 1e-9:
+        return jsonify({'error': f'Payment exceeds remaining balance ({remaining:.2f})'}), 400
 
     default_date, default_time = get_now_date_time()
     payment_date = data.get('date') or default_date
     payment_time = data.get('time') or default_time
-    notes = data.get('notes', '')
+    notes = str(data.get('notes', ''))
+    field_error = _validate_text_dates({'date': payment_date, 'time': payment_time, 'notes': notes})
+    if field_error:
+        return jsonify({'error': field_error}), 400
 
     conn = db.get_db()
     cursor = conn.cursor()
-    cursor.execute(f"INSERT INTO {cfg['payments_table']} ({cfg['fk_field']}, amount, date, time, notes) VALUES (?, ?, ?, ?, ?)",
-                   (record_id, amount, payment_date, payment_time, notes))
-    
-    current_paid = float(header.get(cfg['paid_field']) or 0)
-    new_paid = current_paid + amount
-    cursor.execute(f"UPDATE {cfg['header_table']} SET {cfg['paid_field']} = ? WHERE id = ?", (new_paid, record_id))
-    conn.commit()
-
-    cursor.execute(f"SELECT * FROM {cfg['payments_table']} WHERE {cfg['fk_field']} = ? ORDER BY date DESC, time DESC, id DESC", (record_id,))
-    payments = [dict(r) for r in cursor.fetchall()]
+    try:
+        # Atomically reserve the payment against the remaining balance. This
+        # prevents two near-simultaneous requests from both passing the earlier
+        # remaining-balance check and corrupting the ledger.
+        cursor.execute(
+            f"UPDATE {cfg['header_table']} SET {cfg['paid_field']} = COALESCE({cfg['paid_field']},0) + ? "
+            f"WHERE id = ? AND user_id = ? AND COALESCE({cfg['paid_field']},0) + ? <= COALESCE({cfg['total_field']},0) + 0.000000001",
+            (amount, record_id, session['user_id'], amount)
+        )
+        if cursor.rowcount <= 0:
+            conn.rollback()
+            conn.close()
+            return jsonify({'error': 'Payment exceeds the current remaining balance. Refresh and try again.'}), 409
+        cursor.execute(f"INSERT INTO {cfg['payments_table']} (user_id, {cfg['fk_field']}, amount, date, time, notes) VALUES (?, ?, ?, ?, ?, ?)",
+                       (session['user_id'], record_id, amount, payment_date, payment_time, notes))
+        conn.commit()
+        cursor.execute(f"SELECT * FROM {cfg['payments_table']} WHERE user_id = ? AND {cfg['fk_field']} = ? ORDER BY date DESC, time DESC, id DESC", (session['user_id'], record_id))
+        payments = [dict(r) for r in cursor.fetchall()]
+    except Exception:
+        conn.rollback()
+        conn.close()
+        raise
     conn.close()
 
-    updated_header = db.fetch_one(cfg['header_table'], record_id)
+    updated_header = db.fetch_one(cfg['header_table'], record_id, session['user_id'])
 
     return jsonify({
         'record': format_smart_row(cfg, updated_header),
@@ -377,17 +698,19 @@ def add_smart_payment(table_name, record_id):
 @app.route('/api/dashboard', methods=['GET'])
 @login_required
 def dashboard_api():
-    data = db.get_dashboard_data()
+    data = db.get_dashboard_data(session['user_id'])
     return jsonify(data)
 
 # AI Assistant Context
+
 def get_income_profile():
-    settings = db.get_settings()
+    settings = db.get_settings(session['user_id'])
     
     def fnum(key):
         try:
-            return float(settings.get(key) or 0)
-        except ValueError:
+            value = float(settings.get(key) or 0)
+            return value if math.isfinite(value) else 0.0
+        except (ValueError, TypeError):
             return 0.0
 
     profile = {
@@ -402,8 +725,9 @@ def get_income_profile():
     profile['total_verified_income'] = round(profile['monthly_income'] + profile['other_income'], 2)
     return profile
 
+
 def gather_financial_context():
-    dash = db.get_dashboard_data()
+    dash = db.get_dashboard_data(session['user_id'])
     income_profile = get_income_profile()
     return {
         'total_income': dash['total_income'],
@@ -415,125 +739,336 @@ def gather_financial_context():
         'total_emi_paid': dash['emi_paid'],
         'emi_pending': dash['emi_pending'],
         'active_emi_count': dash['active_emi_count'],
-        'total_debt': dash['outstanding_debt'] + dash['net_balance'], # approx
-        'debt_paid': 0,
+        'total_debt': dash.get('total_debt', 0),
+        'debt_paid': dash.get('debt_paid', 0),
         'outstanding_debt': dash['outstanding_debt'],
         'total_shopping': dash['total_shopping'],
         'net_balance': dash['net_balance'],
         'income_profile': income_profile
     }
 
-def local_ai_response(query, context, language_key, user_name='Ijas'):
+
+def local_ai_response(query, context, language_key, user_name='User'):
+    """Small finance-only emergency fallback.
+
+    This is intentionally NOT used as a replacement for Gemini general chat.
+    The old version silently used this for every Gemini failure, which made the
+    assistant look as if it only knew saved app data and caused repetitive
+    answers. Set AI_LOCAL_FALLBACK=1 only if a finance-only fallback is wanted.
+    """
     lower = query.lower()
     currency = 'AED'
 
     if any(k in lower for k in ['emi', 'loan', 'installment']):
-        return f"{user_name}, you have {context['active_emi_count']} active EMIs totaling {context['total_emi']:.2f} {currency}, with {context['emi_pending']:.2f} {currency} still pending. Focus on paying pending EMIs first to reduce your fixed commitments."
-
+        return f"{user_name}, you have {context['active_emi_count']} active EMIs totaling {context['total_emi']:.2f} {currency}, with {context['emi_pending']:.2f} {currency} still pending."
     if any(k in lower for k in ['debt', 'borrow', 'loan balance', 'outstanding debt']):
-        return f"{user_name}, your outstanding debt is {context['outstanding_debt']:.2f} {currency}. Use the debt repayment slice and avoid new borrowing until the balance is lower."
-
+        return f"{user_name}, your outstanding debt is {context['outstanding_debt']:.2f} {currency}."
     if any(k in lower for k in ['balance', 'net balance', 'cash', 'available']):
-        return f"{user_name}, your current net balance is {context['net_balance']:.2f} {currency}. Total income is {context['total_income']:.2f}, expenses are {context['total_expenses']:.2f}, and pending EMIs are {context['emi_pending']:.2f}."
-
+        return f"{user_name}, your current net balance is {context['net_balance']:.2f} {currency}."
     if any(k in lower for k in ['savings', 'goal', 'save more', 'save']):
-        goal_text = f"Your savings goal is {context['savings_goal']:.2f} {currency}." if context['savings_goal'] > 0 else "Keep building your savings consistently."
-        return f"{user_name}, you have {context['total_savings']:.2f} {currency} in savings. {goal_text}"
-
+        return f"{user_name}, you have {context['total_savings']:.2f} {currency} in savings and your saved goal is {context['savings_goal']:.2f} {currency}."
     if any(k in lower for k in ['salary', 'income']):
         if context['income_profile']['saved']:
-            return f"{user_name}, your verified monthly income is {context['income_profile']['monthly_income']:.2f} {currency}, with other income {context['income_profile']['other_income']:.2f} {currency}."
-        return f"{user_name}, I do not have your saved salary profile. Save your income profile to get smarter recommendations."
+            return f"{user_name}, your saved monthly income is {context['income_profile']['monthly_income']:.2f} {currency} and other income is {context['income_profile']['other_income']:.2f} {currency}."
+        return f"{user_name}, I do not have a saved salary profile yet."
+    return None
 
-    if any(k in lower for k in ['help', 'advice', 'suggest', 'recommend']):
-        return f"{user_name}, based on your data, keep at least 20% of income for savings, cover EMI commitments first, and avoid extra discretionary spending until your net balance improves."
 
-    if language_key == 'ml':
-        return f"ഹായ് {user_name}, ഞാൻ നിങ്ങളുടെ zuooi Ai അസിസ്റ്റന്റ് ആണ്. നിലവിലെ സാമ്പത്തിക വിവരങ്ങൾ: വരുമാനം {context['total_income']:.2f} {currency}, ചിലവുകൾ {context['total_expenses']:.2f} {currency}, ഇ.എം.ഐ ബാക്കി {context['emi_pending']:.2f} {currency}, ബാക്കി {context['net_balance']:.2f} {currency}."
+def _gemini_api_key():
+    # google-genai accepts either variable. Supporting both avoids a common
+    # Render configuration mismatch where GOOGLE_API_KEY was set but the old
+    # app only checked GEMINI_API_KEY.
+    return (os.environ.get('GEMINI_API_KEY') or os.environ.get('GOOGLE_API_KEY') or '').strip()
 
-    return f"Hello {user_name}, I am zuooi Ai, your Gemini AI Assistant. Ask me anything about your finances, budget, or general questions in English or Malayalam."
+
+def _gemini_models_to_try():
+    configured = (os.environ.get('GEMINI_MODEL') or '').strip()
+    # Current stable production models first. Old 1.5 models and the shut-down
+    # 2.0 alias are deliberately removed.
+    candidates = [configured, 'gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-2.5-flash']
+    result = []
+    for item in candidates:
+        if item and item not in result:
+            result.append(item)
+    return result
+
+
+def _build_ai_system_instruction(user_name, language_key, mode):
+    if language_key.startswith('ml'):
+        language = (
+            "Reply naturally in Malayalam. You may keep unavoidable technical names in English. "
+            "Do not switch to English unless the user asks."
+        )
+    else:
+        language = "Reply naturally in English unless the user asks for another language."
+
+    voice_rule = (
+        "For voice mode, keep answers concise and natural for speech, usually 1 to 4 sentences. "
+        "Do not use markdown tables or long lists."
+        if mode in ('voice', 'call') else
+        "For chat mode, answer at the length needed by the question. Use simple formatting only when useful."
+    )
+
+    return (
+        f"You are zuooi Ai, the Gemini-powered assistant inside AZRET Manage Plan for {user_name}. "
+        f"{language} {voice_rule} "
+        "You are a GENERAL-PURPOSE conversational assistant, not only a finance bot. "
+        "Answer questions about everyday knowledge, technology, travel, writing, calculations, ideas, and other normal topics using your model knowledge. "
+        "Use the supplied AZRET financial context ONLY when the user's question is actually about their money, budget, savings, EMI, debt, shopping plan, or app records. "
+        "For unrelated questions, IGNORE the financial context completely. "
+        "Use recent conversation history to understand follow-up questions and pronouns. "
+        "Do not repeat a canned greeting or repeat the same financial summary unless it directly answers the new question. "
+        "Never claim that saved app data is current real-world information. If current/live external information is requested and no live search tool is available, say that limitation clearly."
+    )
+
+
+def _is_finance_related(query, history=None):
+    # Classify primarily from the NEW turn. The old implementation searched
+    # several previous user turns too, so one earlier finance question could
+    # keep attaching finance context to unrelated later questions and encourage
+    # repetitive answers. Only use history for short ambiguous follow-ups.
+    current = str(query or '').lower().strip()
+    keywords = [
+        'money', 'finance', 'financial', 'budget', 'income', 'salary', 'expense', 'saving', 'savings',
+        'emi', 'debt', 'loan', 'balance', 'cash', 'aed', 'inr', 'rupee', 'dirham', 'shopping', 'spend', 'payment',
+        'വരുമാനം', 'ശമ്പളം', 'ചിലവ്', 'ചെലവ്', 'സേവിംഗ്', 'സമ്പാദ്യം', 'കടം', 'ഇഎംഐ', 'ഇ.എം.ഐ', 'ബാലൻസ്', 'പണം', 'ബജറ്റ്'
+    ]
+    if any(k in current for k in keywords):
+        return True
+    english_followup = bool(re.search(r'\b(?:it|that|this|those|them|more|why)\b|\bhow\s+much\b|\bwhat\s+about\b', current))
+    malayalam_followup = any(m in current for m in ('അതെ', 'അത്', 'ഇത്', 'എത്ര', 'പിന്നെ'))
+    if len(current) <= 45 and (english_followup or malayalam_followup):
+        prev_users = [str(x.get('content') or '').lower() for x in (history or []) if x.get('role') == 'user']
+        if prev_users and any(k in prev_users[-1] for k in keywords):
+            return True
+    return False
+
+
+def _format_financial_context(context):
+    if not context:
+        return "AZRET FINANCIAL CONTEXT: not attached because this conversation is not about saved finance records."
+    return (
+        "AZRET PRIVATE FINANCIAL CONTEXT (use only when relevant):\n"
+        f"Total Income: {context['total_income']:.2f} AED\n"
+        f"Total Expenses: {context['total_expenses']:.2f} AED\n"
+        f"Total Savings: {context['total_savings']:.2f} AED\n"
+        f"Savings Goal: {context['savings_goal']:.2f} AED\n"
+        f"Active EMIs: {context['active_emi_count']}\n"
+        f"EMI Pending: {context['emi_pending']:.2f} AED\n"
+        f"Outstanding Debt: {context['outstanding_debt']:.2f} AED\n"
+        f"Net Balance: {context['net_balance']:.2f} AED\n"
+        f"Saved Monthly Salary Profile: {context['income_profile']['monthly_income']:.2f} AED"
+    )
+
+
+def _format_recent_ai_history(history):
+    if not history:
+        return "(No previous conversation yet.)"
+    lines = []
+    for item in history[-16:]:
+        role = 'User' if item.get('role') == 'user' else 'Assistant'
+        text = str(item.get('content') or '').strip().replace('\x00', '')
+        # Keep prompt size controlled while still preserving multi-turn context.
+        if len(text) > 3500:
+            text = text[:3500] + '…'
+        lines.append(f"{role}: {text}")
+    return "\n".join(lines)
+
+
+@app.route('/api/ai-status', methods=['GET'])
+@login_required
+def ai_status():
+    key = _gemini_api_key()
+    return jsonify({
+        'configured': bool(key),
+        'key_source': 'GEMINI_API_KEY' if os.environ.get('GEMINI_API_KEY') else ('GOOGLE_API_KEY' if os.environ.get('GOOGLE_API_KEY') else None),
+        'models': _gemini_models_to_try(),
+        'history_count': len(db.get_ai_chat_history(session['user_id'], 40)),
+        'provider': 'Google Gemini'
+    })
+
+
+@app.route('/api/ai-history', methods=['GET', 'DELETE'])
+@login_required
+def ai_history():
+    if request.method == 'DELETE':
+        deleted = db.clear_ai_chat_history(session['user_id'])
+        return jsonify({'success': True, 'deleted': deleted})
+    history = db.get_ai_chat_history(session['user_id'], 40)
+    return jsonify({'history': history})
+
 
 @app.route('/api/ai-assistant', methods=['POST'])
 @login_required
 def ai_assistant():
-    data = request.get_json() or {}
+    retry_after = _rate_limit('ai', session.get('user_id'), 40, 60)
+    if retry_after:
+        return jsonify({'error': 'AI request limit reached. Please wait a moment and try again.', 'code': 'AI_RATE_LIMIT'}), 429, {'Retry-After': str(retry_after)}
+    data = request.get_json(silent=True) or {}
     query = (data.get('query') or data.get('message') or data.get('prompt') or '').strip()
     language_key = (data.get('language') or 'en').strip().lower()
-    mode = data.get('mode', 'chat') # 'chat' or 'voice' / 'call'
+    mode = (data.get('mode') or 'chat').strip().lower()
+    if mode not in ('chat', 'voice', 'call'):
+        mode = 'chat'
 
     if not query:
         return jsonify({'error': 'No query provided'}), 400
+    if len(query) > 12000:
+        return jsonify({'error': 'Message is too long. Please shorten it and try again.'}), 400
 
-    context = gather_financial_context()
-    user_name = session.get('username', 'Ijas')
+    user_name = session.get('username', 'User')
+    history = db.get_ai_chat_history(session['user_id'], 20)
+    finance_related = _is_finance_related(query, history)
+    context = gather_financial_context() if finance_related else None
+    gemini_key = _gemini_api_key()
+
+    if not gemini_key:
+        fallback = None
+        if context and os.environ.get('AI_LOCAL_FALLBACK', '0') == '1':
+            fallback = local_ai_response(query, context, language_key, user_name)
+        if fallback:
+            db.add_ai_chat_message(session['user_id'], 'user', query, mode)
+            db.add_ai_chat_message(session['user_id'], 'assistant', fallback, mode)
+            return jsonify({'response': fallback, 'reply': fallback, 'language': language_key, 'mode': mode, 'provider': 'local-finance-fallback'}), 200
+        return jsonify({
+            'error': 'Gemini API is not configured on the server.',
+            'code': 'GEMINI_NOT_CONFIGURED',
+            'hint': 'Set GEMINI_API_KEY (or GOOGLE_API_KEY) in Render Environment and redeploy.'
+        }), 503
+
+    system_instruction = _build_ai_system_instruction(user_name, language_key, mode)
+    if context:
+        current_message = f"{_format_financial_context(context)}\n\nUSER MESSAGE:\n{query}"
+    else:
+        current_message = query
 
     response_text = None
-    gemini_key = os.environ.get('GEMINI_API_KEY')
+    used_model = None
+    errors = []
+    client = None
+    try:
+        from google import genai
+        from google.genai import types
+        client = genai.Client(api_key=gemini_key)
 
-    if gemini_key:
-        try:
-            from google import genai
-            client = genai.Client(api_key=gemini_key)
-            lang_instr = "Respond in Malayalam (മലയാളം)" if language_key.startswith('ml') else "Respond in English"
-            
-            if mode in ['voice', 'call']:
-                system_instructions = (
-                    f"You are zuooi Ai, an intelligent live voice AI assistant and financial advisor for {user_name}. "
-                    f"Language instruction: {lang_instr}. "
-                    f"You are powered by Gemini with full conversational and general knowledge capabilities. "
-                    f"You can answer ANY question, query, calculation, or real-world concept (both financial and general topics outside finance). "
-                    f"Provide clear, direct, intelligent spoken answers in 1 to 3 clear sentences. Avoid repetition or canned responses. Do NOT use bullet points, symbols, markdown asterisks, or lists."
-                )
+        # Use Gemini's native multi-turn chat representation instead of
+        # flattening history into one giant prompt string. Google documents
+        # explicit user/model history for chat, which improves follow-ups and
+        # reduces the tendency to repeat prior answers.
+        chat_history = []
+        # Normalize persisted history before sending it to Gemini. A truncated
+        # window can otherwise begin with a model turn or contain duplicate
+        # consecutive roles after an interrupted request. Current Gemini chat
+        # APIs are stricter about malformed/prefilled model turns.
+        normalized_history = []
+        for item in history[-20:]:
+            role = 'user' if item.get('role') == 'user' else 'model'
+            text = str(item.get('content') or '').strip()[:3500]
+            if not text:
+                continue
+            if not normalized_history and role != 'user':
+                continue
+            if normalized_history and normalized_history[-1][0] == role:
+                normalized_history[-1] = (role, normalized_history[-1][1] + "\n" + text)
             else:
-                system_instructions = (
-                    f"You are zuooi Ai, an advanced Gemini-powered AI Assistant and Financial Command Advisor for {user_name}. "
-                    f"Language instruction: {lang_instr}. "
-                    f"You have full intelligence and general knowledge to discuss ANY topic inside or outside the financial application. "
-                    f"Answer every question uniquely and thoughtfully. When answering financial questions, use the app's financial context below. "
-                    f"Format with clean markdown bolding key terms or numbers."
+                normalized_history.append((role, text))
+        # The new message is always a user turn, so do not prefill a final model
+        # turn in history; drop it if an interrupted prior request left one.
+        if normalized_history and normalized_history[-1][0] == 'model':
+            pass  # valid completed prior turn before the new user message
+        for role, text in normalized_history[-16:]:
+            chat_history.append(types.Content(role=role, parts=[types.Part(text=text)]))
+
+        for mname in _gemini_models_to_try():
+            try:
+                chat = client.chats.create(
+                    model=mname,
+                    history=chat_history,
+                    config=types.GenerateContentConfig(
+                        system_instruction=system_instruction,
+                        # Gemini 3.6+ deprecates sampling parameters such as
+                        # temperature/top_p/top_k. Keeping the config minimal
+                        # avoids present/future 400 responses on current models.
+                        max_output_tokens=2048 if mode == 'chat' else 700,
+                    ),
                 )
-
-            prompt_text = (
-                f"{system_instructions}\n\n"
-                f"App Financial Context:\n"
-                f"- Total Income: {context['total_income']:.2f} AED\n"
-                f"- Total Expenses: {context['total_expenses']:.2f} AED\n"
-                f"- Total Savings: {context['total_savings']:.2f} AED (Goal: {context['savings_goal']:.2f} AED)\n"
-                f"- Active EMIs: {context['active_emi_count']} with {context['emi_pending']:.2f} AED pending\n"
-                f"- Outstanding Debt: {context['outstanding_debt']:.2f} AED\n"
-                f"- Net Balance: {context['net_balance']:.2f} AED\n"
-                f"- Monthly Salary Profile: {context['income_profile']['monthly_income']:.2f} AED\n\n"
-                f"User Question: {query}"
-            )
-
-            models_to_try = [
-                os.environ.get('GEMINI_MODEL', 'gemini-2.5-flash'),
-                'gemini-2.0-flash',
-                'gemini-1.5-flash',
-                'gemini-1.5-pro'
-            ]
-            
-            for mname in models_to_try:
-                try:
-                    res = client.models.generate_content(model=mname, contents=prompt_text)
-                    if res and res.text:
-                        response_text = res.text.strip()
-                        break
-                except Exception as ex_m:
-                    print(f"[AI ASSISTANT] Model {mname} failed: {ex_m}")
-                    continue
-        except Exception as e:
-            print(f"[AI ASSISTANT] Gemini call failed: {e}")
+                response = chat.send_message(message=current_message)
+                candidate = (getattr(response, 'text', None) or '').strip()
+                if candidate:
+                    response_text = candidate
+                    used_model = mname
+                    break
+                errors.append(f"{mname}: empty response")
+            except Exception as ex_m:
+                # Keep server logs useful while not leaking API keys or internal
+                # stack traces to the public client. A short one-time retry helps
+                # with transient 429/500/503 model-load spikes without causing
+                # duplicate successful replies or long request storms.
+                safe_error = str(ex_m).replace(gemini_key, '[redacted]')[:500]
+                print(f"[AI ASSISTANT] Model {mname} failed: {safe_error}")
+                errors.append(f"{mname}: {safe_error}")
+                transient = any(code in safe_error.lower() for code in ('429', '500', '502', '503', '504', 'temporar', 'unavailable', 'high demand'))
+                if transient:
+                    try:
+                        time.sleep(0.35)
+                        retry_chat = client.chats.create(
+                            model=mname,
+                            history=chat_history,
+                            config=types.GenerateContentConfig(
+                                system_instruction=system_instruction,
+                                max_output_tokens=2048 if mode == 'chat' else 700,
+                            ),
+                        )
+                        retry_response = retry_chat.send_message(message=current_message)
+                        candidate = (getattr(retry_response, 'text', None) or '').strip()
+                        if candidate:
+                            response_text = candidate
+                            used_model = mname
+                            break
+                    except Exception as retry_exc:
+                        retry_safe = str(retry_exc).replace(gemini_key, '[redacted]')[:500]
+                        print(f"[AI ASSISTANT] Model {mname} retry failed: {retry_safe}")
+                        errors.append(f"{mname} retry: {retry_safe}")
+    except Exception as exc:
+        safe_error = str(exc).replace(gemini_key, '[redacted]')[:500]
+        print(f"[AI ASSISTANT] Gemini SDK/client failed: {safe_error}")
+        errors.append(f"SDK: {safe_error}")
+    finally:
+        if client is not None:
+            try:
+                client.close()
+            except Exception:
+                pass
 
     if not response_text:
-        response_text = local_ai_response(query, context, language_key, user_name)
+        fallback = None
+        if context and os.environ.get('AI_LOCAL_FALLBACK', '0') == '1':
+            fallback = local_ai_response(query, context, language_key, user_name)
+        if fallback:
+            response_text = fallback
+            used_model = 'local-finance-fallback'
+        else:
+            # Do not silently pretend that canned financial data came from Gemini.
+            # This was the main source of the old repetitive/wrong behaviour.
+            return jsonify({
+                'error': 'Gemini could not answer this request right now.',
+                'code': 'GEMINI_CALL_FAILED',
+                'hint': 'Check Render logs, API key permissions/quota, and the configured GEMINI_MODEL.',
+                'tried_models': _gemini_models_to_try()
+            }), 502
+
+    db.add_ai_chat_message(session['user_id'], 'user', query, mode)
+    db.add_ai_chat_message(session['user_id'], 'assistant', response_text, mode)
 
     return jsonify({
         'response': response_text,
         'reply': response_text,
         'language': language_key,
-        'mode': mode
+        'mode': mode,
+        'provider': 'Google Gemini' if used_model != 'local-finance-fallback' else used_model,
+        'model': used_model
     })
+
 
 @app.route('/api/fetch-product-details', methods=['POST'])
 @login_required
@@ -581,56 +1116,95 @@ def global_search_api():
     if not q:
         return jsonify([])
 
-    results = db.search_global(q)
+    results = db.search_global(q, session['user_id'])
     return jsonify(results)
 
 @app.route('/api/settings', methods=['GET'])
 @login_required
 def get_settings_api():
-    return jsonify(db.get_settings())
+    return jsonify(db.get_settings(session['user_id']))
 
 @app.route('/api/settings', methods=['POST'])
 @login_required
 def save_settings_api():
     data = request.get_json() or {}
-    db.save_settings(data)
+    if not isinstance(data, dict):
+        return jsonify({'success': False, 'error': 'Invalid settings payload'}), 400
+    allowed = {'theme', 'default_currency', 'exchange_rate', 'shopping_budget'}
+    safe = {k: v for k, v in data.items() if k in allowed}
+    if not safe:
+        return jsonify({'success': False, 'error': 'No supported settings supplied'}), 400
+    if 'theme' in safe and safe['theme'] not in {'light', 'dark'}:
+        return jsonify({'success': False, 'error': 'Invalid theme'}), 400
+    if 'default_currency' in safe and safe['default_currency'] not in {'AED', 'INR'}:
+        return jsonify({'success': False, 'error': 'Invalid currency'}), 400
+    for key in ('exchange_rate', 'shopping_budget'):
+        if key in safe:
+            try:
+                num = float(safe[key])
+            except (TypeError, ValueError):
+                return jsonify({'success': False, 'error': f'Invalid {key}'}), 400
+            if not math.isfinite(num) or num < 0:
+                return jsonify({'success': False, 'error': f'Invalid {key}'}), 400
+            safe[key] = str(num)
+    db.save_settings(safe, session['user_id'])
     return jsonify({'success': True})
 
 @app.route('/api/branding', methods=['GET'])
 def get_branding():
-    settings = db.get_settings()
+    settings = db.get_settings(session['user_id']) if session.get('user_id') else db.get_public_branding()
+    logged_in = bool(session.get('user_id'))
+    def asset_url(kind, legacy_key, default=''):
+        if logged_in and db.get_user_asset(session['user_id'], kind):
+            return f"/api/assets/{kind}"
+        value = settings.get(legacy_key, default)
+        # Old Render-local uploads are ephemeral; only return them if the file
+        # still exists. New uploads are database-backed and persistent.
+        if value and str(value).startswith('/static/'):
+            local_path = str(value).split('?',1)[0].lstrip('/')
+            if not os.path.exists(local_path):
+                return default
+        return value
     return jsonify({
         'app_name': settings.get('app_name', 'AZRET MANAGE PLAN'),
-        'logo_url': settings.get('logo_url', ''),
-        'splash_video_url': settings.get('splash_video_url', '/static/video/enter_video_logo.mp4'),
-        'theme_image_url': settings.get('theme_image_url', ''),
-        'theme_video_url': settings.get('theme_video_url', '')
+        'logo_url': asset_url('logo', 'logo_url', ''),
+        'splash_video_url': asset_url('splash_video', 'splash_video_url', ''),
+        'theme_image_url': asset_url('theme_image', 'theme_image_url', ''),
+        'theme_video_url': asset_url('theme_video', 'theme_video_url', '')
     })
+
+@app.route('/api/assets/<kind>', methods=['GET'])
+@login_required
+def serve_user_asset(kind):
+    if kind not in ASSET_LIMITS:
+        return jsonify({'error': 'unknown asset'}), 404
+    asset = db.get_user_asset(session['user_id'], kind)
+    if not asset:
+        return jsonify({'error': 'asset not found'}), 404
+    data = asset.get('data')
+    if isinstance(data, memoryview):
+        data = data.tobytes()
+    response = send_file(io.BytesIO(bytes(data)), mimetype=asset.get('mime_type') or 'application/octet-stream', conditional=True)
+    response.headers['Cache-Control'] = 'private, max-age=3600'
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    return response
 
 @app.route('/api/logo', methods=['POST'])
 @login_required
 def upload_logo():
     if 'file' not in request.files:
         return jsonify({'success': False, 'error': 'No file provided'}), 400
-
-    file = request.files['file']
-    if file and allowed_file(file.filename, ALLOWED_IMAGE_EXTENSIONS):
-        ext = file.filename.rsplit('.', 1)[1].lower()
-        filename = f"logo.{ext}"
-        filepath = os.path.join(UPLOAD_FOLDER, filename)
-        file.save(filepath)
-
-        logo_url = f"/static/uploads/{filename}?v={int(time.time())}"
-        db.save_settings({'logo_url': logo_url})
-        return jsonify({'success': True, 'logo_url': logo_url})
-
-    return jsonify({'success': False, 'error': 'Invalid image file'}), 400
+    url, err = _save_asset_upload(request.files['file'], 'logo', ALLOWED_IMAGE_EXTENSIONS)
+    if err:
+        return jsonify({'success': False, 'error': err[0]}), err[1]
+    db.save_settings({'logo_url': url}, session['user_id'])
+    return jsonify({'success': True, 'logo_url': url})
 
 @app.route('/api/logo', methods=['DELETE'])
 @login_required
 def delete_logo():
-    settings = db.get_settings()
-    db.save_settings({'logo_url': ''})
+    db.delete_user_asset(session['user_id'], 'logo')
+    db.save_settings({'logo_url': ''}, session['user_id'])
     return jsonify({'success': True})
 
 @app.route('/api/splash-video', methods=['POST'])
@@ -638,25 +1212,18 @@ def delete_logo():
 def upload_splash_video():
     if 'file' not in request.files:
         return jsonify({'success': False, 'error': 'No file provided'}), 400
-
-    file = request.files['file']
-    if file and allowed_file(file.filename, ALLOWED_VIDEO_EXTENSIONS):
-        ext = file.filename.rsplit('.', 1)[1].lower()
-        filename = f"splash.{ext}"
-        filepath = os.path.join(VIDEO_UPLOAD_FOLDER, filename)
-        file.save(filepath)
-
-        video_url = f"/static/uploads/video/{filename}?v={int(time.time())}"
-        db.save_settings({'splash_video_url': video_url})
-        return jsonify({'success': True, 'splash_video_url': video_url})
-
-    return jsonify({'success': False, 'error': 'Invalid video file'}), 400
+    url, err = _save_asset_upload(request.files['file'], 'splash_video', ALLOWED_VIDEO_EXTENSIONS)
+    if err:
+        return jsonify({'success': False, 'error': err[0]}), err[1]
+    db.save_settings({'splash_video_url': url}, session['user_id'])
+    return jsonify({'success': True, 'splash_video_url': url})
 
 @app.route('/api/splash-video', methods=['DELETE'])
 @login_required
 def delete_splash_video():
-    default_url = '/static/video/enter_video_logo.mp4'
-    db.save_settings({'splash_video_url': default_url})
+    db.delete_user_asset(session['user_id'], 'splash_video')
+    default_url = ''
+    db.save_settings({'splash_video_url': default_url}, session['user_id'])
     return jsonify({'success': True, 'splash_video_url': default_url})
 
 @app.route('/api/theme-image', methods=['POST'])
@@ -664,24 +1231,17 @@ def delete_splash_video():
 def upload_theme_image():
     if 'file' not in request.files:
         return jsonify({'success': False, 'error': 'No file provided'}), 400
-
-    file = request.files['file']
-    if file and allowed_file(file.filename, ALLOWED_IMAGE_EXTENSIONS):
-        ext = file.filename.rsplit('.', 1)[1].lower()
-        filename = f"theme.{ext}"
-        filepath = os.path.join(THEME_UPLOAD_FOLDER, filename)
-        file.save(filepath)
-
-        theme_url = f"/static/uploads/theme/{filename}?v={int(time.time())}"
-        db.save_settings({'theme_image_url': theme_url})
-        return jsonify({'success': True, 'theme_image_url': theme_url})
-
-    return jsonify({'success': False, 'error': 'Invalid image file'}), 400
+    url, err = _save_asset_upload(request.files['file'], 'theme_image', ALLOWED_IMAGE_EXTENSIONS)
+    if err:
+        return jsonify({'success': False, 'error': err[0]}), err[1]
+    db.save_settings({'theme_image_url': url}, session['user_id'])
+    return jsonify({'success': True, 'theme_image_url': url})
 
 @app.route('/api/theme-image', methods=['DELETE'])
 @login_required
 def delete_theme_image():
-    db.save_settings({'theme_image_url': ''})
+    db.delete_user_asset(session['user_id'], 'theme_image')
+    db.save_settings({'theme_image_url': ''}, session['user_id'])
     return jsonify({'success': True})
 
 @app.route('/api/theme-video', methods=['POST'])
@@ -689,36 +1249,33 @@ def delete_theme_image():
 def upload_theme_video():
     if 'file' not in request.files:
         return jsonify({'success': False, 'error': 'No file provided'}), 400
-
-    file = request.files['file']
-    if file and allowed_file(file.filename, ALLOWED_VIDEO_EXTENSIONS):
-        ext = file.filename.rsplit('.', 1)[1].lower()
-        filename = f"theme.{ext}"
-        filepath = os.path.join(THEME_VIDEO_UPLOAD_FOLDER, filename)
-        file.save(filepath)
-
-        theme_video_url = f"/static/uploads/theme_video/{filename}?v={int(time.time())}"
-        db.save_settings({'theme_video_url': theme_video_url})
-        return jsonify({'success': True, 'theme_video_url': theme_video_url})
-
-    return jsonify({'success': False, 'error': 'Invalid video file'}), 400
+    url, err = _save_asset_upload(request.files['file'], 'theme_video', ALLOWED_VIDEO_EXTENSIONS)
+    if err:
+        return jsonify({'success': False, 'error': err[0]}), err[1]
+    db.save_settings({'theme_video_url': url}, session['user_id'])
+    return jsonify({'success': True, 'theme_video_url': url})
 
 @app.route('/api/theme-video', methods=['DELETE'])
 @login_required
 def delete_theme_video():
-    db.save_settings({'theme_video_url': ''})
+    db.delete_user_asset(session['user_id'], 'theme_video')
+    db.save_settings({'theme_video_url': ''}, session['user_id'])
     return jsonify({'success': True})
 
 @app.route('/api/export', methods=['GET'])
 @login_required
 def export_data():
-    dump = {}
+    # A backup must include payment history too, otherwise EMI/debt ledgers cannot
+    # be reconstructed after an import. Everything remains scoped to this user.
+    dump = {'backup_version': 2}
     for table in TABLE_CONFIGS:
-        dump[table] = db.fetch_all(table)
-    dump['settings'] = db.get_settings()
+        dump[table] = db.fetch_all(table, session['user_id'])
+    for table in ('emi_payments', 'debt_payments'):
+        dump[table] = db.fetch_all(table, session['user_id'])
+    dump['settings'] = db.get_settings(session['user_id'])
 
     filename = f"azret_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-    buf = io.BytesIO(json.dumps(dump, indent=2).encode('utf-8'))
+    buf = io.BytesIO(json.dumps(dump, indent=2, default=str).encode('utf-8'))
     return send_file(buf, mimetype='application/json', as_attachment=True, download_name=filename)
 
 @app.route('/api/import', methods=['POST'])
@@ -730,20 +1287,96 @@ def import_data():
     file = request.files['file']
     try:
         content = json.loads(file.read().decode('utf-8'))
-        for table in TABLE_CONFIGS:
-            if table in content and isinstance(content[table], list):
-                for rec in content[table]:
-                    rec_copy = dict(rec)
-                    rec_copy.pop('id', None)
-                    if rec_copy:
-                        db.insert_record(table, rec_copy)
+        if not isinstance(content, dict):
+            raise ValueError('Backup root must be an object')
 
-        if 'settings' in content and isinstance(content['settings'], dict):
-            db.save_settings(content['settings'])
+        # Map old backup IDs to newly inserted IDs. This is required so imported
+        # EMI/debt payment history points at the correct newly-created parent row.
+        id_maps = {'emi': {}, 'debts': {}}
+        for table in TABLE_CONFIGS:
+            rows = content.get(table, [])
+            if not isinstance(rows, list):
+                continue
+            allowed_fields = set(TABLE_CONFIGS[table]['fields'])
+            for rec in rows:
+                if not isinstance(rec, dict):
+                    continue
+                old_id = rec.get('id')
+                rec_copy = {k: rec.get(k) for k in allowed_fields if k in rec}
+                if not rec_copy:
+                    continue
+                # Backups are untrusted input too: reject malformed/negative/NaN
+                # numeric values rather than corrupting finance totals.
+                malformed = False
+                for field in NUMERIC_FIELDS.intersection(rec_copy):
+                    try:
+                        num = float(rec_copy[field] if rec_copy[field] is not None else 0)
+                    except (TypeError, ValueError):
+                        malformed = True; break
+                    if not math.isfinite(num) or num < 0 or num > MAX_FINANCE_VALUE or (field == 'quantity' and num <= 0):
+                        malformed = True; break
+                    rec_copy[field] = num
+                if malformed:
+                    continue
+                if _validate_text_dates(rec_copy):
+                    continue
+                integrity_error = _validate_record_integrity(table, rec_copy)
+                if integrity_error:
+                    continue
+                new_id = db.insert_record(table, rec_copy, session['user_id'])
+                if table in id_maps and old_id is not None:
+                    id_maps[table][str(old_id)] = new_id
+
+        payment_specs = {
+            'emi_payments': ('emi_id', 'emi'),
+            'debt_payments': ('debt_id', 'debts')
+        }
+        for table, (fk_field, parent_table) in payment_specs.items():
+            rows = content.get(table, [])
+            if not isinstance(rows, list):
+                continue
+            for rec in rows:
+                if not isinstance(rec, dict):
+                    continue
+                mapped_parent = id_maps[parent_table].get(str(rec.get(fk_field)))
+                if not mapped_parent:
+                    # Old v1 backups did not contain payment history; malformed v2
+                    # rows are skipped rather than linked to another user's record.
+                    continue
+                try:
+                    amount = float(rec.get('amount', 0))
+                except (TypeError, ValueError):
+                    continue
+                if not math.isfinite(amount) or amount <= 0 or amount > MAX_FINANCE_VALUE:
+                    continue
+                payload = {
+                    fk_field: mapped_parent,
+                    'amount': amount,
+                    'date': str(rec.get('date') or get_now_date_time()[0]),
+                    'time': str(rec.get('time') or get_now_date_time()[1]),
+                    'notes': str(rec.get('notes') or '')
+                }
+                if _validate_text_dates(payload):
+                    continue
+                db.insert_record(table, payload, session['user_id'])
+
+        settings = content.get('settings')
+        if isinstance(settings, dict):
+            # Do not import identity/user_id fields; settings are always written
+            # under the authenticated account by database.save_settings().
+            safe_settings = {}
+            for k, v in settings.items():
+                key = str(k)[:80]
+                if key in {'user_id', 'id'}:
+                    continue
+                value = str(v)
+                if len(value) <= 12000:
+                    safe_settings[key] = value
+            db.save_settings(safe_settings, session['user_id'])
 
         return jsonify({'success': True})
-    except Exception as e:
-        return jsonify({'success': False, 'error': 'Invalid JSON file'}), 400
+    except Exception:
+        return jsonify({'success': False, 'error': 'Invalid or incompatible JSON backup'}), 400
 
 @app.route('/api/clear-all-data', methods=['POST'])
 @login_required
@@ -752,13 +1385,13 @@ def clear_all_data_api():
     if data.get('confirm') != 'DELETE':
         return jsonify({'success': False, 'error': 'Confirmation text mismatch'}), 400
 
-    db.clear_all_data()
+    db.clear_all_data(session['user_id'])
     return jsonify({'success': True})
 
 @app.route('/api/advice', methods=['GET'])
 @login_required
 def get_advice():
-    dash = db.get_dashboard_data()
+    dash = db.get_dashboard_data(session['user_id'])
     income = dash['total_income']
     expenses = dash['total_expenses']
     savings = dash['total_savings']
@@ -766,7 +1399,7 @@ def get_advice():
 
     conn = db.get_db()
     cursor = conn.cursor()
-    cursor.execute("SELECT category, COALESCE(SUM(amount),0) as t FROM expenses GROUP BY category ORDER BY t DESC LIMIT 1")
+    cursor.execute("SELECT category, COALESCE(SUM(amount),0) as t FROM expenses WHERE user_id=? GROUP BY category ORDER BY t DESC LIMIT 1", (session['user_id'],))
     cat_row = cursor.fetchone()
     conn.close()
 
@@ -831,16 +1464,17 @@ def save_income_profile_route():
     data = request.get_json() or {}
     try:
         monthly_income = float(data.get('monthly_income', 0))
-    except ValueError:
+    except (ValueError, TypeError):
         monthly_income = 0.0
 
-    if monthly_income <= 0:
+    if not math.isfinite(monthly_income) or monthly_income <= 0:
         return jsonify({'error': 'Enter a valid verified monthly income to save your profile'}), 400
 
     def get_f(key):
         try:
-            return max(0.0, float(data.get(key, 0)))
-        except ValueError:
+            value = float(data.get(key, 0))
+            return value if math.isfinite(value) and value >= 0 else 0.0
+        except (ValueError, TypeError):
             return 0.0
 
     other_income = get_f('other_income')
@@ -858,7 +1492,7 @@ def save_income_profile_route():
         'income_profile_updated_at': datetime.now().strftime('%Y-%m-%d %H:%M')
     }
 
-    db.save_settings(values)
+    db.save_settings(values, session['user_id'])
     return jsonify(get_income_profile())
 
 @app.route('/api/salary-plan', methods=['POST'])
@@ -874,7 +1508,9 @@ def salary_plan_route():
     data = request.get_json() or {}
     try:
         override_salary = float(data.get('salary', 0))
-    except ValueError:
+    except (ValueError, TypeError):
+        override_salary = 0.0
+    if not math.isfinite(override_salary) or override_salary < 0:
         override_salary = 0.0
 
     verified_income = profile['total_verified_income']
@@ -886,10 +1522,10 @@ def salary_plan_route():
 
     conn = db.get_db()
     cursor = conn.cursor()
-    cursor.execute("SELECT COALESCE(SUM(monthly_payment),0) FROM emi WHERE COALESCE(amount,0) - COALESCE(paid,0) > 0")
+    cursor.execute("SELECT COALESCE(SUM(monthly_payment),0) FROM emi WHERE user_id=? AND COALESCE(amount,0)-COALESCE(paid,0)>0", (session['user_id'],))
     emi_monthly = cursor.fetchone()[0]
 
-    cursor.execute("SELECT COALESCE(SUM(monthly_payment),0) FROM debts WHERE COALESCE(total_amount,0) - COALESCE(paid_amount,0) > 0")
+    cursor.execute("SELECT COALESCE(SUM(monthly_payment),0) FROM debts WHERE user_id=? AND COALESCE(total_amount,0)-COALESCE(paid_amount,0)>0", (session['user_id'],))
     debt_monthly = cursor.fetchone()[0]
     conn.close()
 
@@ -943,7 +1579,7 @@ def salary_plan_route():
     emi_pct = round((total_emi_commitment / salary) * 100, 1) if salary else 0
     debt_pct = round((total_debt_commitment / salary) * 100, 1) if salary else 0
 
-    dash = db.get_dashboard_data()
+    dash = db.get_dashboard_data(session['user_id'])
     total_savings = dash['total_savings']
     savings_goal = dash['savings_goal']
 
@@ -1017,22 +1653,37 @@ def generate_report(kind):
     conn = db.get_db()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT COALESCE(SUM(amount),0) FROM income WHERE date LIKE ?", (date_filter,))
+    cursor.execute("SELECT COALESCE(SUM(amount),0) FROM income WHERE user_id=? AND date LIKE ?", (session['user_id'], date_filter))
     income = cursor.fetchone()[0]
 
-    cursor.execute("SELECT COALESCE(SUM(amount),0) FROM expenses WHERE date LIKE ?", (date_filter,))
+    cursor.execute("SELECT COALESCE(SUM(amount),0) FROM expenses WHERE user_id=? AND date LIKE ?", (session['user_id'], date_filter))
     expenses = cursor.fetchone()[0]
 
-    cursor.execute("SELECT COALESCE(SUM(amount),0) FROM savings WHERE date LIKE ?", (date_filter,))
+    cursor.execute("SELECT COALESCE(SUM(amount),0) FROM savings WHERE user_id=? AND date LIKE ?", (session['user_id'], date_filter))
     savings = cursor.fetchone()[0]
 
-    cursor.execute("SELECT COALESCE(SUM(amount),0) FROM family_transfers WHERE date LIKE ?", (date_filter,))
+    cursor.execute("SELECT COALESCE(SUM(amount),0) FROM family_transfers WHERE user_id=? AND date LIKE ?", (session['user_id'], date_filter))
     family = cursor.fetchone()[0]
 
-    cursor.execute("SELECT COALESCE(SUM(paid),0) FROM emi WHERE date LIKE ?", (date_filter,))
-    emi_paid = cursor.fetchone()[0]
+    # EMI `paid` is a cumulative balance on the parent row, so filtering the
+    # parent by its creation date gives wrong monthly/yearly payment totals.
+    # Reconstruct period activity from the payment ledger plus any initial paid
+    # amount that existed when the EMI record was created.
+    cursor.execute("SELECT id, COALESCE(paid,0) AS paid, date FROM emi WHERE user_id=?", (session['user_id'],))
+    emi_rows = [dict(r) for r in cursor.fetchall()]
+    cursor.execute("SELECT emi_id, COALESCE(amount,0) AS amount, date FROM emi_payments WHERE user_id=?", (session['user_id'],))
+    payment_rows = [dict(r) for r in cursor.fetchall()]
+    paid_by_emi = {}
+    for row in payment_rows:
+        paid_by_emi[row['emi_id']] = paid_by_emi.get(row['emi_id'], 0.0) + float(row.get('amount') or 0)
+    prefix = date_filter[:-1] if date_filter.endswith('%') else date_filter
+    emi_paid = sum(float(r.get('amount') or 0) for r in payment_rows if str(r.get('date') or '').startswith(prefix))
+    for row in emi_rows:
+        initial_paid = max(0.0, float(row.get('paid') or 0) - paid_by_emi.get(row['id'], 0.0))
+        if str(row.get('date') or '').startswith(prefix):
+            emi_paid += initial_paid
 
-    cursor.execute("SELECT COALESCE(SUM(total_amount - paid_amount),0) FROM debts")
+    cursor.execute("SELECT COALESCE(SUM(total_amount - paid_amount),0) FROM debts WHERE user_id=?", (session['user_id'],))
     debt_out = cursor.fetchone()[0]
     conn.close()
 

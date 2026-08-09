@@ -1,6 +1,6 @@
 # AZRET MANAGE PLAN
 
-A private, premium personal finance management web app — built with
+A public, premium multi-user personal finance management web app — built with
 Flask, SQLite, vanilla JS and a blue/white glassmorphism dashboard.
 Designed to run **entirely on your own device** (including Chromebook
 Linux / Chrome), with no cloud account and no data leaving your machine.
@@ -140,7 +140,7 @@ device only.
 |-------------|-------------------------------------|
 | Backend     | Python 3, Flask                     |
 | Templates   | Jinja2                              |
-| Database    | SQLite (via Python `sqlite3`)       |
+| Database    | Neon/PostgreSQL in production; SQLite fallback locally |
 | Frontend    | Vanilla HTML5 / CSS3 / JavaScript   |
 | Charts      | Custom dependency-free canvas engine|
 | PDF Reports | ReportLab                           |

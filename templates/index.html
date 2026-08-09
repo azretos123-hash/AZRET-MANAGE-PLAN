@@ -1,11 +1,16 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <meta name="csrf-token" content="{{ csrf_token }}">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>AZRET MANAGE PLAN</title>
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#1E4DB7">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="AZRET">
 <link rel="icon" id="faviconLink" href="{{ url_for('static', filename='icons/icon-192.png') }}">
 <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/icon-192.png') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
@@ -1067,7 +1072,7 @@
           </div>
           <div class="card glass about-card">
             <h3>About AZRET MANAGE PLAN</h3>
-            <p>AZRET MANAGE PLAN is a private, offline-first personal finance dashboard built for a single household. All data stays in a local SQLite database on this device — nothing is sent anywhere.</p>
+            <p>AZRET MANAGE PLAN is a public multi-user personal finance platform. Anyone can create an account and use the service online, while each account's financial records remain securely separated in the database.</p>
             <p class="footer-credit">Powered by AZRET</p>
           </div>
         </div>
@@ -1155,9 +1160,9 @@
           <div class="card glass">
             <h3>Data Management</h3>
             <div class="settings-actions">
-              <button class="btn-secondary" id="btnBackup">Backup Database</button>
-              <label class="btn-secondary file-label">Restore Database
-                <input type="file" id="restoreFile" accept=".db" hidden>
+              <button class="btn-secondary" id="btnBackup">Backup My Account</button>
+              <label class="btn-secondary file-label">Restore My Account
+                <input type="file" id="restoreFile" accept=".json" hidden>
               </label>
               <button class="btn-secondary" id="btnExport">Export Data (JSON)</button>
               <label class="btn-secondary file-label">Import Data
@@ -1171,11 +1176,15 @@
             <h3>Profile</h3>
             <form id="usernameForm">
               <label>Username</label>
-              <input type="text" id="profileUsername" maxlength="40" required placeholder="e.g. Ijas">
-              <div class="form-actions">
-                <button type="submit" class="btn-primary">Save Username</button>
-              </div>
+              <input type="text" id="profileUsername" minlength="3" maxlength="40" required placeholder="Your username">
+              <div class="form-actions"><button type="submit" class="btn-primary">Save Username</button></div>
               <p id="usernameMsg" class="form-error" style="display:none;"></p>
+            </form>
+            <form id="emailForm" style="margin-top:16px;">
+              <label>Email</label>
+              <input type="email" id="profileEmail" required placeholder="you@example.com">
+              <div class="form-actions"><button type="submit" class="btn-primary">Save Email</button></div>
+              <p id="emailMsg" class="form-error" style="display:none;"></p>
             </form>
           </div>
 
@@ -1185,7 +1194,7 @@
               <label>Current Password</label>
               <input type="password" id="currentPassword" required>
               <label>New Password</label>
-              <input type="password" id="newPassword" required minlength="4">
+              <input type="password" id="newPassword" required minlength="8">
               <div class="form-actions">
                 <button type="submit" class="btn-primary">Update Password</button>
               </div>
@@ -1198,7 +1207,7 @@
     </main>
 
     <footer class="app-footer">
-      <span>AZRET MANAGE PLAN</span> · <span id="footerYear"></span> · Powered by AZRET · 100% Local &amp; Private
+      <span>AZRET MANAGE PLAN</span> · <span id="footerYear"></span> · Powered by AZRET · Public Multi-User Finance Platform
     </footer>
   </div>
 </div>
@@ -1240,6 +1249,7 @@
       </div>
 
       <div class="ai-modal-head-right">
+        <button type="button" class="ph-modal-close" id="clearGeminiChatBtn" aria-label="Clear Gemini conversation" title="Clear conversation & AI memory" style="font-size:15px;width:auto;padding:0 10px;">Clear</button>
         <div class="currency-switch lang-switch" id="voiceAssistantLangToggle" title="Switch Language">
           <button type="button" class="cur-opt active" data-lang="en">EN</button>
           <button type="button" class="cur-opt" data-lang="ml">ML</button>
@@ -1274,7 +1284,7 @@
             <path d="M12 17v4M8 21h8"/>
           </svg>
         </button>
-        <input type="text" id="geminiChatInput" placeholder="Ask Gemini about your finances… (Malayalam/English)" autocomplete="off">
+        <input type="text" id="geminiChatInput" placeholder="Ask Gemini anything… (Malayalam/English)" autocomplete="off">
         <button type="submit" id="geminiSendBtn" class="btn-primary chat-send-btn">
           <span>Send</span>
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
@@ -1305,7 +1315,7 @@
         </div>
 
         <div id="liveTranscriptBox" class="live-transcript-box">
-          <p id="liveTranscriptText">Tap "Start Call" to talk directly with AZRET Gemini Advisor in real time.</p>
+          <p id="liveTranscriptText">Tap "Start Call" for continuous voice conversation with Gemini.</p>
         </div>
 
         <div class="live-call-controls">
@@ -1347,6 +1357,26 @@
 <div id="toast" class="toast"></div>
 
 <script src="{{ url_for('static', filename='js/charts.js') }}"></script>
-<script src="/static/js/app.js?v=2.1"></script>
+<script src="/static/js/app.js?v=2.2"></script>
+
+  <!-- Mobile bottom navigation -->
+  <nav class="mobile-bottom-nav" id="mobileBottomNav" aria-label="Mobile navigation">
+    <button class="mobile-nav-item active" data-mobile-page="dashboard" aria-label="Dashboard">
+      <span class="mobile-nav-icon">⌂</span><span>Home</span>
+    </button>
+    <button class="mobile-nav-item" data-mobile-page="income" aria-label="Income">
+      <span class="mobile-nav-icon">↑</span><span>Income</span>
+    </button>
+    <button class="mobile-nav-item" data-mobile-page="expenses" aria-label="Expenses">
+      <span class="mobile-nav-icon">↓</span><span>Expense</span>
+    </button>
+    <button class="mobile-nav-item" data-mobile-page="savings" aria-label="Savings">
+      <span class="mobile-nav-icon">◇</span><span>Savings</span>
+    </button>
+    <button class="mobile-nav-item" id="mobileMoreBtn" aria-label="More menu">
+      <span class="mobile-nav-icon">☰</span><span>More</span>
+    </button>
+  </nav>
+
 </body>
 </html>

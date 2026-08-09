@@ -1,107 +1,128 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <meta name="csrf-token" content="{{ csrf_token }}">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title id="pageTitle">AZRET MANAGE PLAN — Sign In</title>
+<title>AZRET MANAGE PLAN — Sign In</title>
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#1E4DB7">
 <link rel="icon" id="faviconLink" href="{{ url_for('static', filename='icons/icon-192.png') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+<style>
+.auth-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:18px 0 20px;padding:5px;border-radius:14px;background:rgba(255,255,255,.08)}
+.auth-tab{border:0;border-radius:10px;padding:10px 12px;background:transparent;color:inherit;font-weight:700;cursor:pointer}.auth-tab.active{background:rgba(255,255,255,.18)}
+.auth-panel[hidden]{display:none}.auth-helper{text-align:center;margin-top:14px;font-size:.86rem;opacity:.72}.auth-success{color:#22c55e}.auth-card{max-height:94vh;overflow:auto}
+</style>
 </head>
 <body class="auth-body">
-
-  <div class="auth-bg">
-    <div class="auth-blob blob-1"></div>
-    <div class="auth-blob blob-2"></div>
-    <div class="auth-blob blob-3"></div>
+<div class="auth-bg" aria-hidden="true">
+  <div class="auth-wallpaper auth-wallpaper-a active" id="authWallpaperA"></div>
+  <div class="auth-wallpaper auth-wallpaper-b" id="authWallpaperB"></div>
+  <div class="auth-wallpaper-overlay"></div>
+  <div class="auth-blob blob-1"></div><div class="auth-blob blob-2"></div><div class="auth-blob blob-3"></div>
+</div>
+<main class="auth-card glass">
+  <div class="auth-brand">
+    <div class="brand-mark"><div class="brand-mark-inner" id="loginLogo"><img src="{{ url_for('static', filename='icons/logo-mark.png') }}" alt="AZRET MANAGE PLAN logo"></div></div>
+    <h1 id="loginBrandTitle">AZRET <span>MANAGE PLAN</span></h1>
+    <p class="auth-tagline">Your public finance platform — create an account and manage your finances online.</p>
   </div>
 
-  <main class="auth-card glass">
-    <div class="auth-brand">
-      <div class="brand-mark">
-        <div class="brand-mark-inner" id="loginLogo">
-          <img src="{{ url_for('static', filename='icons/logo-mark.png') }}" alt="AZRET MANAGE PLAN logo">
-        </div>
-      </div>
-      <h1 id="loginBrandTitle">AZRET <span>MANAGE PLAN</span></h1>
-      <p class="auth-tagline">Your private, online-first finance command centre.</p>
-    </div>
+  <div class="auth-tabs" role="tablist">
+    <button class="auth-tab active" id="loginTab" type="button">Sign In</button>
+    <button class="auth-tab" id="registerTab" type="button">Create Account</button>
+  </div>
 
-    <form id="loginForm" class="auth-form" autocomplete="off">
-      <label for="username">Username</label>
-      <input type="text" id="username" name="username" placeholder="Enter your username" required autofocus autocomplete="username">
-
-      <label for="password">Access Password</label>
+  <section id="loginPanel" class="auth-panel">
+    <form id="loginForm" class="auth-form" autocomplete="on">
+      <label for="username">Username or Email</label>
+      <input type="text" id="username" placeholder="Enter username or email" required autofocus autocomplete="username">
+      <label for="password">Password</label>
       <div class="password-field">
-        <input type="password" id="password" name="password" placeholder="Enter your password" required autocomplete="current-password">
-        <button type="button" id="togglePassword" class="icon-btn" aria-label="Show password">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/>
-            <circle cx="12" cy="12" r="3"/>
-          </svg>
-        </button>
+        <input type="password" id="password" placeholder="Enter your password" required autocomplete="current-password">
+        <button type="button" class="icon-btn password-toggle" data-target="password" aria-label="Show password">👁</button>
       </div>
-      <p id="loginError" class="form-error" style="display:none;"></p>
-      <button type="submit" class="btn-primary btn-block">
-        <span>Unlock Dashboard</span>
-      </button>
+      <p id="loginError" class="form-error" style="display:none"></p>
+      <button type="submit" class="btn-primary btn-block"><span>Open Dashboard</span></button>
     </form>
+  </section>
 
-    <p class="auth-powered">Powered by AZRET · 100% Local &amp; Private</p>
-  </main>
+  <section id="registerPanel" class="auth-panel" hidden>
+    <form id="registerForm" class="auth-form" autocomplete="on">
+      <label for="regUsername">Username</label>
+      <input type="text" id="regUsername" minlength="3" maxlength="40" placeholder="Choose a username" required autocomplete="username">
+      <label for="regEmail">Email</label>
+      <input type="email" id="regEmail" placeholder="you@example.com" required autocomplete="email">
+      <label for="regPassword">Password</label>
+      <div class="password-field">
+        <input type="password" id="regPassword" minlength="8" placeholder="Minimum 8 characters" required autocomplete="new-password">
+        <button type="button" class="icon-btn password-toggle" data-target="regPassword" aria-label="Show password">👁</button>
+      </div>
+      <label for="regConfirm">Confirm Password</label>
+      <div class="password-field">
+        <input type="password" id="regConfirm" minlength="8" placeholder="Re-enter password" required autocomplete="new-password">
+        <button type="button" class="icon-btn password-toggle" data-target="regConfirm" aria-label="Show password">👁</button>
+      </div>
+      <p id="registerError" class="form-error" style="display:none"></p>
+      <button type="submit" class="btn-primary btn-block"><span>Create Account</span></button>
+    </form>
+  </section>
 
+  <p class="auth-helper">Public website · Register, sign in and manage your finance records online.</p>
+  <p class="auth-powered">Powered by AZRET</p>
+</main>
 <script>
-document.getElementById('togglePassword').addEventListener('click', function () {
-  const input = document.getElementById('password');
-  input.type = input.type === 'password' ? 'text' : 'password';
-});
+// Online login wallpaper rotation — no API key required.
+// Lorem Picsum serves random web photos; a new seed is generated on each page load
+// and every rotation. If the remote image cannot load, the CSS gradient remains visible.
+const wallpaperLayers=[document.getElementById('authWallpaperA'),document.getElementById('authWallpaperB')];
+let activeWallpaper=0;
+function makeWallpaperUrl(){
+  const seed=(window.crypto&&crypto.randomUUID)?crypto.randomUUID():`${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const w=Math.max(1280,Math.min(2400,Math.round(window.innerWidth*(window.devicePixelRatio||1))));
+  const h=Math.max(900,Math.min(1600,Math.round(window.innerHeight*(window.devicePixelRatio||1))));
+  return `https://picsum.photos/seed/azret-${encodeURIComponent(seed)}/${w}/${h}`;
+}
+function rotateOnlineWallpaper(){
+  const next=1-activeWallpaper;
+  const url=makeWallpaperUrl();
+  const probe=new Image();
+  probe.referrerPolicy='no-referrer';
+  probe.onload=()=>{
+    wallpaperLayers[next].style.backgroundImage=`url("${probe.src}")`;
+    wallpaperLayers[next].classList.add('active');
+    wallpaperLayers[activeWallpaper].classList.remove('active');
+    activeWallpaper=next;
+  };
+  // Keep the existing wallpaper/gradient if the online service is temporarily unavailable.
+  probe.onerror=()=>{};
+  probe.src=url;
+}
+rotateOnlineWallpaper();
+const wallpaperTimer=setInterval(()=>{ if(!document.hidden) rotateOnlineWallpaper(); },30000);
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden) rotateOnlineWallpaper(); });
 
-document.getElementById('loginForm').addEventListener('submit', async function (e) {
-  e.preventDefault();
-  const username = document.getElementById('username').value;
-  const password = document.getElementById('password').value;
-  const errEl = document.getElementById('loginError');
-  const btn = e.target.querySelector('button[type="submit"]');
-  btn.classList.add('loading');
-  try {
-    const res = await fetch('/api/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password })
-    });
-    const data = await res.json();
-    if (data.success) {
-      window.location.href = '/splash';
-    } else {
-      errEl.textContent = data.error || 'Incorrect username or password';
-      errEl.style.display = 'block';
-      btn.classList.remove('loading');
-    }
-  } catch (err) {
-    errEl.textContent = 'Unable to reach server.';
-    errEl.style.display = 'block';
-    btn.classList.remove('loading');
-  }
-});
+const loginTab=document.getElementById('loginTab'), registerTab=document.getElementById('registerTab');
+const loginPanel=document.getElementById('loginPanel'), registerPanel=document.getElementById('registerPanel');
+function setTab(which){const login=which==='login'; loginPanel.hidden=!login; registerPanel.hidden=login; loginTab.classList.toggle('active',login); registerTab.classList.toggle('active',!login)}
+loginTab.onclick=()=>setTab('login'); registerTab.onclick=()=>setTab('register');
+document.querySelectorAll('.password-toggle').forEach(btn=>btn.addEventListener('click',()=>{const el=document.getElementById(btn.dataset.target); el.type=el.type==='password'?'text':'password'}));
 
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/service-worker.js').catch(() => {});
-  });
+async function submitJson(url,payload,errorEl,button){
+  errorEl.style.display='none'; button.classList.add('loading'); button.disabled=true;
+  try{const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':(document.querySelector('meta[name=\"csrf-token\"]')?.content||'')},body:JSON.stringify(payload)}); const data=await res.json();
+    if(res.ok&&data.success){window.location.href=data.redirect||'/splash'; return}
+    errorEl.textContent=data.error||'Something went wrong'; errorEl.style.display='block';
+  }catch(e){errorEl.textContent='Unable to reach server.'; errorEl.style.display='block'}
+  finally{button.classList.remove('loading'); button.disabled=false}
 }
 
-(async function applyBranding() {
-  try {
-    const res = await fetch('/api/branding');
-    const data = await res.json();
-    if (data.logo_url) {
-      document.getElementById('loginLogo').innerHTML = `<img src="${data.logo_url}" alt="Logo">`;
-      const fav = document.getElementById('faviconLink');
-      if (fav) fav.href = data.logo_url;
-    }
-  } catch (e) { /* offline: keep default branding */ }
-})();
+document.getElementById('loginForm').addEventListener('submit',e=>{e.preventDefault(); submitJson('/api/login',{username:document.getElementById('username').value.trim(),password:document.getElementById('password').value},document.getElementById('loginError'),e.currentTarget.querySelector('button[type=submit]'))});
+document.getElementById('registerForm').addEventListener('submit',e=>{e.preventDefault(); const p=document.getElementById('regPassword').value,c=document.getElementById('regConfirm').value,err=document.getElementById('registerError'); if(p!==c){err.textContent='Passwords do not match';err.style.display='block';return} submitJson('/api/register',{username:document.getElementById('regUsername').value.trim(),email:document.getElementById('regEmail').value.trim(),password:p,confirm_password:c},err,e.currentTarget.querySelector('button[type=submit]'))});
+
+if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('/service-worker.js').catch(()=>{}))}
+(async()=>{try{const r=await fetch('/api/branding',{cache:'no-store'});const d=await r.json();if(d.logo_url){const host=document.getElementById('loginLogo');host.textContent='';const img=document.createElement('img');img.src=String(d.logo_url);img.alt='Logo';host.appendChild(img);document.getElementById('faviconLink').href=String(d.logo_url)}}catch(e){}})();
 </script>
 </body>
 </html>
