@@ -1,4 +1,4 @@
-/* RIZQ رزق — Growth نمو — Service Worker
+/* RIZQ رزق — Service Worker
    Public multi-user safe caching policy:
    - Never cache authenticated HTML/navigation responses.
    - Never cache API responses.
@@ -7,7 +7,7 @@
    from being replayed after logout on the same device.
 */
 
-const CACHE_NAME = 'rizq-v25-final-hardened';
+const CACHE_NAME = 'rizq-cache-v33';
 const STATIC_ASSETS = [
   '/manifest.json',
   '/static/css/style.css',
@@ -16,7 +16,7 @@ const STATIC_ASSETS = [
   '/static/icons/icon-192.png',
   '/static/icons/icon-512.png',
   '/static/icons/logo-mark.png',
-  '/static/icons/azret-ai.webp'
+  '/static/icons/rizq-ai-avatar.webp',
 ];
 
 self.addEventListener('install', (event) => {

@@ -1,7 +1,7 @@
 {
-  "name": "rizq-growth-finance",
-  "version": "1.0.0",
-  "description": "Rizq رزق — Growth نمو - Public multi-user personal finance platform",
+  "name": "rizq-finance",
+  "version": "1.0.32",
+  "description": "Rizq رزق — Plan • Manage • Grow — public multi-user personal finance platform",
   "scripts": {
     "dev": "python3 app.py",
     "build": "python3 -c 'import app'",

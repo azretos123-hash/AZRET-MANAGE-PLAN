@@ -1,5 +1,5 @@
 /* ==========================================================================
-   RIZQ رزق — Growth — Application Logic
+   RIZQ رزق — Application Logic
    ========================================================================== */
 
 /* Security: attach CSRF token to every same-origin state-changing fetch. */
@@ -15,7 +15,15 @@ window.fetch = function(input, init = {}) {
     if (AZRET_CSRF_TOKEN) headers.set('X-CSRF-Token', AZRET_CSRF_TOKEN);
     init = { ...init, headers };
   }
-  return _azretFetch(input, init);
+  return _azretFetch(input, init).then((response) => {
+    // A public multi-user site can leave a tab open longer than the server
+    // session. Redirect cleanly instead of letting every widget try to render
+    // the {error: 'unauthorized'} JSON as finance data.
+    if (sameOrigin && response.status === 401 && window.location.pathname !== '/login') {
+      window.location.assign('/login');
+    }
+    return response;
+  });
 };
 
 const state = {
@@ -350,7 +358,7 @@ async function loadBranding() {
 }
 
 function applyBranding(logoUrl) {
-  const targets = ['sidebarLogo', 'splashLogo', 'brandingPreview'];
+  const targets = ['splashLogo', 'brandingPreview'];
   targets.forEach(id => {
     const el = document.getElementById(id);
     if (!el || !logoUrl) return;
@@ -875,7 +883,7 @@ function speakDashboardSummary() {
       SpeechRecognition), supports English and Malayalam.
    2. On the final recognized transcript, the text is sent to the server
       (/api/ai-assistant), which calls Gemini and returns a short, on-topic
-      reply restricted to this app's financial data.
+      Gemini reply; finance context is attached only when the question is finance-related.
    3. The reply is spoken back automatically (SpeechSynthesis), and shown as
       a single status/transcript line — no scrolling chat window.
    ========================================================================== */
@@ -895,8 +903,10 @@ let geminiRequestInFlight = false;
 let liveTurnSerial = 0;
 
 function setupVoiceAssistant() {
+  if (!state.voiceLanguage || state.voiceLanguage === 'en-US') state.voiceLanguage = chooseInitialAssistantLanguage();
   const openBtn = document.getElementById('assistantBtn');
   const closeBtn = document.getElementById('voiceAssistantClose');
+  const minimizeBtn = document.getElementById('voiceAssistantMinimize');
   const modal = document.getElementById('voiceAssistantModal');
   const langToggle = document.getElementById('voiceAssistantLangToggle');
   const modeChatBtn = document.getElementById('modeChatBtn');
@@ -906,6 +916,7 @@ function setupVoiceAssistant() {
   if (openBtn) openBtn.addEventListener('click', openGeminiModal);
   if (clearBtn) clearBtn.addEventListener('click', clearGeminiConversation);
   if (closeBtn) closeBtn.addEventListener('click', closeGeminiModal);
+  if (minimizeBtn) minimizeBtn.addEventListener('click', toggleGeminiMinimize);
   if (modal) {
     modal.addEventListener('click', (e) => {
       if (e.target === modal) closeGeminiModal();
@@ -945,6 +956,14 @@ function setupVoiceAssistant() {
 
   // Gemini Live Call Setup
   setupGeminiLiveCall();
+
+  // The girl herself is the natural voice trigger. Opening the window never starts the microphone.
+  const liveAvatar = document.getElementById('liveOrb');
+  const triggerVoice = () => document.getElementById('liveMainCallBtn')?.click();
+  if (liveAvatar) {
+    liveAvatar.addEventListener('click', triggerVoice);
+    liveAvatar.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); triggerVoice(); } });
+  }
 }
 
 function openVoiceAssistantModal() {
@@ -969,6 +988,8 @@ function openGeminiModal() {
   const modal = document.getElementById('voiceAssistantModal');
   if (!modal) return;
   modal.style.display = 'flex';
+  modal.querySelector('.gemini-assistant-modal')?.classList.remove('ai-minimized');
+  document.getElementById('assistantBtn')?.classList.add('ai-launcher-hidden');
   document.body.classList.add('modal-open');
   loadGeminiHistory();
   switchGeminiMode('live');
@@ -979,10 +1000,23 @@ function openGeminiModal() {
 function closeGeminiModal() {
   const modal = document.getElementById('voiceAssistantModal');
   if (modal) modal.style.display = 'none';
+  modal?.querySelector('.gemini-assistant-modal')?.classList.remove('ai-minimized');
+  document.getElementById('assistantBtn')?.classList.remove('ai-launcher-hidden');
   document.body.classList.remove('modal-open');
   endLiveCall();
   speechSynthesis.cancel();
   stopVoiceAssistantListening();
+}
+
+function toggleGeminiMinimize() {
+  const shell = document.querySelector('#voiceAssistantModal .gemini-assistant-modal');
+  if (!shell) return;
+  const minimized = shell.classList.toggle('ai-minimized');
+  const btn = document.getElementById('voiceAssistantMinimize');
+  if (btn) { btn.textContent = minimized ? '□' : '−'; btn.title = minimized ? 'Restore' : 'Minimize'; }
+  // Minimize only changes the visual shell. Keep an already-started voice conversation alive.
+  // Closing (X) is the action that stops the microphone, speech and call state.
+  if (minimized) { updateLiveStatus(liveCallActive ? 'Azret AI active in minimized mode' : 'Azret AI minimized'); }
 }
 
 function switchGeminiMode(mode) {
@@ -1012,6 +1046,18 @@ function updateVoiceAssistantLanguageUI(toggle) {
     const btnLang = btn.dataset.lang === 'ml' ? 'ml-IN' : 'en-US';
     btn.classList.toggle('active', current === btnLang);
   });
+}
+
+function detectAssistantLanguageFromText(text) {
+  const value = String(text || '');
+  // Malayalam Unicode block. No visible EN/ML switch is required.
+  if (/[\u0D00-\u0D7F]/.test(value)) return 'ml-IN';
+  return 'en-US';
+}
+
+function chooseInitialAssistantLanguage() {
+  const langs = Array.isArray(navigator.languages) ? navigator.languages : [navigator.language || 'en-US'];
+  return langs.some(l => String(l).toLowerCase().startsWith('ml')) ? 'ml-IN' : 'en-US';
 }
 
 function getAssistantLanguageKey(languageCode) {
@@ -1109,11 +1155,21 @@ async function sendGeminiChatMessage(text) {
   if (sendBtn) sendBtn.disabled = true;
 
   try {
-    const res = await fetch('/api/ai-assistant', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query: cleanText, language: getAssistantLanguageKey(state.voiceLanguage), mode: 'chat' }),
-    });
+    const detectedLang = detectAssistantLanguageFromText(cleanText);
+    state.voiceLanguage = detectedLang;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 20000);
+    let res;
+    try {
+      res = await fetch('/api/ai-assistant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: cleanText, language: getAssistantLanguageKey(detectedLang), mode: 'chat' }),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
     let data = {};
     try { data = await res.json(); } catch (e) {}
     if (!res.ok) {
@@ -1125,7 +1181,8 @@ async function sendGeminiChatMessage(text) {
     if (!reply) throw new Error('Azret AI returned an empty response');
     updateGeminiChatMessage(botMsgId, reply, data.language || state.voiceLanguage);
   } catch (err) {
-    updateGeminiChatMessage(botMsgId, `Could not connect to Azret AI: ${err.message || 'network error'}`, state.voiceLanguage);
+    const detail = err && err.name === 'AbortError' ? 'Azret AI took too long to respond. Please try again.' : `Could not connect to Azret AI: ${err.message || 'network error'}`;
+    updateGeminiChatMessage(botMsgId, detail, state.voiceLanguage);
   } finally {
     geminiRequestInFlight = false;
     if (sendBtn) sendBtn.disabled = false;
@@ -1210,14 +1267,19 @@ function startChatMicListening() {
     if (micBtn) micBtn.classList.remove('listening');
     state.aiListening = false;
     if (input && input.value.trim()) {
-      sendGeminiChatMessage(input.value.trim());
+      const query = input.value.trim();
+      state.voiceLanguage = detectAssistantLanguageFromText(query);
+      sendGeminiChatMessage(query);
       input.value = '';
     }
   };
 
-  recognition.onerror = () => {
+  recognition.onerror = (event) => {
     if (micBtn) micBtn.classList.remove('listening');
     state.aiListening = false;
+    const code = event && event.error;
+    if (code === 'not-allowed' || code === 'service-not-allowed') toast('Microphone permission is blocked. Allow microphone access in the browser and try again.', 'error');
+    else if (code === 'audio-capture') toast('No microphone was found on this device.', 'error');
   };
 
   recognition.start();
@@ -1304,7 +1366,7 @@ function startLiveCall() {
     } else {
       if (liveCallActive && !liveCallMuted) startLiveCallTurn();
     }
-  }, 1000);
+  }, 250);
 }
 
 function endLiveCall() {
@@ -1372,6 +1434,8 @@ function startLiveCallTurn() {
   let finalTranscript = '';
   let hadError = false;
   let retryScheduled = false;
+  let submitted = false;
+
   const scheduleRetry = (delay) => {
     if (retryScheduled || myTurn !== liveTurnSerial || !liveCallActive || liveCallMuted) return;
     retryScheduled = true;
@@ -1380,69 +1444,103 @@ function startLiveCallTurn() {
     }, delay);
   };
 
+  const submitVoiceQuery = async (text) => {
+    const clean = String(text || '').trim();
+    if (!clean || submitted || myTurn !== liveTurnSerial || !liveCallActive) return;
+    submitted = true;
+    state.voiceLanguage = detectAssistantLanguageFromText(clean);
+    updateLiveStatus('Azret AI Thinking… ✨');
+    if (orb) orb.classList.add('speaking');
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+      let res;
+      try {
+        res = await fetch('/api/ai-assistant', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: clean, language: getAssistantLanguageKey(state.voiceLanguage), mode: 'voice' }),
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeoutId);
+      }
+      let data = {};
+      try { data = await res.json(); } catch (e) {}
+      if (!res.ok) throw new Error(data.error || data.hint || `Gemini request failed (${res.status})`);
+      if (myTurn !== liveTurnSerial || !liveCallActive) return;
+      const reply = data.response || data.reply;
+      if (!reply) throw new Error('Empty Azret AI response');
+      updateLiveTranscript(`Azret AI: ${reply}`);
+      if (liveSpeakerOn) {
+        updateLiveStatus('Azret AI Speaking… 🔊');
+        speakVoiceAssistantReply(reply, data.language || state.voiceLanguage, () => {
+          if (myTurn !== liveTurnSerial) return;
+          if (orb) orb.classList.remove('speaking');
+          scheduleRetry(250);
+        });
+      } else {
+        if (orb) orb.classList.remove('speaking');
+        scheduleRetry(400);
+      }
+    } catch (err) {
+      if (myTurn !== liveTurnSerial || !liveCallActive) return;
+      const msg = err && err.name === 'AbortError' ? 'Response took too long. Please try again.' : (err.message || 'AI connection error.');
+      updateLiveTranscript(`Azret AI: ${msg}`);
+      updateLiveStatus('Azret AI connection problem');
+      if (orb) orb.classList.remove('speaking');
+      scheduleRetry(1200);
+    }
+  };
+
   recognition.onresult = (e) => {
-    if (myTurn !== liveTurnSerial) return;
+    if (myTurn !== liveTurnSerial || submitted) return;
     let interim = '';
+    let gotFinal = false;
     for (let i = e.resultIndex; i < e.results.length; i++) {
-      if (e.results[i].isFinal) finalTranscript += e.results[i][0].transcript;
-      else interim += e.results[i][0].transcript;
+      if (e.results[i].isFinal) {
+        finalTranscript += e.results[i][0].transcript;
+        gotFinal = true;
+      } else {
+        interim += e.results[i][0].transcript;
+      }
     }
     const text = (finalTranscript + interim).trim();
     if (text) updateLiveTranscript(`You: ${text}`);
+    // Do not wait for the browser's onend event once a final transcript exists.
+    // Starting the Gemini request immediately removes a noticeable voice-mode pause.
+    if (gotFinal && finalTranscript.trim()) {
+      try { recognition.stop(); } catch (e) {}
+      submitVoiceQuery(finalTranscript);
+    }
   };
 
-  recognition.onerror = () => {
+  recognition.onerror = (event) => {
     hadError = true;
     if (state.aiRecognition === recognition) state.aiRecognition = null;
-    scheduleRetry(1500);
+    const code = event && event.error;
+    if (code === 'not-allowed' || code === 'service-not-allowed') {
+      updateLiveStatus('Microphone permission required');
+      updateLiveTranscript('Allow microphone access in your browser, then tap the avatar or Start Call again.');
+      liveCallActive = false;
+      updateLiveTimerDisplay();
+      return;
+    }
+    if (code === 'audio-capture') {
+      updateLiveStatus('Microphone not available');
+      updateLiveTranscript('No working microphone was detected on this device.');
+      liveCallActive = false;
+      return;
+    }
+    if (!submitted) scheduleRetry(code === 'no-speech' ? 450 : 900);
   };
 
   recognition.onend = () => {
     if (state.aiRecognition === recognition) state.aiRecognition = null;
-    if (myTurn !== liveTurnSerial || hadError) return;
+    if (myTurn !== liveTurnSerial || hadError || submitted) return;
     const text = finalTranscript.trim();
-    if (text) {
-      updateLiveStatus('Azret AI Thinking… ✨');
-      if (orb) orb.classList.add('speaking');
-
-      fetch('/api/ai-assistant', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: text, language: getAssistantLanguageKey(state.voiceLanguage), mode: 'voice' }),
-      })
-        .then(async res => {
-          let data = {};
-          try { data = await res.json(); } catch (e) {}
-          if (!res.ok) throw new Error(data.error || data.hint || `Gemini request failed (${res.status})`);
-          return data;
-        })
-        .then(data => {
-          if (myTurn !== liveTurnSerial || !liveCallActive) return;
-          const reply = data.response || data.reply;
-          if (!reply) throw new Error('Empty Azret AI response');
-          updateLiveTranscript(`Azret AI: ${reply}`);
-          if (liveSpeakerOn) {
-            updateLiveStatus('Azret AI Speaking… 🔊');
-            speakVoiceAssistantReply(reply, data.language || state.voiceLanguage, () => {
-              if (myTurn !== liveTurnSerial) return;
-              if (orb) orb.classList.remove('speaking');
-              scheduleRetry(600);
-            });
-          } else {
-            if (orb) orb.classList.remove('speaking');
-            scheduleRetry(1000);
-          }
-        })
-        .catch((err) => {
-          if (myTurn !== liveTurnSerial || !liveCallActive) return;
-          updateLiveTranscript(`Azret AI: ${err.message || 'AI connection error.'}`);
-          updateLiveStatus('Azret AI connection problem');
-          if (orb) orb.classList.remove('speaking');
-          scheduleRetry(2500);
-        });
-    } else {
-      scheduleRetry(1000);
-    }
+    if (text) submitVoiceQuery(text);
+    else scheduleRetry(500);
   };
 
   try {
@@ -1450,7 +1548,7 @@ function startLiveCallTurn() {
     state.aiRecognition = recognition;
   } catch (e) {
     hadError = true;
-    scheduleRetry(2000);
+    scheduleRetry(1200);
   }
 }
 
@@ -1475,29 +1573,47 @@ function cleanTextForSpeech(text) {
     .trim();
 }
 
+function pickPreferredAssistantVoice(targetLang) {
+  const voices = window.speechSynthesis ? speechSynthesis.getVoices() : [];
+  if (!voices.length) return null;
+  const base = String(targetLang || 'en-US').toLowerCase().split('-')[0];
+  const sameLang = voices.filter(v => String(v.lang || '').toLowerCase().startsWith(base));
+  // Voice names vary by ChromeOS/Android/Windows. Prefer commonly feminine/natural
+  // voices when present, but always fall back to a correct-language voice.
+  const preferredName = /female|samantha|zira|aria|jenny|ava|emma|google.*(us|uk)|microsoft.*(aria|zira|jenny)/i;
+  return sameLang.find(v => preferredName.test(v.name || '')) || sameLang.find(v => v.localService) || sameLang[0] || voices[0];
+}
+
 function speakVoiceAssistantReply(text, lang, onEndCallback) {
   if (!window.speechSynthesis || !text) {
+    setAzretAIState('idle');
     if (onEndCallback) onEndCallback();
     return;
   }
-
   speechSynthesis.cancel();
   const clean = cleanTextForSpeech(text);
-  const utterance = new SpeechSynthesisUtterance(clean);
-  const targetLang = String(lang || '').toLowerCase().startsWith('ml') ? 'ml-IN' : 'en-US';
-  utterance.lang = targetLang;
-  utterance.rate = 0.95;
-
-  const voices = speechSynthesis.getVoices();
-  const matchVoice = voices.find(v => v.lang.toLowerCase().startsWith(targetLang.toLowerCase()))
-    || voices.find(v => v.lang.toLowerCase().includes('ml') || v.lang.toLowerCase().includes('hi') || v.lang.toLowerCase().includes('in'));
-  if (matchVoice) utterance.voice = matchVoice;
-
-  if (onEndCallback) {
-    utterance.onend = onEndCallback;
-    utterance.onerror = onEndCallback;
+  if (!clean) {
+    setAzretAIState('idle');
+    if (onEndCallback) onEndCallback();
+    return;
   }
-
+  const targetLang = String(lang || '').toLowerCase().startsWith('ml') ? 'ml-IN' : 'en-US';
+  const utterance = new SpeechSynthesisUtterance(clean);
+  utterance.lang = targetLang;
+  utterance.rate = targetLang === 'ml-IN' ? 0.96 : 1.01;
+  utterance.pitch = 1.03;
+  const selected = pickPreferredAssistantVoice(targetLang);
+  if (selected) utterance.voice = selected;
+  let finished = false;
+  const finish = () => {
+    if (finished) return;
+    finished = true;
+    setAzretAIState('idle');
+    if (onEndCallback) onEndCallback();
+  };
+  utterance.onstart = () => setAzretAIState('speaking');
+  utterance.onend = finish;
+  utterance.onerror = finish;
   speechSynthesis.speak(utterance);
 }
 
@@ -1662,6 +1778,8 @@ async function loadTable(table, params = {}) {
   try {
     const res = await fetch(`/api/${table}${qs ? '?' + qs : ''}`);
     const data = await res.json();
+    if (!res.ok) throw new Error(data?.error || `Could not load ${table}`);
+    if (!Array.isArray(data)) throw new Error(`Invalid ${table} response`);
     state.tables[table] = data;
     renderTable(table, data);
   } catch (e) { toast('Could not load records', 'error'); }
@@ -3302,8 +3420,5 @@ function setAzretAIState(mode) {
 const _v16UpdateLiveStatus=updateLiveStatus;
 updateLiveStatus=function(text){_v16UpdateLiveStatus(text);const t=String(text||'').toLowerCase();if(t.includes('listening'))setAzretAIState('listening');else if(t.includes('thinking')||t.includes('connecting'))setAzretAIState('thinking');else if(t.includes('speaking'))setAzretAIState('speaking');else if(t.includes('connected'))setAzretAIState('greeting');else setAzretAIState('idle');};
 
-// Softer, more natural browser TTS where available.
-const _v16SpeakVoiceAssistantReply=speakVoiceAssistantReply;
-speakVoiceAssistantReply=function(text,lang,onEndCallback){setAzretAIState('speaking');if(!window.speechSynthesis||!text){setAzretAIState('idle');if(onEndCallback)onEndCallback();return;}speechSynthesis.cancel();const clean=cleanTextForSpeech(text);const u=new SpeechSynthesisUtterance(clean),target=String(lang||'').toLowerCase().startsWith('ml')?'ml-IN':'en-US';u.lang=target;u.rate=1.02;u.pitch=1.03;const voices=speechSynthesis.getVoices(),preferred=voices.find(v=>v.lang.toLowerCase().startsWith(target.toLowerCase())&&/female|samantha|zira|google|microsoft/i.test(v.name))||voices.find(v=>v.lang.toLowerCase().startsWith(target.toLowerCase()))||voices.find(v=>v.lang.toLowerCase().includes(target.split('-')[0]));if(preferred)u.voice=preferred;u.onend=()=>{setAzretAIState('idle');if(onEndCallback)onEndCallback();};u.onerror=u.onend;speechSynthesis.speak(u);};
 
 document.addEventListener('DOMContentLoaded',()=>{setupDashboardWallpaper();setupCurrencyPairSettings();setupFxInteractions();loadCurrencyCatalog();setAzretAIState('idle');});

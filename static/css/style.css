@@ -1,5 +1,5 @@
 /* ==========================================================================
-   RIZQ رزق — Growth — Stylesheet
+   RIZQ رزق — Stylesheet
    Design tokens: Premium Blue Glassmorphism — luxury banking finish
    ========================================================================== */
 @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Noto+Kufi+Arabic:wght@500;600;700&family=Playfair+Display:wght@600;700&display=swap');
@@ -1858,3 +1858,211 @@ body{background:var(--bg);}
 @keyframes azretFrameBreathe{0%,100%{transform:scale(1)}50%{transform:scale(1.018) translateY(-2px)}}
 @keyframes azretFrameSpeak{0%,100%{transform:scale(1)}50%{transform:scale(1.026) translateY(-2px)}}
 
+
+/* ========================================================================== 
+   V26 — Approved RIZQ luxury cinematic login (real HTML/CSS, no baked image)
+   ========================================================================== */
+.auth-v26{margin:0;min-height:100vh;overflow-x:hidden;background:#020813;color:#f7f2e8;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;}
+.auth-cinematic-bg{position:fixed;inset:0;overflow:hidden;z-index:0;background:
+ radial-gradient(circle at 82% 16%,rgba(22,91,220,.28),transparent 29%),
+ radial-gradient(circle at 22% 55%,rgba(210,151,38,.12),transparent 34%),
+ linear-gradient(125deg,#030812 0%,#061327 48%,#020710 100%);}
+.auth-cinematic-bg:before{content:"";position:absolute;inset:0;opacity:.28;background-image:
+ radial-gradient(circle,rgba(255,213,124,.9) 0 1px,transparent 1.6px),
+ radial-gradient(circle,rgba(77,148,255,.72) 0 1px,transparent 1.6px);
+ background-size:83px 83px,127px 127px;background-position:17px 21px,61px 37px;animation:v26StarDrift 28s linear infinite;}
+.auth-cinematic-bg:after{content:"";position:absolute;left:-8%;right:-8%;bottom:-23%;height:44%;background:repeating-radial-gradient(ellipse at center,rgba(35,98,196,.13) 0 2px,transparent 3px 18px);transform:perspective(500px) rotateX(66deg);filter:blur(.2px);opacity:.48;animation:v26WaterMove 12s ease-in-out infinite alternate;}
+.auth-aurora{position:absolute;border-radius:50%;filter:blur(90px);opacity:.28;mix-blend-mode:screen;}
+.auth-aurora-blue{width:42vw;height:42vw;right:-12vw;top:-12vw;background:#0b62ff;animation:v26Aurora 13s ease-in-out infinite alternate;}
+.auth-aurora-gold{width:34vw;height:34vw;left:-10vw;bottom:-14vw;background:#c9912e;animation:v26Aurora 16s ease-in-out infinite alternate-reverse;}
+.auth-light-ribbon{position:absolute;width:75vw;height:280px;left:-14vw;border:1px solid transparent;border-top-color:rgba(221,166,58,.42);border-radius:50%;filter:drop-shadow(0 0 12px rgba(231,177,65,.25));transform:rotate(-8deg);}
+.ribbon-one{top:38%;animation:v26Ribbon 12s ease-in-out infinite alternate;}.ribbon-two{top:54%;left:-5vw;border-top-color:rgba(57,125,255,.48);animation:v26Ribbon 15s ease-in-out infinite alternate-reverse;}
+.auth-water-glow{position:absolute;left:0;right:0;bottom:0;height:22%;background:linear-gradient(to top,rgba(0,69,181,.14),transparent);filter:blur(18px);}
+@keyframes v26StarDrift{to{background-position:100px 80px,-90px 150px}}
+@keyframes v26WaterMove{to{transform:perspective(500px) rotateX(66deg) translateX(30px) scale(1.04)}}
+@keyframes v26Aurora{to{transform:translate(5vw,3vh) scale(1.12);opacity:.38}}
+@keyframes v26Ribbon{to{transform:translateX(8vw) translateY(-22px) rotate(-4deg);opacity:.75}}
+
+.auth-shell-v26{position:relative;z-index:2;width:min(1320px,94vw);min-height:100vh;margin:auto;display:grid;grid-template-columns:minmax(0,1.05fr) minmax(440px,.95fr);align-items:center;gap:clamp(34px,6vw,100px);padding:42px 0;}
+.auth-hero-v26{text-align:center;padding:24px 18px;animation:v26HeroIn .95s cubic-bezier(.16,1,.3,1) both;}
+.rizq-title-lockup{display:grid;justify-items:center;position:relative;isolation:isolate;}
+.rizq-word-en,.rizq-word-ar{position:relative;margin:0;color:#e9bd56;text-shadow:0 0 10px rgba(255,197,73,.35),0 0 32px rgba(233,170,47,.22);background:linear-gradient(110deg,#8e5d10 0%,#ffd976 22%,#fff1bd 40%,#d79b2c 58%,#fff0ad 74%,#a66a12 100%);background-size:220% 100%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;animation:v26GoldReveal 1.05s cubic-bezier(.16,1,.3,1) both,v26GoldShimmer 7s 1.5s ease-in-out infinite;}
+.rizq-word-en{font-family:Georgia,"Times New Roman",serif;font-size:clamp(5rem,9vw,9.2rem);line-height:.9;letter-spacing:-.035em;}
+.rizq-word-ar{font-family:"Noto Naskh Arabic","Noto Sans Arabic",Tahoma,Arial,sans-serif;font-size:clamp(5.5rem,10vw,10rem);line-height:.95;margin-top:10px;}
+.rizq-divider,.hero-mini-divider,.auth-title-ornament{width:min(390px,78%);display:flex;align-items:center;justify-content:center;gap:13px;color:#e9bd56;margin:16px auto 10px;opacity:.9}.rizq-divider span,.hero-mini-divider span,.auth-title-ornament span{height:1px;flex:1;background:linear-gradient(90deg,transparent,#d7a53d,transparent)}.rizq-divider b,.hero-mini-divider b,.auth-title-ornament b{font-weight:400;text-shadow:0 0 12px rgba(255,194,64,.65)}
+.hero-feature-row{display:flex;align-items:center;justify-content:center;gap:22px;margin-top:18px;color:#eee6d7}.hero-feature-row>i{width:1px;height:54px;background:linear-gradient(transparent,#d7a53d,transparent)}.hero-feature{display:grid;gap:5px;place-items:center;min-width:80px}.hero-feature-icon{font-size:30px;color:#e2ae3f;text-shadow:0 0 14px rgba(230,171,53,.42)}.hero-feature strong{font-family:Georgia,"Times New Roman",serif;font-size:1.16rem;font-weight:500}
+.hero-smart-line{font-family:Georgia,"Times New Roman",serif;font-size:clamp(1.2rem,2vw,1.65rem);letter-spacing:.02em;margin:22px 0 0;color:#f7f0df}.hero-mini-divider{width:min(300px,60%);margin:12px auto}.hero-public-copy{font-size:.96rem;line-height:1.7;color:rgba(242,239,232,.78);margin:0}
+@keyframes v26HeroIn{from{opacity:0;transform:translateX(-36px)}to{opacity:1;transform:none}}
+@keyframes v26GoldReveal{from{opacity:0;filter:blur(8px);transform:translateY(18px) scale(.98)}to{opacity:1;filter:blur(0);transform:none}}
+@keyframes v26GoldShimmer{0%,70%,100%{background-position:0 0}82%{background-position:100% 0}}
+
+.auth-card-v26{position:relative;overflow:hidden;padding:clamp(30px,4vw,48px);border-radius:30px;background:linear-gradient(145deg,rgba(9,24,49,.84),rgba(2,10,24,.93));border:1px solid rgba(224,178,77,.55);box-shadow:0 28px 80px rgba(0,0,0,.48),inset 0 0 0 1px rgba(52,125,255,.08),0 0 42px rgba(17,92,220,.1);backdrop-filter:blur(22px) saturate(132%);-webkit-backdrop-filter:blur(22px) saturate(132%);animation:v26CardIn .9s .12s cubic-bezier(.16,1,.3,1) both;}
+.auth-card-v26:before{content:"";position:absolute;inset:-2px;border-radius:32px;padding:2px;background:conic-gradient(from var(--auth-angle,0deg),transparent 0 38%,rgba(53,132,255,.95) 44%,transparent 49% 67%,rgba(242,190,75,.95) 73%,transparent 79%);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none;animation:v26BorderRun 8s linear infinite;}
+.auth-card-scan{position:absolute;inset:-80% -50%;background:linear-gradient(115deg,transparent 45%,rgba(255,216,123,.07) 49%,rgba(85,151,255,.10) 51%,transparent 55%);transform:translateX(-45%);animation:v26CardSweep 7s ease-in-out infinite;pointer-events:none}
+@keyframes v26CardIn{from{opacity:0;transform:translateX(38px) scale(.985)}to{opacity:1;transform:none}}
+@property --auth-angle{syntax:'<angle>';initial-value:0deg;inherits:false}@keyframes v26BorderRun{to{--auth-angle:360deg}}@keyframes v26CardSweep{0%,62%,100%{transform:translateX(-45%)}78%{transform:translateX(45%)}}
+.auth-card-header{text-align:center;margin-bottom:26px}.auth-section-kicker{display:flex;align-items:center;justify-content:center;gap:12px;color:#e6b54c;letter-spacing:.48em;font-size:.76rem;margin-bottom:13px}.auth-section-kicker span{width:42px;height:1px;background:linear-gradient(90deg,transparent,#d4a03c)}.auth-section-kicker span:last-child{transform:scaleX(-1)}.auth-section-kicker strong{font-weight:650}.auth-card-header h2{font-family:Georgia,"Times New Roman",serif;font-weight:500;font-size:clamp(2rem,3vw,2.8rem);margin:0;color:#fff7e8;text-shadow:0 0 18px rgba(255,207,104,.12)}.auth-title-ornament{width:210px;margin:12px auto 0}
+.auth-form-v26{display:grid;gap:10px}.auth-form-v26 label{font-weight:650;font-size:.92rem;color:#f2ddab;margin-top:5px}.auth-input-wrap{position:relative;isolation:isolate;border-radius:15px;padding:1px;background:linear-gradient(100deg,rgba(107,147,211,.44),rgba(218,169,72,.28),rgba(79,132,215,.44));overflow:hidden}.auth-input-wrap:before{content:"";position:absolute;z-index:-1;inset:-2px;width:35%;background:linear-gradient(90deg,transparent,rgba(255,202,87,.85),rgba(67,143,255,.8),transparent);filter:blur(1px);transform:translateX(-160%);animation:v26InputLight 6.4s ease-in-out infinite}.auth-input-wrap:focus-within{box-shadow:0 0 0 1px rgba(76,147,255,.45),0 0 24px rgba(47,122,255,.18)}.auth-input-wrap input{width:100%;border:0!important;outline:0!important;border-radius:14px!important;margin:0!important;padding:16px 48px 16px 46px!important;background:rgba(6,20,43,.88)!important;color:#fff!important;font-size:1rem!important;box-shadow:none!important}.auth-input-wrap input::placeholder{color:rgba(233,239,250,.52)}.auth-input-icon{position:absolute;left:16px;top:50%;transform:translateY(-50%);z-index:2;color:#d9ad55;font-size:1.08rem}.password-toggle-v26{position:absolute;right:8px;top:50%;transform:translateY(-50%);z-index:3;border:0;background:transparent;color:#d8e1ef;font-size:1.05rem;cursor:pointer;padding:10px}.auth-options-row{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:5px 0 8px}.remember-row{display:flex!important;align-items:center;gap:9px!important;color:rgba(241,241,241,.78)!important;font-weight:500!important;margin:0!important}.remember-row input{accent-color:#d5a53f;width:17px;height:17px}.forgot-password-link{border:0;background:transparent;color:#2f91ff;cursor:pointer;font-weight:650;padding:6px 0}.forgot-password-link:hover{text-decoration:underline;color:#67b2ff}
+@keyframes v26InputLight{0%,62%,100%{transform:translateX(-160%)}80%{transform:translateX(420%)}}
+.auth-primary-v26,.auth-secondary-v26{position:relative;overflow:hidden;width:100%;border-radius:15px;min-height:56px;font-family:Georgia,"Times New Roman",serif;font-size:1.13rem;cursor:pointer;transition:transform .2s ease,box-shadow .2s ease}.auth-primary-v26{display:flex;align-items:center;justify-content:center;border:1px solid rgba(231,185,82,.7);color:#fff6dc;background:linear-gradient(100deg,#ac7418 0%,#0d387e 35%,#0a2d69 68%,#145ac3 100%);box-shadow:0 10px 26px rgba(0,72,190,.25),inset 0 1px rgba(255,255,255,.12)}.auth-primary-v26:before{content:"";position:absolute;inset:-20% auto -20% -35%;width:26%;background:linear-gradient(100deg,transparent,rgba(255,237,181,.72),transparent);transform:skewX(-18deg);animation:v26ButtonShine 5s ease-in-out infinite}.auth-primary-v26 b{position:absolute;right:22px;font-size:2rem;font-weight:300;color:#f7cf70}.auth-primary-v26:hover,.auth-secondary-v26:hover{transform:translateY(-2px)}.auth-primary-v26:hover{box-shadow:0 14px 32px rgba(0,84,215,.32),0 0 18px rgba(233,181,70,.15)}@keyframes v26ButtonShine{0%,58%,100%{left:-35%}78%{left:115%}}
+.auth-or-v26{display:flex;align-items:center;gap:16px;margin:22px 0;color:#e2b84f}.auth-or-v26 span{height:1px;flex:1;background:linear-gradient(90deg,transparent,rgba(213,165,63,.66))}.auth-or-v26 span:last-child{transform:scaleX(-1)}.auth-or-v26 b{font-size:.84rem}.auth-secondary-v26{border:1px solid rgba(214,165,67,.68);background:rgba(5,15,31,.46);color:#f5f0e7}.auth-secondary-v26 span{color:#e8b849;margin-right:8px}.secure-login-v26{text-align:center;margin-top:25px}.secure-login-v26 strong{display:block;color:#e6b949;font-size:1rem}.secure-login-v26 strong span{margin-right:7px}.secure-login-v26 p{margin:8px 0 0;color:rgba(227,234,245,.63);font-size:.82rem}.auth-error-v26{margin:0 0 2px!important}.register-heading{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}.register-heading h3{margin:0;color:#f5d17e;font-family:Georgia,"Times New Roman",serif}.auth-back-btn{border:0;background:transparent;color:#64aaff;cursor:pointer}.auth-panel-v26[hidden]{display:none}
+
+.forgot-dialog{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;padding:20px;background:rgba(1,5,13,.72);backdrop-filter:blur(9px);opacity:0;transition:opacity .18s ease}.forgot-dialog.open{opacity:1}.forgot-dialog[hidden]{display:none}.forgot-dialog-card{position:relative;width:min(430px,92vw);padding:30px;border-radius:22px;border:1px solid rgba(223,175,70,.55);background:linear-gradient(145deg,#0b1b36,#050d1c);box-shadow:0 26px 80px rgba(0,0,0,.5);text-align:center}.forgot-dialog-card h3{font-family:Georgia,"Times New Roman",serif;color:#f1cc75;font-size:1.8rem;margin:0 0 10px}.forgot-dialog-card p{color:rgba(237,242,250,.75);line-height:1.6;font-size:.9rem}.forgot-close{position:absolute;right:14px;top:10px;border:0;background:transparent;color:#fff;font-size:1.7rem;cursor:pointer}
+
+@media(max-width:900px){.auth-shell-v26{grid-template-columns:1fr;width:min(680px,92vw);gap:12px;padding:26px 0 36px}.auth-hero-v26{padding:14px 6px 4px}.rizq-word-en{font-size:clamp(4.2rem,18vw,7rem)}.rizq-word-ar{font-size:clamp(4.7rem,20vw,7.8rem)}.hero-feature-row{margin-top:10px}.hero-public-copy{display:none}.auth-card-v26{padding:28px 22px;border-radius:24px}.desktop-only{display:none}}
+@media(max-width:520px){.auth-shell-v26{width:94vw}.hero-feature-row{gap:10px}.hero-feature-row>i{height:40px}.hero-feature{min-width:68px}.hero-feature-icon{font-size:23px}.hero-feature strong{font-size:.98rem}.hero-smart-line{font-size:1.1rem}.auth-options-row{align-items:flex-start}.forgot-password-link{font-size:.82rem}.auth-card-header h2{font-size:2rem}.auth-section-kicker{letter-spacing:.3em}.auth-card-v26{backdrop-filter:blur(16px)}}
+@media(prefers-reduced-motion:reduce){.auth-v26 *,.auth-v26 *:before,.auth-v26 *:after{animation-duration:.001ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important}}
+\n\n/* V27 — official RIZQ sidebar brand lockup */\n.sidebar-brand{\n  gap:12px; padding:2px 2px 20px; align-items:center; position:relative;\n}\n.brand-logo-wrap{\n  width:62px; height:62px; min-width:62px; border-radius:50%; overflow:hidden;\n  background:#07553f; border:1px solid rgba(211,164,51,.55);\n  box-shadow:0 8px 22px rgba(3,71,53,.14),0 0 0 3px rgba(211,164,51,.06);\n}\n.brand-logo-wrap img{\n  width:100%; height:100%; object-fit:cover; object-position:center; border-radius:50%;\n}\n.sidebar-brand-text{gap:3px; min-width:0; line-height:1; margin-right:auto;}\n.sidebar-brand-text .brand-name-bilingual{\n  display:flex; align-items:baseline; gap:6px; width:max-content; max-width:100%;\n  font-family:Georgia,"Times New Roman",serif; font-size:20px; font-weight:800;\n  letter-spacing:-.02em; color:#0c315d; position:relative; overflow:hidden;\n  background:linear-gradient(105deg,#0d3769 0%,#174f9b 35%,#d3a433 50%,#174f9b 65%,#0d3769 100%);\n  background-size:240% 100%; -webkit-background-clip:text; background-clip:text;\n  -webkit-text-fill-color:transparent; animation:rizqSidebarShimmer 7s ease-in-out infinite;\n}\n.sidebar-brand-text .brand-name-bilingual b{\n  font-family:"Noto Naskh Arabic","Noto Sans Arabic",Tahoma,Arial,sans-serif;\n  font-size:22px; font-weight:800; color:inherit; -webkit-text-fill-color:transparent;\n}\n.sidebar-brand-text .brand-motto-en{\n  font-size:8px; line-height:1.2; letter-spacing:.025em; color:var(--navy-700);\n  font-weight:700; white-space:nowrap; text-transform:none;\n}\n.sidebar-brand-text .brand-tagline-en{\n  font-size:7px; line-height:1.2; color:var(--text-muted); white-space:nowrap; font-style:italic;\n}\n.brand-theme-toggle{margin-left:auto; flex:0 0 auto;}\n[data-theme="dark"] .sidebar-brand-text .brand-name-bilingual{\n  background:linear-gradient(105deg,#f7fbff 0%,#78aef8 34%,#e1b852 50%,#78aef8 66%,#f7fbff 100%);\n  background-size:240% 100%; -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;\n}\n[data-theme="dark"] .sidebar-brand-text .brand-motto-en{color:#dbeafe;}\n@keyframes rizqSidebarShimmer{0%,68%,100%{background-position:0 0}82%{background-position:100% 0}}\n@media(max-width:1100px){.brand-logo-wrap{width:58px;height:58px;min-width:58px}.sidebar-brand-text .brand-name-bilingual{font-size:19px}.sidebar-brand-text .brand-name-bilingual b{font-size:21px}}\n@media(prefers-reduced-motion:reduce){.sidebar-brand-text .brand-name-bilingual{animation:none!important}}\n
+/* V28 — Dashboard Rizq AI live avatar dock. No screenshot/card image is used. */
+#page-dashboard{position:relative;}
+.rizq-ai-dock{position:absolute;z-index:12;right:8px;top:-8px;width:245px;min-height:112px;border:1px solid rgba(76,141,255,.22);border-radius:28px;padding:12px 12px 12px 105px;background:linear-gradient(135deg,rgba(255,255,255,.80),rgba(244,248,255,.62));backdrop-filter:blur(18px) saturate(145%);box-shadow:0 18px 45px rgba(21,58,128,.14);cursor:pointer;text-align:left;color:var(--text);overflow:visible;isolation:isolate;transition:transform .25s ease,box-shadow .25s ease;}
+[data-theme="dark"] .rizq-ai-dock{background:linear-gradient(135deg,rgba(12,29,63,.88),rgba(7,20,47,.72));border-color:rgba(216,179,108,.20);}
+.rizq-ai-dock:hover{transform:translateY(-3px);box-shadow:0 22px 54px rgba(21,58,128,.22);}
+.rizq-ai-avatar-wrap{position:absolute;left:10px;bottom:8px;width:92px;height:92px;border-radius:50%;overflow:hidden;border:2px solid rgba(255,255,255,.95);box-shadow:0 0 0 3px rgba(216,179,108,.65),0 0 0 7px rgba(76,141,255,.12),0 12px 30px rgba(16,54,126,.24);background:#eef4ff;animation:rizqAvatarBreathe 4.8s ease-in-out infinite;}
+.rizq-ai-avatar{width:100%;height:100%;object-fit:cover;object-position:43% 16%;transform:scale(1.7);transform-origin:43% 18%;display:block;}
+.rizq-ai-halo{position:absolute;left:2px;bottom:0;width:108px;height:108px;border-radius:50%;background:conic-gradient(from 0deg,transparent 0 20%,rgba(76,141,255,.85) 28%,transparent 36% 63%,rgba(216,179,108,.88) 72%,transparent 82%);filter:blur(.2px);animation:rizqHaloSpin 7s linear infinite;z-index:-1;opacity:.8;}
+.rizq-ai-wave{position:absolute;width:35px;height:35px;left:1px;bottom:2px;color:#f0c66f;filter:drop-shadow(0 2px 5px rgba(77,43,4,.22));transform-origin:55% 85%;animation:rizqWave 5.2s ease-in-out infinite;z-index:4;}
+.rizq-ai-blink{position:absolute;left:31px;top:32px;width:31px;height:2px;border-radius:50%;background:rgba(26,21,30,.55);opacity:0;z-index:3;animation:rizqBlink 5.8s infinite;}
+.rizq-ai-smile{position:absolute;left:43px;top:55px;width:16px;height:6px;border-bottom:2px solid rgba(126,49,57,.48);border-radius:0 0 50% 50%;opacity:.35;animation:rizqSmile 7s ease-in-out infinite;z-index:3;}
+.rizq-ai-copy{display:flex;min-height:68px;flex-direction:column;justify-content:center;gap:5px;position:relative;z-index:2;}
+.rizq-ai-hello{width:max-content;max-width:95px;overflow:hidden;white-space:nowrap;font-family:var(--font-elegant);font-size:24px;font-weight:800;color:#1e4db7;border-right:2px solid #d8b36c;animation:rizqTypeHello 6.8s steps(6,end) infinite, rizqCaret .7s step-end infinite;}
+[data-theme="dark"] .rizq-ai-hello{color:#f1c971;}
+.rizq-ai-sub{font-size:11px;line-height:1.25;color:var(--text-muted);font-weight:700;max-width:115px;}
+.rizq-ai-mic{position:absolute;right:10px;bottom:9px;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;color:#fff;background:linear-gradient(135deg,#2f7cff,#1748b4);box-shadow:0 0 0 0 rgba(47,124,255,.30);animation:rizqMicPulse 2.1s ease-out infinite;}
+.rizq-ai-mic svg{width:15px;height:15px;}
+@keyframes rizqHaloSpin{to{transform:rotate(360deg)}}
+@keyframes rizqAvatarBreathe{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-2px) scale(1.018)}}
+@keyframes rizqWave{0%,62%,100%{transform:rotate(0)}66%{transform:rotate(18deg)}70%{transform:rotate(-10deg)}74%{transform:rotate(18deg)}78%{transform:rotate(0)}}
+@keyframes rizqBlink{0%,43%,46%,100%{opacity:0;transform:scaleY(1)}44%,45%{opacity:.72;transform:scaleY(2)}}
+@keyframes rizqSmile{0%,65%,100%{transform:scaleX(1);opacity:.30}72%,82%{transform:scaleX(1.18);opacity:.62}}
+@keyframes rizqTypeHello{0%,10%{width:0}28%,72%{width:6ch}86%,100%{width:0}}
+@keyframes rizqCaret{50%{border-color:transparent}}
+@keyframes rizqMicPulse{0%{box-shadow:0 0 0 0 rgba(47,124,255,.34)}70%{box-shadow:0 0 0 10px rgba(47,124,255,0)}100%{box-shadow:0 0 0 0 rgba(47,124,255,0)}}
+@media(min-width:1100px){#page-dashboard>.dashboard-hero-head{padding-right:270px;min-height:132px;}}
+@media(max-width:1099px){.rizq-ai-dock{position:relative;right:auto;top:auto;margin:0 0 14px auto;width:min(245px,100%);}#page-dashboard>.dashboard-hero-head{padding-right:20px;}}
+@media(max-width:620px){.rizq-ai-dock{width:100%;min-height:96px;padding-left:92px;border-radius:22px}.rizq-ai-avatar-wrap{width:76px;height:76px}.rizq-ai-halo{width:90px;height:90px}.rizq-ai-hello{font-size:21px}.rizq-ai-sub{max-width:150px}.rizq-ai-wave{width:29px;height:29px}.rizq-ai-blink,.rizq-ai-smile{display:none}}
+@media(prefers-reduced-motion:reduce){.rizq-ai-dock *{animation:none!important}.rizq-ai-hello{width:auto;border-right:0}}
+/* V29 — Azret AI interaction polish */
+.rizq-ai-dock.ai-launcher-hidden{opacity:0!important;pointer-events:none!important;transform:scale(.86)!important;visibility:hidden!important}
+#liveOrb{cursor:pointer}
+#liveOrb:focus-visible{outline:3px solid rgba(49,122,255,.45);outline-offset:8px}
+.gemini-assistant-modal.ai-minimized{width:min(390px,92vw)!important;max-height:none!important;position:fixed!important;right:22px!important;bottom:22px!important;left:auto!important;top:auto!important;padding:12px 14px!important;border-radius:22px!important}
+.gemini-assistant-modal.ai-minimized .ai-modal-mode-selector,
+.gemini-assistant-modal.ai-minimized .gemini-view-container{display:none!important}
+.gemini-assistant-modal.ai-minimized .ai-modal-head{margin:0!important;align-items:center!important}
+.gemini-assistant-modal.ai-minimized .ai-modal-head-left h3:after{content:' • Ready';font-family:var(--font-ui);font-size:12px;font-weight:600;color:#27b477;margin-left:7px}
+.ai-minimize-btn{font-size:24px!important;line-height:1!important}
+/* Avatar remains the visual trigger: no decorative mic badge beside it. */
+.rizq-ai-mic{display:none!important}
+@media(max-width:620px){.gemini-assistant-modal.ai-minimized{right:10px!important;bottom:10px!important;width:calc(100vw - 20px)!important}}
+
+/* === V31: form field visual normalization ===
+   Replace bright/white entry boxes with the navy outlined field treatment
+   requested from the reference screenshots. Keep navigation/search chrome intact. */
+:root{
+  --v31-field-bg: rgba(8, 27, 61, .94);
+  --v31-field-bg-hover: rgba(10, 34, 76, .97);
+  --v31-field-border: rgba(70, 126, 224, .46);
+  --v31-field-border-focus: #4d8fff;
+  --v31-field-text: #f7f9ff;
+  --v31-field-placeholder: rgba(224, 233, 249, .55);
+}
+
+.form-card input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]),
+.form-card select,
+.form-card textarea,
+.calc-card input:not([type="checkbox"]):not([type="radio"]),
+.calc-card select,
+#passwordForm input:not([type="checkbox"]):not([type="radio"]),
+.budget-bar-row input,
+.currency-select-grid select,
+.table-search,
+.gemini-chat-input-row input {
+  background: var(--v31-field-bg) !important;
+  color: var(--v31-field-text) !important;
+  border: 1px solid var(--v31-field-border) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.035), 0 6px 18px rgba(4,17,41,.08) !important;
+  caret-color: #8db8ff;
+  transition: border-color .18s ease, box-shadow .18s ease, background .18s ease, transform .18s ease;
+}
+
+.form-card input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):hover,
+.form-card select:hover,
+.form-card textarea:hover,
+.calc-card input:hover,
+.calc-card select:hover,
+#passwordForm input:hover,
+.budget-bar-row input:hover,
+.currency-select-grid select:hover,
+.table-search:hover,
+.gemini-chat-input-row input:hover {
+  background: var(--v31-field-bg-hover) !important;
+  border-color: rgba(89, 148, 247, .68) !important;
+}
+
+.form-card input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):focus,
+.form-card select:focus,
+.form-card textarea:focus,
+.calc-card input:focus,
+.calc-card select:focus,
+#passwordForm input:focus,
+.budget-bar-row input:focus,
+.currency-select-grid select:focus,
+.table-search:focus,
+.gemini-chat-input-row input:focus {
+  outline: none !important;
+  background: rgba(8,31,72,.99) !important;
+  border-color: var(--v31-field-border-focus) !important;
+  box-shadow: 0 0 0 3px rgba(77,143,255,.15), inset 0 1px 0 rgba(255,255,255,.045) !important;
+}
+
+.form-card input::placeholder,
+.form-card textarea::placeholder,
+.calc-card input::placeholder,
+#passwordForm input::placeholder,
+.budget-bar-row input::placeholder,
+.table-search::placeholder,
+.gemini-chat-input-row input::placeholder {
+  color: var(--v31-field-placeholder) !important;
+  opacity: 1;
+}
+
+.form-card select option,
+.calc-card select option,
+.currency-select-grid select option {
+  background: #091d42;
+  color: #f7f9ff;
+}
+
+.form-card input[type="date"],
+.form-card input[type="time"],
+.form-card input[type="datetime-local"],
+.form-card input[type="month"] {
+  color-scheme: dark;
+}
+
+/* Keep the V26 login treatment and the top search field independent. */
+.auth-input-wrap input,
+.topbar-search input {
+  box-shadow: none !important;
+}
+
+
+/* V32 — final Azret AI stability/animation pass.
+   The assistant window uses the standalone avatar asset, never the old screenshot mockup. */
+.azret-wave-hand{display:none!important}
+.azret-avatar-frame{overflow:hidden!important;isolation:isolate}
+.azret-live-avatar{object-position:44% 14%!important;transform-origin:48% 30%!important;transition:filter .25s ease}
+.azret-avatar-stage[data-ai-state="greeting"] .azret-live-avatar{animation:v32Greeting 2.8s ease-in-out infinite}
+.azret-avatar-stage[data-ai-state="listening"] .azret-live-avatar{animation:v32Listening 2.2s ease-in-out infinite;filter:saturate(1.04)}
+.azret-avatar-stage[data-ai-state="thinking"] .azret-live-avatar{animation:v32Thinking 2.6s ease-in-out infinite}
+.azret-avatar-stage[data-ai-state="speaking"] .azret-live-avatar{animation:v32Speaking .9s ease-in-out infinite;filter:saturate(1.08) brightness(1.02)}
+.azret-avatar-stage[data-ai-state="speaking"] .azret-avatar-frame:after{content:"";position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle at 50% 68%,rgba(238,183,194,.10),transparent 22%);animation:v32MouthGlow .34s ease-in-out infinite;pointer-events:none}
+@keyframes v32Greeting{0%,100%{transform:scale(1.42) translateY(2%)}50%{transform:scale(1.45) translateY(0)}}
+@keyframes v32Listening{0%,100%{transform:scale(1.43) translateY(1%) rotate(0)}50%{transform:scale(1.45) translateY(-1%) rotate(-.6deg)}}
+@keyframes v32Thinking{0%,100%{transform:scale(1.43) translate(0,1%) rotate(0)}50%{transform:scale(1.45) translate(1.2%,-1%) rotate(.8deg)}}
+@keyframes v32Speaking{0%,100%{transform:scale(1.43) translateY(1%)}50%{transform:scale(1.455) translateY(-.5%)}}
+@keyframes v32MouthGlow{0%,100%{opacity:.12}50%{opacity:.44}}
+.gemini-assistant-modal.ai-minimized{z-index:10020!important}
+.gemini-assistant-modal.ai-minimized .ai-modal-head-left h3:after{content:' • Active';}
+@media(prefers-reduced-motion:reduce){.azret-live-avatar,.azret-avatar-frame:after{animation:none!important}}

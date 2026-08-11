@@ -802,7 +802,7 @@ def _gemini_models_to_try():
     configured = (os.environ.get('GEMINI_MODEL') or '').strip()
     # Current stable production models first. Old 1.5 models and the shut-down
     # 2.0 alias are deliberately removed.
-    candidates = ['gemini-3.5-flash-lite', configured, 'gemini-2.5-flash-lite', 'gemini-3.6-flash', 'gemini-2.5-flash']
+    candidates = ['gemini-3.5-flash-lite', configured, 'gemini-3.1-flash-lite', 'gemini-2.5-flash-lite']
     result = []
     for item in candidates:
         if item and item not in result:
@@ -827,7 +827,7 @@ def _build_ai_system_instruction(user_name, language_key, mode):
     )
 
     return (
-        f"You are Azret AI, the Gemini-powered assistant inside Rizq رزق — Growth نمو for {user_name}. "
+        f"You are Azret AI, the Gemini-powered assistant inside Rizq رزق for {user_name}. "
         f"{language} {voice_rule} "
         "You are a GENERAL-PURPOSE conversational assistant, not only a finance bot. "
         "Answer questions about everyday knowledge, technology, travel, writing, calculations, ideas, and other normal topics using your model knowledge. "
@@ -939,7 +939,7 @@ def ai_assistant():
         return jsonify({'error': 'Message is too long. Please shorten it and try again.'}), 400
 
     user_name = session.get('username', 'User')
-    history = db.get_ai_chat_history(session['user_id'], 12)
+    history = db.get_ai_chat_history(session['user_id'], 8)
     finance_related = _is_finance_related(query, history)
     context = gather_financial_context() if finance_related else None
     gemini_key = _gemini_api_key()
@@ -971,7 +971,7 @@ def ai_assistant():
     try:
         from google import genai
         from google.genai import types
-        client = genai.Client(api_key=gemini_key)
+        client = genai.Client(api_key=gemini_key, http_options=types.HttpOptions(timeout=8000))
 
         # Use Gemini's native multi-turn chat representation instead of
         # flattening history into one giant prompt string. Google documents
@@ -983,9 +983,9 @@ def ai_assistant():
         # consecutive roles after an interrupted request. Current Gemini chat
         # APIs are stricter about malformed/prefilled model turns.
         normalized_history = []
-        for item in history[-12:]:
+        for item in history[-8:]:
             role = 'user' if item.get('role') == 'user' else 'model'
-            text = str(item.get('content') or '').strip()[:3500]
+            text = str(item.get('content') or '').strip()[:1800]
             if not text:
                 continue
             if not normalized_history and role != 'user':
@@ -998,7 +998,7 @@ def ai_assistant():
         # turn in history; drop it if an interrupted prior request left one.
         if normalized_history and normalized_history[-1][0] == 'model':
             pass  # valid completed prior turn before the new user message
-        for role, text in normalized_history[-10:]:
+        for role, text in normalized_history[-6:]:
             chat_history.append(types.Content(role=role, parts=[types.Part(text=text)]))
 
         for mname in _gemini_models_to_try():
@@ -1011,7 +1011,7 @@ def ai_assistant():
                         # Gemini 3.6+ deprecates sampling parameters such as
                         # temperature/top_p/top_k. Keeping the config minimal
                         # avoids present/future 400 responses on current models.
-                        max_output_tokens=900 if mode == 'chat' else 360,
+                        max_output_tokens=600 if mode == 'chat' else 220,
                     ),
                 )
                 response = chat.send_message(message=current_message)
@@ -1029,28 +1029,9 @@ def ai_assistant():
                 safe_error = str(ex_m).replace(gemini_key, '[redacted]')[:500]
                 print(f"[AI ASSISTANT] Model {mname} failed: {safe_error}")
                 errors.append(f"{mname}: {safe_error}")
-                transient = any(code in safe_error.lower() for code in ('429', '500', '502', '503', '504', 'temporar', 'unavailable', 'high demand'))
-                if transient:
-                    try:
-                        time.sleep(0.12)
-                        retry_chat = client.chats.create(
-                            model=mname,
-                            history=chat_history,
-                            config=types.GenerateContentConfig(
-                                system_instruction=system_instruction,
-                                max_output_tokens=900 if mode == 'chat' else 360,
-                            ),
-                        )
-                        retry_response = retry_chat.send_message(message=current_message)
-                        candidate = (getattr(retry_response, 'text', None) or '').strip()
-                        if candidate:
-                            response_text = candidate
-                            used_model = mname
-                            break
-                    except Exception as retry_exc:
-                        retry_safe = str(retry_exc).replace(gemini_key, '[redacted]')[:500]
-                        print(f"[AI ASSISTANT] Model {mname} retry failed: {retry_safe}")
-                        errors.append(f"{mname} retry: {retry_safe}")
+                # Fast-fail: move immediately to the next low-latency model instead of
+                # retrying the same overloaded endpoint and making the user wait.
+                continue
     except Exception as exc:
         safe_error = str(exc).replace(gemini_key, '[redacted]')[:500]
         print(f"[AI ASSISTANT] Gemini SDK/client failed: {safe_error}")
@@ -1359,7 +1340,7 @@ def get_branding():
     # are intentionally disabled. Login wallpapers remain online/random and
     # are independent from these removed dashboard settings.
     return jsonify({
-        'app_name': 'Rizq رزق — Growth نمو',
+        'app_name': 'Rizq رزق',
         'logo_url': '/static/icons/logo-mark.png',
         'splash_video_url': '',
         'theme_image_url': '',
@@ -1896,7 +1877,7 @@ def generate_report(kind):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font('Arial', 'B', 16)
-    pdf.cell(0, 10, 'RIZQ / RIZQ - Growth', 0, 1, 'C')
+    pdf.cell(0, 10, 'RIZQ - A Smarter Financial Life', 0, 1, 'C')
     pdf.set_font('Arial', '', 9)
     pdf.cell(0, 6, 'Plan - Manage - Grow | A Smarter Financial Life', 0, 1, 'C')
     pdf.set_font('Arial', '', 12)

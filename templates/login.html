@@ -2,134 +2,169 @@
 <html lang="en">
 <head>
   <meta name="csrf-token" content="{{ csrf_token }}">
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Rizq رزق — Growth نمو — Sign In</title>
-<link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#1E4DB7">
-<link rel="icon" id="faviconLink" href="{{ url_for('static', filename='icons/icon-192.png') }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-<style>
-.auth-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:18px 0 20px;padding:5px;border-radius:14px;background:rgba(255,255,255,.08)}
-.auth-tab{border:0;border-radius:10px;padding:10px 12px;background:transparent;color:inherit;font-weight:700;cursor:pointer}.auth-tab.active{background:rgba(255,255,255,.18)}
-.auth-panel[hidden]{display:none}.auth-helper{text-align:center;margin-top:14px;font-size:.86rem;opacity:.72}.auth-success{color:#22c55e}.auth-card{max-height:94vh;overflow:auto}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Rizq رزق — Sign In</title>
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#06101f">
+  <link rel="icon" id="faviconLink" href="{{ url_for('static', filename='icons/icon-192.png') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=26">
 </head>
-<body class="auth-body">
-<div class="auth-bg" aria-hidden="true">
-  <div class="auth-wallpaper auth-wallpaper-a active" id="authWallpaperA"></div>
-  <div class="auth-wallpaper auth-wallpaper-b" id="authWallpaperB"></div>
-  <div class="auth-wallpaper-overlay"></div>
-  <div class="auth-blob blob-1"></div><div class="auth-blob blob-2"></div><div class="auth-blob blob-3"></div>
-</div>
-<main class="auth-card glass">
-  <div class="auth-brand">
-    <div class="brand-mark"><div class="brand-mark-inner" id="loginLogo"><img src="{{ url_for('static', filename='icons/logo-mark.png') }}" alt="RIZQ finance logo"></div></div>
-    <div id="loginBrandTitle" class="login-brand-stack">
-      <h1>Rizq <span lang="ar" dir="rtl">رزق</span></h1>
-      <h2>Growth <span lang="ar" dir="rtl">نمو</span></h2>
-      <p class="brand-motto">Plan • Manage • Grow</p>
-      <p class="brand-motto-ar" lang="ar" dir="rtl">خطّط • أدر • نمُ</p>
-      <p class="brand-tagline">A Smarter Financial Life</p>
-      <p class="brand-tagline-ar" lang="ar" dir="rtl">لحياة مالية أذكى</p>
-    </div>
-    <p class="auth-tagline">Your public finance platform — create an account and manage your finances online.</p>
+<body class="auth-body auth-v26">
+  <div class="auth-cinematic-bg" aria-hidden="true">
+    <div class="auth-aurora auth-aurora-blue"></div>
+    <div class="auth-aurora auth-aurora-gold"></div>
+    <div class="auth-stars"></div>
+    <div class="auth-light-ribbon ribbon-one"></div>
+    <div class="auth-light-ribbon ribbon-two"></div>
+    <div class="auth-water-glow"></div>
   </div>
 
-  <div class="auth-tabs" role="tablist">
-    <button class="auth-tab active" id="loginTab" type="button">Sign In</button>
-    <button class="auth-tab" id="registerTab" type="button">Create Account</button>
-  </div>
-
-  <section id="loginPanel" class="auth-panel">
-    <form id="loginForm" class="auth-form" autocomplete="on">
-      <label for="username">Username or Email</label>
-      <input type="text" id="username" placeholder="Enter username or email" required autofocus autocomplete="username">
-      <label for="password">Password</label>
-      <div class="password-field">
-        <input type="password" id="password" placeholder="Enter your password" required autocomplete="current-password">
-        <button type="button" class="icon-btn password-toggle" data-target="password" aria-label="Show password">👁</button>
+  <main class="auth-shell-v26">
+    <section class="auth-hero-v26" aria-label="Rizq brand introduction">
+      <div class="rizq-title-lockup">
+        <h1 class="rizq-word-en">Rizq</h1>
+        <div class="rizq-divider" aria-hidden="true"><span></span><b>✦</b><span></span></div>
+        <div class="rizq-word-ar" lang="ar" dir="rtl">رزق</div>
       </div>
-      <p id="loginError" class="form-error" style="display:none"></p>
-      <button type="submit" class="btn-primary btn-block"><span>Open Dashboard</span></button>
-    </form>
-  </section>
 
-  <section id="registerPanel" class="auth-panel" hidden>
-    <form id="registerForm" class="auth-form" autocomplete="on">
-      <label for="regUsername">Username</label>
-      <input type="text" id="regUsername" minlength="3" maxlength="40" placeholder="Choose a username" required autocomplete="username">
-      <label for="regEmail">Email</label>
-      <input type="email" id="regEmail" placeholder="you@example.com" required autocomplete="email">
-      <label for="regPassword">Password</label>
-      <div class="password-field">
-        <input type="password" id="regPassword" minlength="8" placeholder="Minimum 8 characters" required autocomplete="new-password">
-        <button type="button" class="icon-btn password-toggle" data-target="regPassword" aria-label="Show password">👁</button>
+      <div class="hero-feature-row" aria-label="Plan Manage Grow">
+        <div class="hero-feature"><span class="hero-feature-icon" aria-hidden="true">◎</span><strong>Plan</strong></div>
+        <i></i>
+        <div class="hero-feature"><span class="hero-feature-icon" aria-hidden="true">▣</span><strong>Manage</strong></div>
+        <i></i>
+        <div class="hero-feature"><span class="hero-feature-icon" aria-hidden="true">↗</span><strong>Grow</strong></div>
       </div>
-      <label for="regConfirm">Confirm Password</label>
-      <div class="password-field">
-        <input type="password" id="regConfirm" minlength="8" placeholder="Re-enter password" required autocomplete="new-password">
-        <button type="button" class="icon-btn password-toggle" data-target="regConfirm" aria-label="Show password">👁</button>
-      </div>
-      <p id="registerError" class="form-error" style="display:none"></p>
-      <button type="submit" class="btn-primary btn-block"><span>Create Account</span></button>
-    </form>
-  </section>
 
-  <p class="auth-helper">Public website · Register, sign in and manage your finance records online.</p>
-  <p class="auth-powered"><strong>Rizq <span lang="ar" dir="rtl">رزق</span></strong> · Growth <span lang="ar" dir="rtl">نمو</span> · Plan • Manage • Grow · <span lang="ar" dir="rtl">خطّط • أدر • نمُ</span></p>
-</main>
+      <p class="hero-smart-line">A Smarter Financial Life</p>
+      <div class="hero-mini-divider" aria-hidden="true"><span></span><b>✦</b><span></span></div>
+      <p class="hero-public-copy">Your public finance platform — create an account<br class="desktop-only"> and manage your finances online.</p>
+    </section>
+
+    <section class="auth-card-v26" aria-label="Account access">
+      <div class="auth-card-scan" aria-hidden="true"></div>
+      <header class="auth-card-header">
+        <div class="auth-section-kicker"><span></span><strong>SIGN IN</strong><span></span></div>
+        <h2>Welcome Back!</h2>
+        <div class="auth-title-ornament" aria-hidden="true"><span></span><b>◇</b><span></span></div>
+      </header>
+
+      <section id="loginPanel" class="auth-panel-v26">
+        <form id="loginForm" class="auth-form-v26" autocomplete="on">
+          <label for="username">Username or Email</label>
+          <div class="auth-input-wrap">
+            <span class="auth-input-icon" aria-hidden="true">♙</span>
+            <input type="text" id="username" placeholder="Enter your username or email" required autofocus autocomplete="username">
+          </div>
+
+          <label for="password">Password</label>
+          <div class="auth-input-wrap password-field-v26">
+            <span class="auth-input-icon" aria-hidden="true">▣</span>
+            <input type="password" id="password" placeholder="Enter your password" required autocomplete="current-password">
+            <button type="button" class="password-toggle-v26" data-target="password" aria-label="Show password">◉</button>
+          </div>
+
+          <div class="auth-options-row">
+            <label class="remember-row"><input type="checkbox" id="rememberMe"><span>Remember me</span></label>
+            <button type="button" class="forgot-password-link" id="forgotPasswordBtn">Forgot Password?</button>
+          </div>
+
+          <p id="loginError" class="form-error auth-error-v26" style="display:none"></p>
+          <button type="submit" class="auth-primary-v26"><span>Sign In</span><b aria-hidden="true">›</b></button>
+        </form>
+
+        <div class="auth-or-v26"><span></span><b>OR</b><span></span></div>
+        <button type="button" class="auth-secondary-v26" id="showRegisterBtn"><span aria-hidden="true">♙+</span> Create New Account</button>
+
+        <div class="secure-login-v26">
+          <strong><span aria-hidden="true">♢</span> Secure Login</strong>
+          <p>Your connection is protected while you sign in.</p>
+        </div>
+      </section>
+
+      <section id="registerPanel" class="auth-panel-v26" hidden>
+        <div class="register-heading">
+          <button type="button" class="auth-back-btn" id="backToLoginBtn">← Back to Sign In</button>
+          <h3>Create New Account</h3>
+        </div>
+        <form id="registerForm" class="auth-form-v26" autocomplete="on">
+          <label for="regUsername">Username</label>
+          <div class="auth-input-wrap"><span class="auth-input-icon" aria-hidden="true">♙</span><input type="text" id="regUsername" minlength="3" maxlength="40" placeholder="Choose a username" required autocomplete="username"></div>
+          <label for="regEmail">Email</label>
+          <div class="auth-input-wrap"><span class="auth-input-icon" aria-hidden="true">✉</span><input type="email" id="regEmail" placeholder="you@example.com" required autocomplete="email"></div>
+          <label for="regPassword">Password</label>
+          <div class="auth-input-wrap password-field-v26"><span class="auth-input-icon" aria-hidden="true">▣</span><input type="password" id="regPassword" minlength="8" placeholder="Minimum 8 characters" required autocomplete="new-password"><button type="button" class="password-toggle-v26" data-target="regPassword" aria-label="Show password">◉</button></div>
+          <label for="regConfirm">Confirm Password</label>
+          <div class="auth-input-wrap password-field-v26"><span class="auth-input-icon" aria-hidden="true">▣</span><input type="password" id="regConfirm" minlength="8" placeholder="Re-enter password" required autocomplete="new-password"><button type="button" class="password-toggle-v26" data-target="regConfirm" aria-label="Show password">◉</button></div>
+          <p id="registerError" class="form-error auth-error-v26" style="display:none"></p>
+          <button type="submit" class="auth-primary-v26"><span>Create Account</span><b aria-hidden="true">›</b></button>
+        </form>
+      </section>
+
+      <div class="forgot-dialog" id="forgotDialog" hidden>
+        <div class="forgot-dialog-card" role="dialog" aria-modal="true" aria-labelledby="forgotTitle">
+          <button type="button" class="forgot-close" id="forgotClose" aria-label="Close">×</button>
+          <h3 id="forgotTitle">Forgot Password?</h3>
+          <p>For account security, password reset needs a verified recovery method. This public site does not expose an insecure reset shortcut.</p>
+          <button type="button" class="auth-secondary-v26" id="forgotOkay">Back to Sign In</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
 <script>
-// Online login wallpaper rotation — no API key required.
-// Lorem Picsum serves random web photos; a new seed is generated on each page load
-// and every rotation. If the remote image cannot load, the CSS gradient remains visible.
-const wallpaperLayers=[document.getElementById('authWallpaperA'),document.getElementById('authWallpaperB')];
-let activeWallpaper=0;
-function makeWallpaperUrl(){
-  const seed=(window.crypto&&crypto.randomUUID)?crypto.randomUUID():`${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  const w=Math.max(1280,Math.min(2400,Math.round(window.innerWidth*(window.devicePixelRatio||1))));
-  const h=Math.max(900,Math.min(1600,Math.round(window.innerHeight*(window.devicePixelRatio||1))));
-  return `https://picsum.photos/seed/rizq-${encodeURIComponent(seed)}/${w}/${h}`;
+const loginPanel=document.getElementById('loginPanel');
+const registerPanel=document.getElementById('registerPanel');
+const showRegisterBtn=document.getElementById('showRegisterBtn');
+const backToLoginBtn=document.getElementById('backToLoginBtn');
+function setAuthPanel(which){
+  const login=which==='login';
+  loginPanel.hidden=!login;
+  registerPanel.hidden=login;
+  document.querySelector('.auth-section-kicker strong').textContent=login?'SIGN IN':'CREATE ACCOUNT';
+  document.querySelector('.auth-card-header h2').textContent=login?'Welcome Back!':'Join Rizq';
 }
-function rotateOnlineWallpaper(){
-  const next=1-activeWallpaper;
-  const url=makeWallpaperUrl();
-  const probe=new Image();
-  probe.referrerPolicy='no-referrer';
-  probe.onload=()=>{
-    wallpaperLayers[next].style.backgroundImage=`url("${probe.src}")`;
-    wallpaperLayers[next].classList.add('active');
-    wallpaperLayers[activeWallpaper].classList.remove('active');
-    activeWallpaper=next;
-  };
-  // Keep the existing wallpaper/gradient if the online service is temporarily unavailable.
-  probe.onerror=()=>{};
-  probe.src=url;
-}
-rotateOnlineWallpaper();
-const wallpaperTimer=setInterval(()=>{ if(!document.hidden) rotateOnlineWallpaper(); },30000);
-document.addEventListener('visibilitychange',()=>{ if(!document.hidden) rotateOnlineWallpaper(); });
+showRegisterBtn.addEventListener('click',()=>setAuthPanel('register'));
+backToLoginBtn.addEventListener('click',()=>setAuthPanel('login'));
 
-const loginTab=document.getElementById('loginTab'), registerTab=document.getElementById('registerTab');
-const loginPanel=document.getElementById('loginPanel'), registerPanel=document.getElementById('registerPanel');
-function setTab(which){const login=which==='login'; loginPanel.hidden=!login; registerPanel.hidden=login; loginTab.classList.toggle('active',login); registerTab.classList.toggle('active',!login)}
-loginTab.onclick=()=>setTab('login'); registerTab.onclick=()=>setTab('register');
-document.querySelectorAll('.password-toggle').forEach(btn=>btn.addEventListener('click',()=>{const el=document.getElementById(btn.dataset.target); el.type=el.type==='password'?'text':'password'}));
+document.querySelectorAll('.password-toggle-v26').forEach(btn=>btn.addEventListener('click',()=>{
+  const el=document.getElementById(btn.dataset.target);
+  el.type=el.type==='password'?'text':'password';
+  btn.setAttribute('aria-label',el.type==='password'?'Show password':'Hide password');
+}));
+
+const forgotDialog=document.getElementById('forgotDialog');
+const openForgot=()=>{forgotDialog.hidden=false; requestAnimationFrame(()=>forgotDialog.classList.add('open'));};
+const closeForgot=()=>{forgotDialog.classList.remove('open'); setTimeout(()=>forgotDialog.hidden=true,180);};
+document.getElementById('forgotPasswordBtn').addEventListener('click',openForgot);
+document.getElementById('forgotClose').addEventListener('click',closeForgot);
+document.getElementById('forgotOkay').addEventListener('click',closeForgot);
+forgotDialog.addEventListener('click',e=>{if(e.target===forgotDialog)closeForgot();});
 
 async function submitJson(url,payload,errorEl,button){
   errorEl.style.display='none'; button.classList.add('loading'); button.disabled=true;
-  try{const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':(document.querySelector('meta[name=\"csrf-token\"]')?.content||'')},body:JSON.stringify(payload)}); const data=await res.json();
-    if(res.ok&&data.success){window.location.href=data.redirect||'/splash'; return}
+  try{
+    const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':(document.querySelector('meta[name="csrf-token"]')?.content||'')},body:JSON.stringify(payload)});
+    const data=await res.json();
+    if(res.ok&&data.success){window.location.href=data.redirect||'/splash';return;}
     errorEl.textContent=data.error||'Something went wrong'; errorEl.style.display='block';
-  }catch(e){errorEl.textContent='Unable to reach server.'; errorEl.style.display='block'}
-  finally{button.classList.remove('loading'); button.disabled=false}
+  }catch(e){errorEl.textContent='Unable to reach server.'; errorEl.style.display='block';}
+  finally{button.classList.remove('loading'); button.disabled=false;}
 }
 
-document.getElementById('loginForm').addEventListener('submit',e=>{e.preventDefault(); submitJson('/api/login',{username:document.getElementById('username').value.trim(),password:document.getElementById('password').value},document.getElementById('loginError'),e.currentTarget.querySelector('button[type=submit]'))});
-document.getElementById('registerForm').addEventListener('submit',e=>{e.preventDefault(); const p=document.getElementById('regPassword').value,c=document.getElementById('regConfirm').value,err=document.getElementById('registerError'); if(p!==c){err.textContent='Passwords do not match';err.style.display='block';return} submitJson('/api/register',{username:document.getElementById('regUsername').value.trim(),email:document.getElementById('regEmail').value.trim(),password:p,confirm_password:c},err,e.currentTarget.querySelector('button[type=submit]'))});
+document.getElementById('loginForm').addEventListener('submit',e=>{
+  e.preventDefault();
+  submitJson('/api/login',{username:document.getElementById('username').value.trim(),password:document.getElementById('password').value},document.getElementById('loginError'),e.currentTarget.querySelector('button[type=submit]'));
+});
 
-if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('/service-worker.js').catch(()=>{}))}
-(async()=>{try{const r=await fetch('/api/branding',{cache:'no-store'});const d=await r.json();if(d.logo_url){const host=document.getElementById('loginLogo');host.textContent='';const img=document.createElement('img');img.src=String(d.logo_url);img.alt='Logo';host.appendChild(img);document.getElementById('faviconLink').href=String(d.logo_url)}}catch(e){}})();
+document.getElementById('registerForm').addEventListener('submit',e=>{
+  e.preventDefault();
+  const p=document.getElementById('regPassword').value,c=document.getElementById('regConfirm').value,err=document.getElementById('registerError');
+  if(p!==c){err.textContent='Passwords do not match';err.style.display='block';return;}
+  submitJson('/api/register',{username:document.getElementById('regUsername').value.trim(),email:document.getElementById('regEmail').value.trim(),password:p,confirm_password:c},err,e.currentTarget.querySelector('button[type=submit]'));
+});
+
+if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('/service-worker.js').catch(()=>{}));}
 </script>
 </body>
 </html>

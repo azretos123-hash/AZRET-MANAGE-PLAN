@@ -1,5 +1,5 @@
 /* ==========================================================================
-   RIZQ رزق — Growth — Mini Charts
+   RIZQ رزق — Mini Charts
    A tiny, dependency-free canvas charting helper so the dashboard renders
    fully offline (no CDN / external library required for the PWA).
    ========================================================================== */

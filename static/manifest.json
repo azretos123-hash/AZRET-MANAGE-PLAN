@@ -1,7 +1,7 @@
 {
-  "name": "Rizq رزق — Growth نمو",
-  "short_name": "Rizq رزق",
-  "description": "Public multi-user personal finance management platform.",
+  "name": "Rizq رزق",
+  "short_name": "Rizq",
+  "description": "Plan • Manage • Grow — A Smarter Financial Life",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
