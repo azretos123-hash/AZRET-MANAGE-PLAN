@@ -1,5 +1,6 @@
 import os
 import sqlite3
+import secrets
 from datetime import datetime
 from werkzeug.security import generate_password_hash
 
@@ -246,6 +247,11 @@ def _create_schema_postgres(c):
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(user_id, kind)
     )''')
+    c.execute('''CREATE TABLE IF NOT EXISTS system_config (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    )''')
 
 
 def _create_schema_sqlite(c):
@@ -329,6 +335,11 @@ def _create_schema_sqlite(c):
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(user_id, kind)
     )''')
+    c.execute('''CREATE TABLE IF NOT EXISTS system_config (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )''')
 
 
 def _ensure_settings_schema(c, owner_id):
@@ -390,18 +401,37 @@ def init_db():
         first = c.fetchone()
         owner_id = first['id'] if first else None
 
-        if owner_id is not None:
-            c.execute("UPDATE users SET created_at = COALESCE(created_at, CURRENT_TIMESTAMP) WHERE id = ?", (owner_id,))
-            # Existing records from the old single-user version become private data
-            # of the first/original account; never expose them to new accounts.
-            for table in DATA_TABLES + PAYMENT_TABLES:
-                c.execute(f"UPDATE {table} SET user_id = ? WHERE user_id IS NULL", (owner_id,))
-
+        # Migrate a legacy single-user settings table before any code touches
+        # settings.user_id. In older databases the settings table may not have
+        # that column yet; touching it first would make startup fail.
         _ensure_settings_schema(c, owner_id)
 
+        if owner_id is not None:
+            c.execute("UPDATE users SET created_at = COALESCE(created_at, CURRENT_TIMESTAMP) WHERE id = ?", (owner_id,))
+            # SECURITY: legacy rows with NULL ownership are never auto-assigned to
+            # whichever account happens to have the lowest id. Only an explicitly
+            # configured legacy owner may claim them. This avoids cross-user data
+            # exposure after converting an old single-user database to public use.
+            legacy_email = (os.environ.get("LEGACY_OWNER_EMAIL") or "").strip().lower()
+            legacy_username = (os.environ.get("LEGACY_OWNER_USERNAME") or "").strip().lower()
+            if legacy_email or legacy_username:
+                c.execute("SELECT username, email FROM users WHERE id=?", (owner_id,))
+                owner = c.fetchone()
+                owner_email = str((owner or {}).get('email') or '').strip().lower()
+                owner_username = str((owner or {}).get('username') or '').strip().lower()
+                owner_match = bool(legacy_email and owner_email == legacy_email)
+                if not legacy_email and legacy_username:
+                    owner_match = owner_username == legacy_username
+                elif owner_match and legacy_username:
+                    owner_match = owner_username == legacy_username
+                if owner_match:
+                    for table in DATA_TABLES + PAYMENT_TABLES:
+                        c.execute(f"UPDATE {table} SET user_id = ? WHERE user_id IS NULL", (owner_id,))
+                    c.execute("UPDATE settings SET user_id=? WHERE user_id=0", (owner_id,))
+
         defaults = {
-            'theme': 'light', 'default_currency': 'AED', 'exchange_rate': '22.60',
-            'app_name': 'AZRET MANAGE PLAN', 'shopping_budget': '0',
+            'theme': 'light', 'default_currency': 'AED', 'primary_currency': 'AED', 'secondary_currency': 'INR', 'exchange_rate': '22.60',
+            'app_name': 'Rizq رزق — Growth نمو', 'shopping_budget': '0',
             'splash_video_url': '',
             'theme_image_url': '', 'theme_video_url': '', 'logo_url': ''
         }
@@ -487,8 +517,8 @@ def create_user(username, email, password):
                 c.execute("UPDATE settings SET user_id=? WHERE user_id=0", (user_id,))
 
         defaults = {
-            'theme': 'light', 'default_currency': 'AED', 'exchange_rate': '22.60',
-            'app_name': 'AZRET MANAGE PLAN', 'shopping_budget': '0',
+            'theme': 'light', 'default_currency': 'AED', 'primary_currency': 'AED', 'secondary_currency': 'INR', 'exchange_rate': '22.60',
+            'app_name': 'Rizq رزق — Growth نمو', 'shopping_budget': '0',
             'splash_video_url': '',
             'theme_image_url': '', 'theme_video_url': '', 'logo_url': ''
         }
@@ -734,6 +764,36 @@ def get_dashboard_data(user_id):
         'chart_savings_growth':savings_series,'chart_categories':categories,'chart_category_totals':category_totals}
 
 
+def get_or_create_system_secret(key="flask_secret_key"):
+    """Return a stable application secret stored in the persistent database.
+
+    This is used only when an explicit SECRET_KEY/AZRET_SECRET_KEY environment
+    variable is absent. On Render + Neon it prevents deploy failures while still
+    keeping Flask sessions stable across restarts/redeploys.
+    """
+    conn = get_db(); c = conn.cursor()
+    try:
+        c.execute("SELECT value FROM system_config WHERE key=?", (key,))
+        row = c.fetchone()
+        if row and row['value']:
+            return row['value']
+
+        candidate = secrets.token_urlsafe(64)
+        c.execute(
+            "INSERT INTO system_config (key,value,updated_at) VALUES (?,?,CURRENT_TIMESTAMP) "
+            "ON CONFLICT(key) DO NOTHING",
+            (key, candidate)
+        )
+        conn.commit()
+        c.execute("SELECT value FROM system_config WHERE key=?", (key,))
+        row = c.fetchone()
+        if not row or not row['value']:
+            raise RuntimeError("Unable to initialize persistent application secret")
+        return row['value']
+    finally:
+        conn.close()
+
+
 def get_settings(user_id):
     conn=get_db(); c=conn.cursor(); c.execute("SELECT key,value FROM settings WHERE user_id=?",(user_id,))
     rows=c.fetchall(); conn.close(); return {r['key']:r['value'] for r in rows}
@@ -742,7 +802,7 @@ def get_settings(user_id):
 def get_public_branding():
     # Public login branding must not depend on the first registered user's
     # personal settings. This prevents accidental cross-user branding leakage.
-    return {'app_name': 'AZRET MANAGE PLAN'}
+    return {'app_name': 'Rizq رزق — Growth نمو'}
 
 
 def save_user_asset(user_id, kind, mime_type, data):

@@ -1,4 +1,4 @@
-/* AZRET MANAGE PLAN — Service Worker
+/* RIZQ رزق — Growth نمو — Service Worker
    Public multi-user safe caching policy:
    - Never cache authenticated HTML/navigation responses.
    - Never cache API responses.
@@ -7,7 +7,7 @@
    from being replayed after logout on the same device.
 */
 
-const CACHE_NAME = 'azret-static-v9-final';
+const CACHE_NAME = 'rizq-v25-final-hardened';
 const STATIC_ASSETS = [
   '/manifest.json',
   '/static/css/style.css',
@@ -15,7 +15,8 @@ const STATIC_ASSETS = [
   '/static/js/charts.js',
   '/static/icons/icon-192.png',
   '/static/icons/icon-512.png',
-  '/static/icons/logo-mark.png'
+  '/static/icons/logo-mark.png',
+  '/static/icons/azret-ai.webp'
 ];
 
 self.addEventListener('install', (event) => {

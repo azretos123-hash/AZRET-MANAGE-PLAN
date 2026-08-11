@@ -4,7 +4,7 @@
   <meta name="csrf-token" content="{{ csrf_token }}">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>AZRET MANAGE PLAN — Sign In</title>
+<title>Rizq رزق — Growth نمو — Sign In</title>
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#1E4DB7">
 <link rel="icon" id="faviconLink" href="{{ url_for('static', filename='icons/icon-192.png') }}">
@@ -24,8 +24,15 @@
 </div>
 <main class="auth-card glass">
   <div class="auth-brand">
-    <div class="brand-mark"><div class="brand-mark-inner" id="loginLogo"><img src="{{ url_for('static', filename='icons/logo-mark.png') }}" alt="AZRET MANAGE PLAN logo"></div></div>
-    <h1 id="loginBrandTitle">AZRET <span>MANAGE PLAN</span></h1>
+    <div class="brand-mark"><div class="brand-mark-inner" id="loginLogo"><img src="{{ url_for('static', filename='icons/logo-mark.png') }}" alt="RIZQ finance logo"></div></div>
+    <div id="loginBrandTitle" class="login-brand-stack">
+      <h1>Rizq <span lang="ar" dir="rtl">رزق</span></h1>
+      <h2>Growth <span lang="ar" dir="rtl">نمو</span></h2>
+      <p class="brand-motto">Plan • Manage • Grow</p>
+      <p class="brand-motto-ar" lang="ar" dir="rtl">خطّط • أدر • نمُ</p>
+      <p class="brand-tagline">A Smarter Financial Life</p>
+      <p class="brand-tagline-ar" lang="ar" dir="rtl">لحياة مالية أذكى</p>
+    </div>
     <p class="auth-tagline">Your public finance platform — create an account and manage your finances online.</p>
   </div>
 
@@ -70,7 +77,7 @@
   </section>
 
   <p class="auth-helper">Public website · Register, sign in and manage your finance records online.</p>
-  <p class="auth-powered">Powered by AZRET</p>
+  <p class="auth-powered"><strong>Rizq <span lang="ar" dir="rtl">رزق</span></strong> · Growth <span lang="ar" dir="rtl">نمو</span> · Plan • Manage • Grow · <span lang="ar" dir="rtl">خطّط • أدر • نمُ</span></p>
 </main>
 <script>
 // Online login wallpaper rotation — no API key required.
@@ -82,7 +89,7 @@ function makeWallpaperUrl(){
   const seed=(window.crypto&&crypto.randomUUID)?crypto.randomUUID():`${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const w=Math.max(1280,Math.min(2400,Math.round(window.innerWidth*(window.devicePixelRatio||1))));
   const h=Math.max(900,Math.min(1600,Math.round(window.innerHeight*(window.devicePixelRatio||1))));
-  return `https://picsum.photos/seed/azret-${encodeURIComponent(seed)}/${w}/${h}`;
+  return `https://picsum.photos/seed/rizq-${encodeURIComponent(seed)}/${w}/${h}`;
 }
 function rotateOnlineWallpaper(){
   const next=1-activeWallpaper;

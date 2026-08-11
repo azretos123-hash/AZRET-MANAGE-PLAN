@@ -1,5 +1,5 @@
 /* ==========================================================================
-   AZRET MANAGE PLAN — Application Logic
+   RIZQ رزق — Growth — Application Logic
    ========================================================================== */
 
 /* Security: attach CSRF token to every same-origin state-changing fetch. */
@@ -27,6 +27,7 @@ const state = {
   editing: {},          // { tableName: id } currently being edited
   shoppingBudget: 0,    // budget threshold, stored in AED
   lastSalaryAED: 0,     // last salary amount entered, stored in AED
+  salaryCreditDay: 27,  // per-user salary day (1-31), loaded from Settings
   salaryPlan: null,     // cache of last /api/salary-plan response
   incomeProfile: null,  // cache of last /api/income-profile response (Phase 4 gate)
   voiceLanguage: 'en-US',  // voice AI language toggle ('en-US' or 'ml-IN')
@@ -35,13 +36,24 @@ const state = {
   emiFullyPaidAlertShown: false,
   username: 'User',        // display name, kept in sync with the users table
   userId: null,             // authenticated account id; used to namespace device-local preferences
+  primaryCurrency: localStorage.getItem('rizq_primary_currency') || 'AED',
+  secondaryCurrency: localStorage.getItem('rizq_secondary_currency') || 'INR',
+  aedRates: { AED: 1, INR: parseFloat(localStorage.getItem('azret_rate') || '22.60') },
+  fxRange: '1M',
 };
 
 /** Same palette as AzretCharts, kept in sync so the allocation list
  *  swatches always match the pie chart slice colours. */
+function localDateISO(date = new Date()) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 const SALARY_PALETTE = ['#4C8DFF', '#1E4DB7', '#1FAA59', '#F5A524', '#E5484D', '#7C8AA5', '#0F2A5E', '#6EDB9A'];
 
-const CURRENCY_SYMBOL = { AED: 'AED', INR: '₹' };
+const CURRENCY_SYMBOL = { AED:'AED', INR:'₹', USD:'$', EUR:'€', GBP:'£', JPY:'¥', CNY:'¥', KRW:'₩', RUB:'₽', TRY:'₺', SAR:'SAR', QAR:'QAR', KWD:'KWD', BHD:'BHD', OMR:'OMR', CAD:'C$', AUD:'A$', CHF:'CHF', SGD:'S$', NZD:'NZ$' };
 
 /** Which fields on each form hold a monetary amount stored in AED in the
  *  database. Used to convert values entered/displayed in the currently
@@ -82,7 +94,11 @@ const SMART_TRACKING = {
 /* ---------------------------------------------------------------------- */
 /* Bootstrapping                                                          */
 /* ---------------------------------------------------------------------- */
-function hideAppLoader() {
+function hideAppLoader(force = false) {
+  // When /splash is intentionally requested, keep the premium intro visible
+  // until playSplashIntro() completes. Normal dashboard loads still hide the
+  // loader immediately.
+  if (window.START_SPLASH && !force) return;
   const loader = document.getElementById('appLoader');
   if (loader) loader.classList.add('hidden');
 
@@ -109,7 +125,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupReportButtons();
   setupSalaryCountdown();
   setupDailyReminder();
-  setupVoiceSynthesis();
   setupVoiceAssistant();
 
   document.getElementById('footerYear').textContent = new Date().getFullYear();
@@ -118,7 +133,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   await loadServerSettings();
   await loadProfile();
-  check27thSalaryNotification();
+  checkSalaryNotification();
   await loadBranding();
   await refreshExchangeRate(true);
 
@@ -158,12 +173,12 @@ function updateGreetingClock() {
   if (hour < 12) greeting = 'Good Morning';
   else if (hour < 17) greeting = 'Good Afternoon';
 
-  // Single combined, centered line — e.g. "Good Evening, Ijas" — instead of
+  // Single combined, centered line — e.g. "Good Evening, User" — instead of
   // a stacked eyebrow label + name.
   const greetingEl = document.getElementById('greetingText');
   if (greetingEl) greetingEl.textContent = greeting;
   const nameEl = document.getElementById('greetingName');
-  if (nameEl) nameEl.textContent = state.username || 'Ijas';
+  if (nameEl) nameEl.textContent = state.username || 'User';
 
   const timeEl = document.getElementById('clockTime');
   if (timeEl) {
@@ -280,7 +295,7 @@ const TABLES_BY_PAGE = {
 /* Topbar: search, currency, theme                                        */
 /* ---------------------------------------------------------------------- */
 function setupTopbar() {
-  document.querySelectorAll('.cur-opt').forEach(btn => {
+  document.querySelectorAll('#currencySwitch .cur-opt').forEach(btn => {
     btn.addEventListener('click', () => setCurrency(btn.dataset.currency));
   });
 
@@ -384,29 +399,22 @@ function applySplashVideo(videoUrl) {
 
 async function playSplashIntro() {
   const loader = document.getElementById('appLoader');
-  const video = document.getElementById('splashVideo');
-  const wrap = document.getElementById('splashVideoWrap');
-  if (!video || !loader || !wrap) {
-    document.getElementById('appLoader').classList.add('hidden');
-    return;
-  }
+  if (!loader) return;
 
+  // V13: the startup experience is a deterministic premium brand animation.
+  // Keeping it local avoids autoplay, network and missing-video failures.
   return new Promise(resolve => {
     let finished = false;
     const cleanup = () => {
       if (finished) return;
       finished = true;
-      video.pause();
       loader.classList.add('hidden');
+      setTimeout(() => { loader.style.display = 'none'; }, 450);
       resolve();
     };
 
-    video.onended = cleanup;
-    video.onerror = cleanup;
-    video.play().catch(() => {
-      setTimeout(cleanup, 1800);
-    });
-    setTimeout(cleanup, 8000);
+    // Long enough to see the reveal, short enough to keep startup feeling fast.
+    setTimeout(cleanup, 3300);
   });
 }
 
@@ -510,7 +518,7 @@ function applyTheme(theme, rerender) {
 /* ---------------------------------------------------------------------- */
 /* Currency                                                               */
 /* ---------------------------------------------------------------------- */
-function setCurrency(cur) {
+function legacy_setCurrency(cur) {
   state.currency = cur;
   localStorage.setItem('azret_currency', cur);
   applyCurrency(cur, true);
@@ -520,7 +528,7 @@ function setCurrency(cur) {
   }).catch(() => {});
 }
 
-function applyCurrency(cur, rerender) {
+function legacy_applyCurrency(cur, rerender) {
   document.querySelectorAll('.cur-opt').forEach(b => b.classList.toggle('active', b.dataset.currency === cur));
   document.querySelectorAll('#settingsCurrencySwitch button').forEach(b => {
     b.classList.toggle('active', b.dataset.currency === cur);
@@ -540,7 +548,7 @@ function applyCurrency(cur, rerender) {
 /** Re-populate the currently-open amount inputs for `table` in the newly
  *  selected display currency, converting from the AED value that was
  *  cached when the record was opened for editing. */
-function convertVisibleAmountInputs(table) {
+function legacy_convertVisibleAmountInputs(table) {
   const id = state.editing[table];
   if (!id) return;
   const rows = state.tables[table] || [];
@@ -558,7 +566,7 @@ function convertVisibleAmountInputs(table) {
 
 function round2(n) { return Math.round((Number(n) || 0) * 100) / 100; }
 
-function rerenderAllVisible() {
+function legacy_rerenderAllVisible() {
   if (state.dashboard) renderDashboard(state.dashboard);
   Object.keys(state.tables).forEach(table => renderTable(table, state.tables[table]));
   if (state.salaryPlan) renderSalaryPlan(state.salaryPlan);
@@ -571,7 +579,7 @@ function rerenderAllVisible() {
 }
 
 /** Convert an AED amount into the active display currency and format it. */
-function fmt(amountAED) {
+function legacy_fmt(amountAED) {
   const val = Number(amountAED) || 0;
   if (state.currency === 'INR') {
     return `₹${(val * state.exchangeRate).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
@@ -582,7 +590,7 @@ function fmt(amountAED) {
 /* ---------------------------------------------------------------------- */
 /* Exchange rate                                                          */
 /* ---------------------------------------------------------------------- */
-async function loadServerSettings() {
+async function legacy_loadServerSettings() {
   try {
     const res = await fetch('/api/settings');
     const s = await res.json();
@@ -591,11 +599,18 @@ async function loadServerSettings() {
     if (s.exchange_rate) { state.exchangeRate = parseFloat(s.exchange_rate); }
     if (s.shopping_budget) { state.shoppingBudget = parseFloat(s.shopping_budget) || 0; }
     if (s.last_salary_amount) { state.lastSalaryAED = parseFloat(s.last_salary_amount) || 0; }
+    if (s.salary_credit_day) {
+      const day = parseInt(s.salary_credit_day, 10);
+      if (Number.isInteger(day) && day >= 1 && day <= 31) state.salaryCreditDay = day;
+    }
+    const salaryDayInput = document.getElementById('salaryCreditDay');
+    if (salaryDayInput) salaryDayInput.value = String(state.salaryCreditDay);
+    renderSalaryCountdown();
     updateShoppingBudgetUI((state.tables.shopping || []).reduce((a, r) => a + (Number(r.total) || 0), 0));
   } catch (e) { /* offline: keep local defaults */ }
 }
 
-async function refreshExchangeRate(silent) {
+async function legacy_refreshExchangeRate(silent) {
   const rateEl = document.getElementById('rateValue');
   const btn = document.getElementById('refreshRate');
   btn.classList.add('loading');
@@ -622,18 +637,43 @@ async function refreshExchangeRate(silent) {
 /* ==========================================================================
    Animated Salary Countdown Widget (Phase 2)
    ========================================================================== */
-const SALARY_CREDIT_DAY = 27;
 const COUNTDOWN_RING_CIRCUMFERENCE = 2 * Math.PI * 52; // matches the r=52 SVG circle
 
-/** Returns the next Salary Credited Date (the 27th of this month, or next
- *  month if today is already past the 27th), and how many days away it is. */
+function daysInMonth(year, monthIndex) {
+  return new Date(year, monthIndex + 1, 0).getDate();
+}
+
+function effectiveSalaryDay(year, monthIndex) {
+  const configured = Math.max(1, Math.min(31, parseInt(state.salaryCreditDay, 10) || 27));
+  return Math.min(configured, daysInMonth(year, monthIndex));
+}
+
+/** Returns the next salary date using this user's configured salary day.
+ * If a month is shorter than the configured day (e.g. 31st in February),
+ * that month's last calendar day is used. */
 function getNextSalaryDate() {
   const now = new Date();
-  let target = new Date(now.getFullYear(), now.getMonth(), SALARY_CREDIT_DAY, 0, 0, 0);
+  let year = now.getFullYear();
+  let month = now.getMonth();
+  let day = effectiveSalaryDay(year, month);
+  let target = new Date(year, month, day, 0, 0, 0);
   if (now > target) {
-    target = new Date(now.getFullYear(), now.getMonth() + 1, SALARY_CREDIT_DAY, 0, 0, 0);
+    month += 1;
+    if (month > 11) { month = 0; year += 1; }
+    day = effectiveSalaryDay(year, month);
+    target = new Date(year, month, day, 0, 0, 0);
   }
   return { target };
+}
+
+function ordinalDay(day) {
+  const n = Number(day) || 27;
+  const mod100 = n % 100;
+  if (mod100 >= 11 && mod100 <= 13) return `${n}th`;
+  if (n % 10 === 1) return `${n}st`;
+  if (n % 10 === 2) return `${n}nd`;
+  if (n % 10 === 3) return `${n}rd`;
+  return `${n}th`;
 }
 
 function setupSalaryCountdown() {
@@ -649,7 +689,10 @@ function renderSalaryCountdown() {
   const secondsEl = document.getElementById('countdownSeconds');
   const ringFill = document.getElementById('countdownRingFill');
   const dateEl = document.getElementById('countdownDate');
+  const dayOfMonthEl = document.getElementById('countdownDayOfMonth');
   if (!card || !daysEl || !hoursEl || !minutesEl || !secondsEl || !ringFill || !dateEl) return;
+
+  if (dayOfMonthEl) dayOfMonthEl.textContent = ordinalDay(state.salaryCreditDay);
 
   const { target } = getNextSalaryDate();
   const diffMs = target - new Date();
@@ -826,7 +869,7 @@ function speakDashboardSummary() {
 }
 
 /* ==========================================================================
-   AZRET Voice Assistant — simplified, single mic-button workflow
+   RIZQ Voice Assistant — simplified, single mic-button workflow
    --------------------------------------------------------------------------
    1. Tap the mic button -> browser starts listening (Web Speech API
       SpeechRecognition), supports English and Malayalam.
@@ -838,7 +881,7 @@ function speakDashboardSummary() {
    ========================================================================== */
 
 /* ==========================================================================
-   AZRET Gemini AI Assistant — Chat & Live Voice Call
+   RIZQ Gemini AI Assistant — Chat & Live Voice Call
    ========================================================================== */
 
 let liveCallActive = false;
@@ -888,9 +931,9 @@ function setupVoiceAssistant() {
         const welcomeEl = document.getElementById('geminiWelcomeText');
         if (welcomeEl) {
           if (state.voiceLanguage === 'ml-IN') {
-            welcomeEl.textContent = 'നമസ്കാരം! ഞാൻ zuooi Ai ആണ്. ഫിനാൻസ് ഉൾപ്പെടെ സാധാരണ ചോദ്യങ്ങളും ടെക്‌നോളജി, യാത്ര, ആശയങ്ങൾ, കണക്കുകൾ തുടങ്ങിയ കാര്യങ്ങളും ചോദിക്കാം.';
+            welcomeEl.textContent = 'ഹായ്! ഞാൻ Azret AI ✨ നിങ്ങളുടെ Rizq ഫിനാൻസ് കാര്യങ്ങളോ സാധാരണ ചോദ്യങ്ങളോ മലയാളത്തിലോ ഇംഗ്ലീഷിലോ ചോദിക്കാം.';
           } else {
-            welcomeEl.textContent = 'Hello! I am zuooi Ai, powered by Gemini. Ask me general questions or questions about your AZRET finances in English or Malayalam.';
+            welcomeEl.textContent = 'Hi! I’m Azret AI. Ask me anything in English or Malayalam — finance, ideas, travel, tech, or everyday questions.';
           }
         }
       });
@@ -909,7 +952,7 @@ function openVoiceAssistantModal() {
   if (!modal) return;
   modal.style.display = 'flex';
   document.body.classList.add('modal-open');
-  setVoiceAssistantStatus('Tap the mic and ask AZRET about your finances.');
+  setVoiceAssistantStatus('Tap the mic and ask Rizq رزق about your finances.');
   setVoiceAssistantTranscript('');
 }
 
@@ -928,6 +971,9 @@ function openGeminiModal() {
   modal.style.display = 'flex';
   document.body.classList.add('modal-open');
   loadGeminiHistory();
+  switchGeminiMode('live');
+  updateLiveStatus('Azret AI Ready');
+  if (typeof setAzretAIState === 'function') setAzretAIState('greeting');
 }
 
 function closeGeminiModal() {
@@ -1011,9 +1057,9 @@ async function clearGeminiConversation() {
     }
     updateLiveTranscript(state.voiceLanguage === 'ml-IN' ? 'സംഭാഷണം ക്ലിയർ ചെയ്തു.' : 'Conversation cleared.');
     geminiHistoryLoaded = true;
-    toast('Gemini conversation cleared', 'success');
+    toast('Azret AI conversation cleared', 'success');
   } catch (e) {
-    toast('Could not clear Gemini conversation', 'error');
+    toast('Could not clear Azret AI conversation', 'error');
   }
 }
 
@@ -1071,15 +1117,15 @@ async function sendGeminiChatMessage(text) {
     let data = {};
     try { data = await res.json(); } catch (e) {}
     if (!res.ok) {
-      const detail = data.hint ? `${data.error || 'Gemini error'}\n${data.hint}` : (data.error || `Gemini request failed (${res.status})`);
+      const detail = data.hint ? `${data.error || 'AI service error'}\n${data.hint}` : (data.error || `Gemini request failed (${res.status})`);
       updateGeminiChatMessage(botMsgId, detail, state.voiceLanguage);
       return;
     }
     const reply = data.response || data.reply;
-    if (!reply) throw new Error('Gemini returned an empty response');
+    if (!reply) throw new Error('Azret AI returned an empty response');
     updateGeminiChatMessage(botMsgId, reply, data.language || state.voiceLanguage);
   } catch (err) {
-    updateGeminiChatMessage(botMsgId, `Could not connect to Gemini AI: ${err.message || 'network error'}`, state.voiceLanguage);
+    updateGeminiChatMessage(botMsgId, `Could not connect to Azret AI: ${err.message || 'network error'}`, state.voiceLanguage);
   } finally {
     geminiRequestInFlight = false;
     if (sendBtn) sendBtn.disabled = false;
@@ -1239,18 +1285,18 @@ function startLiveCall() {
   }
   if (btnLabel) btnLabel.textContent = 'End Call';
 
-  updateLiveStatus('Connecting to Gemini AI…');
+  updateLiveStatus('Connecting to Azret AI…');
   const orb = document.getElementById('liveOrb');
   if (orb) orb.classList.add('active');
 
   setTimeout(() => {
     if (!liveCallActive) return;
-    updateLiveStatus('Live Connected 🟢');
+    updateLiveStatus('Azret AI Connected 🟢');
     const welcome = state.voiceLanguage === 'ml-IN'
-      ? 'നമസ്കാരം! അസ്രെറ്റ് ലൈവ് കോളിലേക്ക് സ്വാഗതം. നിങ്ങളുടെ ചോദ്യം ചോദിക്കാം.'
-      : "Hello! Connected to AZRET Gemini voice chat. Ask me anything, including follow-up questions.";
+      ? 'ഹായ്! Azret AI ഇവിടെ ഉണ്ട് ✨ സംസാരിക്കൂ, ഞാൻ കേൾക്കുന്നു.'
+      : "Hi! Azret AI is connected ✨ Talk naturally — I can handle follow-up questions too.";
     
-    updateLiveTranscript(`AZRET: ${welcome}`);
+    updateLiveTranscript(`Azret AI: ${welcome}`);
     if (liveSpeakerOn) {
       speakVoiceAssistantReply(welcome, state.voiceLanguage, () => {
         if (liveCallActive && !liveCallMuted) startLiveCallTurn();
@@ -1356,7 +1402,7 @@ function startLiveCallTurn() {
     if (myTurn !== liveTurnSerial || hadError) return;
     const text = finalTranscript.trim();
     if (text) {
-      updateLiveStatus('AZRET Thinking… 🧠');
+      updateLiveStatus('Azret AI Thinking… ✨');
       if (orb) orb.classList.add('speaking');
 
       fetch('/api/ai-assistant', {
@@ -1373,10 +1419,10 @@ function startLiveCallTurn() {
         .then(data => {
           if (myTurn !== liveTurnSerial || !liveCallActive) return;
           const reply = data.response || data.reply;
-          if (!reply) throw new Error('Empty Gemini response');
-          updateLiveTranscript(`AZRET: ${reply}`);
+          if (!reply) throw new Error('Empty Azret AI response');
+          updateLiveTranscript(`Azret AI: ${reply}`);
           if (liveSpeakerOn) {
-            updateLiveStatus('AZRET Speaking… 🔊');
+            updateLiveStatus('Azret AI Speaking… 🔊');
             speakVoiceAssistantReply(reply, data.language || state.voiceLanguage, () => {
               if (myTurn !== liveTurnSerial) return;
               if (orb) orb.classList.remove('speaking');
@@ -1389,8 +1435,8 @@ function startLiveCallTurn() {
         })
         .catch((err) => {
           if (myTurn !== liveTurnSerial || !liveCallActive) return;
-          updateLiveTranscript(`AZRET: ${err.message || 'Gemini connection error.'}`);
-          updateLiveStatus('Gemini connection problem');
+          updateLiveTranscript(`Azret AI: ${err.message || 'AI connection error.'}`);
+          updateLiveStatus('Azret AI connection problem');
           if (orb) orb.classList.remove('speaking');
           scheduleRetry(2500);
         });
@@ -1455,14 +1501,16 @@ function speakVoiceAssistantReply(text, lang, onEndCallback) {
   speechSynthesis.speak(utterance);
 }
 
-function check27thSalaryNotification() {
+function checkSalaryNotification() {
   const today = new Date();
-  const dayOfMonth = today.getDate();
+  const configuredDay = Math.max(1, Math.min(31, parseInt(state.salaryCreditDay, 10) || 27));
+  const salaryDayThisMonth = effectiveSalaryDay(today.getFullYear(), today.getMonth());
 
-  // Show ONLY on the 27th day of the month
-  if (dayOfMonth !== 27) return;
+  // Show only on this user's configured salary day (or the month's last day
+  // when the configured day does not exist in a shorter month).
+  if (today.getDate() !== salaryDayThisMonth) return;
 
-  const dateStr = today.toISOString().slice(0, 10);
+  const dateStr = localDateISO(today);
   const salaryStorageKey = `salary_asked_${state.userId || state.username || 'account'}_${dateStr}`;
   const answered = localStorage.getItem(salaryStorageKey);
   if (answered) return;
@@ -1471,6 +1519,8 @@ function check27thSalaryNotification() {
   if (!notifEl) return;
 
   notifEl.style.display = 'flex';
+  const title = notifEl.querySelector('.s27-text strong');
+  if (title) title.textContent = `Salary day (${ordinalDay(configuredDay)})`;
 
   const yesBtn = document.getElementById('s27YesBtn');
   const noBtn = document.getElementById('s27NoBtn');
@@ -1496,6 +1546,7 @@ function check27thSalaryNotification() {
     };
   }
 }
+
 
 
 /* ==========================================================================
@@ -1707,7 +1758,7 @@ function computeTotals(table, rows) {
   if (table === 'shopping') {
     const total = sum('total');
     document.getElementById('shopping-count').textContent = String(rows.length);
-    document.getElementById('shopping-total').innerHTML = `<span class="cur-unit">${state.currency}</span> ${(state.currency === 'INR' ? total * state.exchangeRate : total).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+    document.getElementById('shopping-total').textContent = fmt(total);
     updateShoppingBudgetUI(total);
   }
 }
@@ -1718,20 +1769,26 @@ function computeTotals(table, rows) {
 function setupShoppingBudget() {
   const btn = document.getElementById('shopping-budget-save');
   if (!btn) return;
-  btn.addEventListener('click', () => {
+  btn.addEventListener('click', async () => {
     const input = document.getElementById('shopping-budget-input');
-    const typed = Number(input.value) || 0;
-    // The budget is stored in AED (base currency), same as every other
-    // amount in the database, regardless of which currency is displayed.
-    state.shoppingBudget = state.currency === 'INR' ? typed / state.exchangeRate : typed;
-    fetch('/api/settings', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ shopping_budget: state.shoppingBudget })
-    }).catch(() => {});
-    toast('Shopping budget updated', 'success');
-    const rows = state.tables.shopping || [];
-    const total = rows.reduce((a, r) => a + (Number(r.total) || 0), 0);
-    updateShoppingBudgetUI(total);
+    const typed = Number(input.value);
+    if (!Number.isFinite(typed) || typed < 0) { toast('Enter a valid shopping budget', 'error'); return; }
+    if (!hasCurrencyRate(state.currency)) { toast(`Exchange rate unavailable for ${state.currency}. Refresh rates first.`, 'error'); return; }
+    const budgetAED = toAED(typed, state.currency);
+    if (!Number.isFinite(budgetAED)) { toast('Could not convert budget safely', 'error'); return; }
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shopping_budget: budgetAED })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Save failed');
+      state.shoppingBudget = budgetAED;
+      toast('Shopping budget updated', 'success');
+      const rows = state.tables.shopping || [];
+      const total = rows.reduce((a, r) => a + (Number(r.total) || 0), 0);
+      updateShoppingBudgetUI(total);
+    } catch (e) { toast(e.message || 'Could not save shopping budget', 'error'); }
   });
 }
 
@@ -1746,7 +1803,7 @@ function updateShoppingBudgetUI(totalAED) {
 
   const budgetAED = state.shoppingBudget || 0;
   input.value = budgetAED > 0
-    ? round2(state.currency === 'INR' ? budgetAED * state.exchangeRate : budgetAED)
+    ? round2(fromAED(budgetAED, state.currency))
     : '';
 
   if (budgetAED <= 0) {
@@ -1815,7 +1872,7 @@ function setupForms() {
     // default date/time to now
     const dateInput = document.getElementById(`${table}-date`);
     const timeInput = document.getElementById(`${table}-time`);
-    if (dateInput && !dateInput.value) dateInput.value = new Date().toISOString().slice(0, 10);
+    if (dateInput && !dateInput.value) dateInput.value = localDateISO();
     if (timeInput && !timeInput.value) timeInput.value = new Date().toTimeString().slice(0, 5);
 
     form.addEventListener('submit', (e) => { e.preventDefault(); submitForm(table); });
@@ -1897,7 +1954,7 @@ function setupProductFetchers() {
 /** Shows the opposite-currency equivalent of whatever the user just typed,
  *  in the neat box sitting immediately to the right of the amount field,
  *  so amounts convert instantly, side-by-side, as they're entered. */
-function updateAmountHint(table, field) {
+function legacy_updateAmountHint(table, field) {
   const el = document.getElementById(`${table}-${field}`);
   const tag = document.getElementById(`${table}-${field}-tag`);
   const value = document.getElementById(`${table}-${field}-value`);
@@ -1945,14 +2002,20 @@ function fieldIds(table) {
  *  the end of a notes string, so re-submitting an edited record refreshes
  *  the block instead of stacking a new one on every save. */
 function stripAutoNote(notes) {
-  return String(notes || '').replace(/\n?\[Original:[^\]]*\]\s*$/i, '').trimEnd();
+  let out = String(notes || '').trimEnd();
+  // V20+ writes [Base: ...] while older versions wrote [Original: ...].
+  // Remove every trailing generated block so editing a record never stacks
+  // duplicate conversion metadata.
+  const generated = /\n?\[(?:Original|Base):[^\]]*\]\s*$/i;
+  while (generated.test(out)) out = out.replace(generated, '').trimEnd();
+  return out;
 }
 
 /** Builds the "Original AED / Converted INR / Date / Time" info line that
  *  gets appended to a record's Notes field on every submission. */
-function buildAutoNote(amountAED, dateVal, timeVal) {
+function legacy_buildAutoNote(amountAED, dateVal, timeVal) {
   const inrVal = amountAED * state.exchangeRate;
-  const d = dateVal || new Date().toISOString().slice(0, 10);
+  const d = dateVal || localDateISO();
   const t = timeVal || new Date().toTimeString().slice(0, 5);
   return `[Original: AED ${round2(amountAED).toFixed(2)} | Converted: INR ${round2(inrVal).toFixed(2)} | ${d} ${t}]`;
 }
@@ -1968,13 +2031,16 @@ async function submitForm(table) {
   // dual-currency toggle (Phase 3: emi/debts) carry a per-field entry
   // currency on the input's dataset; everything else falls back to
   // whatever the global display currency is set to.
-  (AMOUNT_FIELDS[table] || []).forEach(f => {
-    if (payload[f] === undefined || payload[f] === '') return;
+  const amountFields = AMOUNT_FIELDS[table] || [];
+  for (const f of amountFields) {
+    if (payload[f] === undefined || payload[f] === '') continue;
     const el = document.getElementById(`${table}-${f}`);
     const entryCur = (el && el.dataset.entryCur) || state.currency;
     const typed = Number(payload[f]) || 0;
-    payload[f] = entryCur === 'INR' ? typed / state.exchangeRate : typed;
-  });
+    if (!hasCurrencyRate(entryCur)) { toast(`Exchange rate unavailable for ${entryCur}. Refresh rates before saving.`, 'error'); return; }
+    payload[f] = toAED(typed, entryCur);
+    if (!Number.isFinite(payload[f])) { toast(`Could not convert ${entryCur} safely.`, 'error'); return; }
+  }
 
   // Shopping Planner's Total is always computed server-side-equivalent
   // here: Quantity × Price (Price already normalised to AED above).
@@ -2022,15 +2088,16 @@ function editRecord(table, id, rows) {
     if (amountFields.has(f)) {
       const aedVal = Number(row[f]) || 0;
       if (SMART_TRACKING[table]) {
-        // Phase 3 dual-currency fields carry their own independent entry
-        // currency — always show the true AED value on edit and reset
-        // that field's toggle back to AED.
-        el.value = round2(aedVal);
-        setEntryCurrency(`${table}-${f}`, 'AED');
+        // Show stored AED values in the user's currently selected currency.
+        // This keeps EMI/Debt edit forms consistent even when AED is not
+        // one of the user's two configured currencies.
+        el.dataset.entryCur = state.currency;
+        el.value = round2(fromAED(aedVal, state.currency));
+        setEntryCurrency(`${table}-${f}`, state.currency);
       } else {
         // Amount fields are stored in AED; show them converted into
         // whichever currency is currently selected for display.
-        el.value = state.currency === 'INR' ? round2(aedVal * state.exchangeRate) : round2(aedVal);
+        el.value = round2(fromAED(aedVal, state.currency));
       }
     } else if (f === 'notes') {
       el.value = stripAutoNote(row[f]);
@@ -2061,11 +2128,11 @@ function resetForm(table) {
 
   const dateInput = document.getElementById(`${table}-date`);
   const timeInput = document.getElementById(`${table}-time`);
-  if (dateInput) dateInput.value = new Date().toISOString().slice(0, 10);
+  if (dateInput) dateInput.value = localDateISO();
   if (timeInput) timeInput.value = new Date().toTimeString().slice(0, 5);
 
   if (SMART_TRACKING[table]) {
-    (AMOUNT_FIELDS[table] || []).forEach(f => setEntryCurrency(`${table}-${f}`, 'AED'));
+    (AMOUNT_FIELDS[table] || []).forEach(f => setEntryCurrency(`${table}-${f}`, state.currency));
     const panel = document.getElementById(`${table}-prev-panel`);
     if (panel) { panel.style.display = 'none'; panel.innerHTML = ''; }
   }
@@ -2075,7 +2142,13 @@ function resetForm(table) {
 async function deleteRecord(table, id) {
   if (!confirm('Delete this record? This cannot be undone.')) return;
   try {
-    await fetch(`/api/${table}/${id}`, { method: 'DELETE' });
+    const res = await fetch(`/api/${table}/${id}`, { method: 'DELETE' });
+    let data = {};
+    try { data = await res.json(); } catch (_) {}
+    if (!res.ok) {
+      toast(data.error || 'Could not delete record', 'error');
+      return;
+    }
     toast('Record deleted', 'success');
     await loadTable(table);
     if (state.dashboard) await loadDashboard();
@@ -2136,12 +2209,12 @@ async function saveIncomeProfile() {
   const typedIncome = Number(document.getElementById('incomeprofile-monthly_income').value) || 0;
   if (typedIncome <= 0) { toast('Enter a valid verified monthly income', 'error'); return; }
 
-  const toAED = (typed) => state.currency === 'INR' ? typed / state.exchangeRate : typed;
+  const toBaseAED = (typed) => toAED(typed, state.currency);
   const payload = {
-    monthly_income: toAED(typedIncome),
-    other_income: toAED(Number(document.getElementById('incomeprofile-other_income').value) || 0),
-    fixed_emi_commitment: toAED(Number(document.getElementById('incomeprofile-fixed_emi_commitment').value) || 0),
-    fixed_debt_commitment: toAED(Number(document.getElementById('incomeprofile-fixed_debt_commitment').value) || 0),
+    monthly_income: toBaseAED(typedIncome),
+    other_income: toBaseAED(Number(document.getElementById('incomeprofile-other_income').value) || 0),
+    fixed_emi_commitment: toBaseAED(Number(document.getElementById('incomeprofile-fixed_emi_commitment').value) || 0),
+    fixed_debt_commitment: toBaseAED(Number(document.getElementById('incomeprofile-fixed_debt_commitment').value) || 0),
     notes: document.getElementById('incomeprofile-notes').value || '',
   };
 
@@ -2174,9 +2247,7 @@ function renderIncomeProfile(profile) {
     const salInput = document.getElementById('salaryplan-amount');
     const hint = document.getElementById('salaryPlanVerifiedHint');
     if (salInput && !salInput.value) {
-      salInput.value = state.currency === 'INR'
-        ? round2(profile.total_verified_income * state.exchangeRate)
-        : round2(profile.total_verified_income);
+      salInput.value = round2(fromAED(profile.total_verified_income, state.currency));
       updateAmountHint('salaryplan', 'amount');
     }
     if (hint) hint.textContent = `Defaults to your verified income (${fmt(profile.total_verified_income)}). Change it to try a what-if amount.`;
@@ -2217,7 +2288,7 @@ async function generateSalaryPlan() {
 
   // Amount fields are always stored/sent in AED, same convention as
   // every other form in the app.
-  const salaryAED = state.currency === 'INR' ? typed / state.exchangeRate : typed;
+  const salaryAED = toAED(typed, state.currency);
   state.lastSalaryAED = salaryAED;
 
   try {
@@ -2360,9 +2431,8 @@ function setupCalculators() {
     const amt = parseFloat(convAmount.value) || 0;
     let result;
     if (convFrom.value === convTo.value) result = amt;
-    else if (convFrom.value === 'AED' && convTo.value === 'INR') result = amt * state.exchangeRate;
-    else result = amt / state.exchangeRate;
-    convResult.textContent = `${CURRENCY_SYMBOL[convFrom.value]} ${amt.toLocaleString(undefined,{maximumFractionDigits:2})} = ${CURRENCY_SYMBOL[convTo.value]} ${result.toLocaleString(undefined,{maximumFractionDigits:2})}`;
+    else result = fromAED(toAED(amt, convFrom.value), convTo.value);
+    convResult.textContent = `${currencySymbol(convFrom.value)} ${amt.toLocaleString(undefined,{maximumFractionDigits:2})} = ${currencySymbol(convTo.value)} ${result.toLocaleString(undefined,{maximumFractionDigits:2})}`;
   }
   [convAmount, convFrom, convTo].forEach(el => el.addEventListener('input', runConv));
   runConv();
@@ -2418,101 +2488,35 @@ function setupSettingsPage() {
     btn.addEventListener('click', () => setCurrency(btn.dataset.currency));
   });
 
-  document.getElementById('logoFile').addEventListener('change', async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const formData = new FormData();
-    formData.append('file', file);
-    try {
-      const res = await fetch('/api/logo', { method: 'POST', body: formData });
-      const data = await res.json();
-      if (data.success) {
-        applyBranding(data.logo_url);
-        toast('Logo updated', 'success');
-      } else {
-        toast(data.error || 'Could not upload logo', 'error');
-      }
-    } catch (err) { toast('Could not upload logo', 'error'); }
-    e.target.value = '';
-  });
+  // Branding, splash-video and dashboard-wallpaper controls were intentionally removed.
 
-  document.getElementById('btnResetLogo').addEventListener('click', async () => {
+  const salaryDateForm = document.getElementById('salaryDateForm');
+  if (salaryDateForm) salaryDateForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const input = document.getElementById('salaryCreditDay');
+    const msg = document.getElementById('salaryDateMsg');
+    const day = parseInt(input.value, 10);
+    if (!Number.isInteger(day) || day < 1 || day > 31) {
+      msg.textContent = 'Choose a day from 1 to 31.';
+      msg.style.display = 'block';
+      return;
+    }
     try {
-      const res = await fetch('/api/logo', { method: 'DELETE' });
+      const res = await fetch('/api/settings', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ salary_credit_day: day })
+      });
       const data = await res.json();
-      if (data.success) {
-        toast('Logo reset to default', 'success');
-        setTimeout(() => window.location.reload(), 600);
-      } else {
-        toast('Could not reset logo', 'error');
-      }
-    } catch (err) { toast('Could not reset logo', 'error'); }
-  });
-
-  // Splash Screen Video (Phase 1) ----------------------------------------
-  document.getElementById('splashVideoFile').addEventListener('change', async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const formData = new FormData();
-    formData.append('file', file);
-    toast('Uploading splash video…');
-    try {
-      const res = await fetch('/api/splash-video', { method: 'POST', body: formData });
-      const data = await res.json();
-      if (data.success) {
-        applySplashVideo(data.splash_video_url);
-        toast('Splash video updated', 'success');
-      } else {
-        toast(data.error || 'Could not upload video', 'error');
-      }
-    } catch (err) { toast('Could not upload video', 'error'); }
-    e.target.value = '';
-  });
-
-  document.getElementById('btnResetSplashVideo').addEventListener('click', async () => {
-    try {
-      const res = await fetch('/api/splash-video', { method: 'DELETE' });
-      const data = await res.json();
-      if (data.success) {
-        applySplashVideo(data.splash_video_url);
-        toast('Splash video reset to default', 'success');
-      } else {
-        toast('Could not reset splash video', 'error');
-      }
-    } catch (err) { toast('Could not reset splash video', 'error'); }
-  });
-
-  // Background Theme Image (Phase 1) --------------------------------------
-  document.getElementById('themeImageFile').addEventListener('change', async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const formData = new FormData();
-    formData.append('file', file);
-    toast('Uploading theme image…');
-    try {
-      const res = await fetch('/api/theme-image', { method: 'POST', body: formData });
-      const data = await res.json();
-      if (data.success) {
-        applyThemeImage(data.theme_image_url);
-        toast('Background theme updated', 'success');
-      } else {
-        toast(data.error || 'Could not upload image', 'error');
-      }
-    } catch (err) { toast('Could not upload image', 'error'); }
-    e.target.value = '';
-  });
-
-  document.getElementById('btnResetThemeImage').addEventListener('click', async () => {
-    try {
-      const res = await fetch('/api/theme-image', { method: 'DELETE' });
-      const data = await res.json();
-      if (data.success) {
-        applyThemeImage('');
-        toast('Background theme removed', 'success');
-      } else {
-        toast('Could not remove background', 'error');
-      }
-    } catch (err) { toast('Could not remove background', 'error'); }
+      if (!res.ok || !data.success) throw new Error(data.error || 'Could not save salary date');
+      state.salaryCreditDay = day;
+      msg.style.display = 'none';
+      renderSalaryCountdown();
+      checkSalaryNotification();
+      toast(`Salary date saved: ${ordinalDay(day)} of each month`, 'success');
+    } catch (err) {
+      msg.textContent = err.message || 'Could not save salary date';
+      msg.style.display = 'block';
+    }
   });
 
   document.getElementById('btnBackup').addEventListener('click', () => {
@@ -2698,7 +2702,7 @@ function applyEmiCategoryFromValue(catValue) {
 /* ---------------------------------------------------------------------- */
 /* Independent per-field dual-currency entry (AED <-> INR)                */
 /* ---------------------------------------------------------------------- */
-function updateDualHint(inputId) {
+function legacy_updateDualHint(inputId) {
   const el = document.getElementById(inputId);
   const tag = document.getElementById(`${inputId}-tag`);
   const value = document.getElementById(`${inputId}-value`);
@@ -2722,7 +2726,7 @@ function updateDualHint(inputId) {
   }
 }
 
-function setEntryCurrency(inputId, cur) {
+function legacy_setEntryCurrency(inputId, cur) {
   const el = document.getElementById(inputId);
   if (!el) return;
 
@@ -2754,7 +2758,7 @@ function setEntryCurrency(inputId, cur) {
   updateDualHint(inputId);
 }
 
-function wireDualCurrencyToggle(inputId) {
+function legacy_wireDualCurrencyToggle(inputId) {
   const el = document.getElementById(inputId);
   if (!el) return;
   el.dataset.entryCur = el.dataset.entryCur || 'AED';
@@ -2858,7 +2862,7 @@ function setupSmartPaymentForm(table) {
 
   const dateInput = document.getElementById(`${table}-payment-date`);
   const timeInput = document.getElementById(`${table}-payment-time`);
-  if (dateInput && !dateInput.value) dateInput.value = new Date().toISOString().slice(0, 10);
+  if (dateInput && !dateInput.value) dateInput.value = localDateISO();
   if (timeInput && !timeInput.value) timeInput.value = new Date().toTimeString().slice(0, 5);
 
   form.addEventListener('submit', async (e) => {
@@ -2870,10 +2874,12 @@ function setupSmartPaymentForm(table) {
     }
 
     const amountEl = document.getElementById(`${table}-payment-amount`);
-    const entryCur = amountEl.dataset.entryCur || 'AED';
+    const entryCur = amountEl.dataset.entryCur || state.currency;
     const typed = Number(amountEl.value) || 0;
     if (typed <= 0) { toast('Enter a payment amount', 'error'); return; }
-    const amountAED = entryCur === 'INR' ? typed / state.exchangeRate : typed;
+    if (!hasCurrencyRate(entryCur)) { toast(`Exchange rate unavailable for ${entryCur}. Refresh rates before saving.`, 'error'); return; }
+    const amountAED = toAED(typed, entryCur);
+    if (!Number.isFinite(amountAED)) { toast('Could not convert payment safely', 'error'); return; }
 
     const payload = {
       amount: round2(amountAED),
@@ -2906,11 +2912,11 @@ function resetSmartPaymentForm(table) {
   document.getElementById(`${table}-payment-record-id`).value = '';
   document.getElementById(`${table}-payment-submit`).disabled = true;
   renderPrevPanel(`${table}-payment-prev-panel`, table, null);
-  setEntryCurrency(`${table}-payment-amount`, 'AED');
+  setEntryCurrency(`${table}-payment-amount`, state.currency);
 
   const dateInput = document.getElementById(`${table}-payment-date`);
   const timeInput = document.getElementById(`${table}-payment-time`);
-  if (dateInput) dateInput.value = new Date().toISOString().slice(0, 10);
+  if (dateInput) dateInput.value = localDateISO();
   if (timeInput) timeInput.value = new Date().toTimeString().slice(0, 5);
 }
 
@@ -3012,3 +3018,292 @@ function setupSmartTracking() {
   setupSmartPaymentForm('debts');
   setupPaymentHistoryModal();
 }
+
+
+/* ========================================================================
+   RIZQ V22 — Final hardening: safe FX, persistence, UI reliability
+   ======================================================================== */
+function currencySymbol(code) { return CURRENCY_SYMBOL[code] || code; }
+function hasCurrencyRate(code) {
+  code = String(code || 'AED').toUpperCase();
+  if (code === 'AED') return true;
+  const rate = Number(state.aedRates?.[code]);
+  return Number.isFinite(rate) && rate > 0;
+}
+function rateFromAED(code) {
+  code = String(code || 'AED').toUpperCase();
+  if (code === 'AED') return 1;
+  const rate = Number(state.aedRates?.[code]);
+  if (Number.isFinite(rate) && rate > 0) return rate;
+  // Never silently treat a foreign currency as 1 AED. Returning NaN makes
+  // callers fail closed instead of corrupting stored financial amounts.
+  return NaN;
+}
+function fromAED(amountAED, code = state.currency) {
+  const rate = rateFromAED(code);
+  return Number.isFinite(rate) ? (Number(amountAED) || 0) * rate : NaN;
+}
+function toAED(amount, code = state.currency) {
+  const rate = rateFromAED(code);
+  return Number.isFinite(rate) && rate > 0 ? (Number(amount) || 0) / rate : NaN;
+}
+function currencyPairRate(base = state.primaryCurrency, quote = state.secondaryCurrency) {
+  const b = rateFromAED(base), q = rateFromAED(quote);
+  return b > 0 ? q / b : 1;
+}
+function otherCurrency(code = state.currency) {
+  return code === state.primaryCurrency ? state.secondaryCurrency : state.primaryCurrency;
+}
+
+function syncCurrencyPairUI() {
+  const pair = [state.primaryCurrency, state.secondaryCurrency];
+  const switchEl = document.getElementById('currencySwitch');
+  if (switchEl) {
+    const buttons = [...switchEl.querySelectorAll('.cur-opt')];
+    buttons.slice(0,2).forEach((btn, i) => {
+      btn.dataset.currency = pair[i]; btn.textContent = pair[i];
+      btn.classList.toggle('active', state.currency === pair[i]);
+    });
+  }
+  const pairLabel = document.getElementById('exchangePairLabel');
+  if (pairLabel) pairLabel.textContent = `${state.primaryCurrency} → ${state.secondaryCurrency}`;
+  const title = document.getElementById('fxTitle');
+  if (title) title.textContent = `${state.primaryCurrency} / ${state.secondaryCurrency} Exchange Trend`;
+  const curLabel = document.getElementById('fxCurrentLabel');
+  if (curLabel) curLabel.textContent = `1 ${state.primaryCurrency}`;
+  const calcTitle = document.getElementById('currencyCalcTitle');
+  if (calcTitle) calcTitle.textContent = `${state.primaryCurrency} ↔ ${state.secondaryCurrency} Calculator`;
+  const fromSel = document.getElementById('convFrom'), toSel = document.getElementById('convTo');
+  [fromSel, toSel].forEach(sel => {
+    if (!sel) return;
+    const old = sel.value;
+    sel.innerHTML = pair.map(c => `<option value="${c}">${c}</option>`).join('');
+    sel.value = pair.includes(old) ? old : (sel === fromSel ? pair[0] : pair[1]);
+  });
+  document.querySelectorAll('.dual-currency-toggle').forEach(toggle => {
+    const buttons=[...toggle.querySelectorAll('.dc-btn')];
+    buttons.slice(0,2).forEach((btn,i)=>{ btn.dataset.cur=pair[i]; btn.textContent=pair[i]; });
+  });
+  document.querySelectorAll('[data-entry-cur]').forEach(el => {
+    if (!pair.includes(el.dataset.entryCur)) el.dataset.entryCur = pair[0];
+  });
+  const pSel=document.getElementById('primaryCurrencySelect'), sSel=document.getElementById('secondaryCurrencySelect');
+  if (pSel && [...pSel.options].some(o=>o.value===pair[0])) pSel.value=pair[0];
+  if (sSel && [...sSel.options].some(o=>o.value===pair[1])) sSel.value=pair[1];
+}
+
+async function setCurrency(cur) {
+  cur = String(cur || '').toUpperCase();
+  if (![state.primaryCurrency, state.secondaryCurrency].includes(cur)) cur = state.primaryCurrency;
+  if (!hasCurrencyRate(cur)) { toast(`Exchange rate unavailable for ${cur}. Refresh rates first.`, 'error'); return; }
+  const previous = state.currency;
+  state.currency = cur;
+  localStorage.setItem('azret_currency', cur);
+  applyCurrency(cur, true);
+  try {
+    const res = await fetch('/api/settings', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({default_currency:cur})});
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.error || 'Could not save currency');
+  } catch (e) {
+    state.currency = previous;
+    localStorage.setItem('azret_currency', previous);
+    applyCurrency(previous, true);
+    toast(e.message || 'Could not save currency selection', 'error');
+  }
+}
+
+function applyCurrency(cur, rerender) {
+  state.currency = String(cur || state.primaryCurrency).toUpperCase();
+  syncCurrencyPairUI();
+  document.querySelectorAll('.cur-opt[data-currency]').forEach(b => b.classList.toggle('active', b.dataset.currency === state.currency));
+  document.querySelectorAll('.cur-unit').forEach(el => { el.textContent = state.currency; });
+  if (rerender) {
+    rerenderAllVisible();
+    Object.keys(state.editing).forEach(convertVisibleAmountInputs);
+    updateAllAmountHints();
+    updateShoppingBudgetUI((state.tables.shopping || []).reduce((a,r)=>a+(Number(r.total)||0),0));
+  }
+}
+
+function convertVisibleAmountInputs(table) {
+  const id=state.editing[table]; if(!id) return;
+  const row=(state.tables[table]||[]).find(r=>String(r.id)===String(id)); if(!row) return;
+  (AMOUNT_FIELDS[table]||[]).forEach(f=>{ const el=document.getElementById(`${table}-${f}`); if(el) el.value=round2(fromAED(Number(row[f])||0,state.currency)); });
+}
+function rerenderAllVisible() {
+  if(state.dashboard) renderDashboard(state.dashboard);
+  Object.keys(state.tables).forEach(t=>renderTable(t,state.tables[t]));
+  if(state.salaryPlan) renderSalaryPlan(state.salaryPlan);
+  const sal=document.getElementById('salaryplan-amount'); if(sal&&state.lastSalaryAED) sal.value=round2(fromAED(state.lastSalaryAED,state.currency));
+}
+function fmt(amountAED) {
+  const v=fromAED(amountAED,state.currency);
+  if (!Number.isFinite(v)) return `${state.currency} —`;
+  const value=v.toLocaleString(undefined,{maximumFractionDigits:2,minimumFractionDigits:0});
+  const sym=currencySymbol(state.currency);
+  return ['₹','$','€','£','¥','₩','₽','₺'].includes(sym) ? `${sym}${value}` : `${sym} ${value}`;
+}
+
+async function fetchAEDRate(code) {
+  code=String(code||'AED').toUpperCase(); if(code==='AED') return 1;
+  const res=await fetch(`/api/fx/rate?base=AED&quote=${encodeURIComponent(code)}`,{cache:'no-store'});
+  if(!res.ok) throw new Error('rate unavailable');
+  const data=await res.json(); const r=Number(data.rate); if(!Number.isFinite(r)||r<=0) throw new Error('invalid rate'); return r;
+}
+async function refreshCurrencyRates() {
+  const codes=[...new Set([state.primaryCurrency,state.secondaryCurrency,'INR'])];
+  const results=await Promise.allSettled(codes.map(async c=>[c,await fetchAEDRate(c)]));
+  results.forEach(x=>{ if(x.status==='fulfilled'){ const [c,r]=x.value; state.aedRates[c]=r; if(c==='INR'){state.exchangeRate=r; localStorage.setItem('azret_rate',String(r));} } });
+  localStorage.setItem('rizq_aed_rates',JSON.stringify(state.aedRates));
+  const required=[state.primaryCurrency,state.secondaryCurrency].filter(c=>c!=='AED');
+  const missing=required.filter(c=>!(Number.isFinite(Number(state.aedRates[c]))&&Number(state.aedRates[c])>0));
+  if(missing.length) throw new Error(`Missing exchange rate for ${missing.join(', ')}`);
+}
+
+async function loadServerSettings() {
+  try {
+    const res=await fetch('/api/settings',{cache:'no-store'}); const cfg=await res.json();
+    if(cfg.theme){state.theme=cfg.theme;applyTheme(cfg.theme,false);}
+    state.primaryCurrency=String(cfg.primary_currency||'AED').toUpperCase();
+    state.secondaryCurrency=String(cfg.secondary_currency||'INR').toUpperCase();
+    if(state.primaryCurrency===state.secondaryCurrency) state.secondaryCurrency=state.primaryCurrency==='INR'?'AED':'INR';
+    state.currency=[state.primaryCurrency,state.secondaryCurrency].includes(String(cfg.default_currency||'').toUpperCase())?String(cfg.default_currency).toUpperCase():state.primaryCurrency;
+    localStorage.setItem('rizq_primary_currency',state.primaryCurrency); localStorage.setItem('rizq_secondary_currency',state.secondaryCurrency); localStorage.setItem('azret_currency',state.currency);
+    try{Object.assign(state.aedRates,JSON.parse(localStorage.getItem('rizq_aed_rates')||'{}'));}catch(_){ }
+    // Server-persisted last-known FX rates make conversions safe on a new
+    // device even if the external reference service is temporarily offline.
+    Object.entries(cfg).forEach(([k,v])=>{
+      const m=/^fx_rate_([A-Z]{3})$/.exec(k);
+      if(m){const n=Number(v);if(Number.isFinite(n)&&n>0)state.aedRates[m[1]]=n;}
+    });
+    if(cfg.exchange_rate){state.exchangeRate=Number(cfg.exchange_rate)||state.exchangeRate;state.aedRates.INR=state.exchangeRate;}
+    if(cfg.shopping_budget) state.shoppingBudget=Number(cfg.shopping_budget)||0;
+    if(cfg.last_salary_amount) state.lastSalaryAED=Number(cfg.last_salary_amount)||0;
+    if(cfg.salary_credit_day){const d=parseInt(cfg.salary_credit_day,10);if(d>=1&&d<=31)state.salaryCreditDay=d;}
+    syncCurrencyPairUI(); applyCurrency(state.currency,false);
+    const sd=document.getElementById('salaryCreditDay'); if(sd) sd.value=String(state.salaryCreditDay);
+    renderSalaryCountdown();
+    try {
+      await refreshCurrencyRates();
+    } catch (e) {
+      const missing=[state.primaryCurrency,state.secondaryCurrency].filter(c=>!hasCurrencyRate(c));
+      if (missing.length && [state.primaryCurrency,state.secondaryCurrency].includes('AED')) {
+        state.currency='AED';
+        localStorage.setItem('azret_currency','AED');
+        toast(`Exchange rate unavailable for ${missing.join(', ')} — showing AED until rates refresh.`, 'error');
+      } else if (missing.length) {
+        toast(`Exchange rates unavailable for ${missing.join(', ')}. Saving converted amounts is disabled until rates refresh.`, 'error');
+      }
+    }
+    applyCurrency(state.currency,true);
+    updateShoppingBudgetUI((state.tables.shopping||[]).reduce((a,r)=>a+(Number(r.total)||0),0));
+  } catch(e) { console.warn('Settings load failed',e); }
+}
+
+async function refreshExchangeRate(silent=false) {
+  const btn=document.getElementById('refreshRate'); if(btn) btn.classList.add('loading');
+  try {
+    await refreshCurrencyRates();
+    const rate=currencyPairRate();
+    const rateEl=document.getElementById('rateValue');
+    if(rateEl) rateEl.textContent=`1 ${state.primaryCurrency} = ${currencySymbol(state.secondaryCurrency)} ${rate.toLocaleString(undefined,{maximumFractionDigits:4})}`;
+    if(!silent) toast('Exchange reference rate updated','success');
+    await refreshFxChart(state.fxRange||'1M');
+  } catch(e) { if(!silent) toast('Rate service unavailable — using last known values','error'); }
+  finally { if(btn) btn.classList.remove('loading'); rerenderAllVisible(); }
+}
+
+function updateAmountHint(table,field) {
+  const el=document.getElementById(`${table}-${field}`),tag=document.getElementById(`${table}-${field}-tag`),value=document.getElementById(`${table}-${field}-value`),box=document.getElementById(`${table}-${field}-box`); if(!el||!value)return;
+  const typed=Number(el.value)||0, other=otherCurrency(state.currency); const converted=fromAED(toAED(typed,state.currency),other);
+  if(tag) tag.textContent=`≈ ${other}`;
+  const txt=converted.toLocaleString(undefined,{maximumFractionDigits:2,minimumFractionDigits:2});
+  if(value.textContent!==txt){value.textContent=txt;if(box&&typed>0){box.classList.remove('pulse');void box.offsetWidth;box.classList.add('pulse');}}
+}
+function buildAutoNote(amountAED,dateVal,timeVal) {
+  const other=otherCurrency(state.currency), otherVal=fromAED(amountAED,other),d=dateVal||localDateISO(),t=timeVal||new Date().toTimeString().slice(0,5);
+  return `[Base: AED ${round2(amountAED).toFixed(2)} | ${other}: ${round2(otherVal).toFixed(2)} | ${d} ${t}]`;
+}
+
+function updateDualHint(inputId) {
+  const el=document.getElementById(inputId),tag=document.getElementById(`${inputId}-tag`),value=document.getElementById(`${inputId}-value`),box=document.getElementById(`${inputId}-box`); if(!el||!value)return;
+  const entry=el.dataset.entryCur||state.primaryCurrency, other=entry===state.primaryCurrency?state.secondaryCurrency:state.primaryCurrency, typed=Number(el.value)||0;
+  const converted=fromAED(toAED(typed,entry),other); if(tag)tag.textContent=`≈ ${other}`;
+  const txt=converted.toLocaleString(undefined,{maximumFractionDigits:2,minimumFractionDigits:2}); if(value.textContent!==txt){value.textContent=txt;if(box&&typed>0){box.classList.remove('pulse');void box.offsetWidth;box.classList.add('pulse');}}
+}
+function setEntryCurrency(inputId,cur) {
+  const el=document.getElementById(inputId); if(!el)return; cur=String(cur||state.primaryCurrency).toUpperCase();
+  if (![state.primaryCurrency, state.secondaryCurrency].includes(cur)) cur = state.currency || state.primaryCurrency;
+  const old=[state.primaryCurrency, state.secondaryCurrency].includes(el.dataset.entryCur) ? el.dataset.entryCur : (state.currency || state.primaryCurrency); if(old!==cur){const typed=Number(el.value);if(Number.isFinite(typed)&&typed>0)el.value=Number(fromAED(toAED(typed,old),cur).toFixed(2));} el.dataset.entryCur=cur;
+  const toggle=document.querySelector(`.dual-currency-toggle[data-field="${inputId}"]`); if(toggle)toggle.querySelectorAll('.dc-btn').forEach(b=>b.classList.toggle('active',b.dataset.cur===cur));
+  const unit=document.getElementById(`${inputId}-unit`); if(unit)unit.textContent=cur; updateDualHint(inputId);
+}
+function wireDualCurrencyToggle(inputId) {
+  const el=document.getElementById(inputId);if(!el)return; if(![state.primaryCurrency,state.secondaryCurrency].includes(el.dataset.entryCur))el.dataset.entryCur=state.primaryCurrency;
+  el.addEventListener('input',()=>updateDualHint(inputId)); const toggle=document.querySelector(`.dual-currency-toggle[data-field="${inputId}"]`);
+  if(toggle)toggle.querySelectorAll('.dc-btn').forEach(btn=>btn.addEventListener('click',e=>{e.preventDefault();setEntryCurrency(inputId,btn.dataset.cur);}));
+  const box=document.getElementById(`${inputId}-box`);if(box){box.style.cursor='pointer';box.onclick=()=>setEntryCurrency(inputId,(el.dataset.entryCur||state.primaryCurrency)===state.primaryCurrency?state.secondaryCurrency:state.primaryCurrency);} updateDualHint(inputId);
+}
+
+async function loadCurrencyCatalog() {
+  const p=document.getElementById('primaryCurrencySelect'),q=document.getElementById('secondaryCurrencySelect'); if(!p||!q)return;
+  try { const r=await fetch('/api/fx/currencies',{cache:'no-store'});const d=await r.json();const list=Array.isArray(d.currencies)?d.currencies:[]; if(!list.length)return;
+    const html=list.map(x=>`<option value="${x.code}">${x.code} — ${escapeHtml(x.name||x.code)}</option>`).join('');p.innerHTML=html;q.innerHTML=html;
+  } catch(_) {}
+  if([...p.options].some(o=>o.value===state.primaryCurrency))p.value=state.primaryCurrency;
+  if([...q.options].some(o=>o.value===state.secondaryCurrency))q.value=state.secondaryCurrency;
+}
+function setupCurrencyPairSettings() {
+  const form=document.getElementById('currencyPairForm'),p=document.getElementById('primaryCurrencySelect'),q=document.getElementById('secondaryCurrencySelect'),swap=document.getElementById('currencyPairSwap'),msg=document.getElementById('currencyPairMsg');
+  if(swap)swap.addEventListener('click',()=>{const t=p.value;p.value=q.value;q.value=t;});
+  if(form)form.addEventListener('submit',async e=>{e.preventDefault();const a=p.value,b=q.value;if(!a||!b||a===b){if(msg){msg.textContent='Choose two different currencies.';msg.style.display='block';}return;}
+    try{
+      // Never save a new currency pair until both conversion rates are known.
+      // Otherwise an outage could make a non-AED amount be treated as AED.
+      const needed=[...new Set([a,b].filter(c=>c!=='AED'))];
+      const fetched=await Promise.all(needed.map(async c=>[c,await fetchAEDRate(c)]));
+      fetched.forEach(([c,r])=>{state.aedRates[c]=r;if(c==='INR'){state.exchangeRate=r;localStorage.setItem('azret_rate',String(r));}});
+      localStorage.setItem('rizq_aed_rates',JSON.stringify(state.aedRates));
+      const r=await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({primary_currency:a,secondary_currency:b,default_currency:a})});const d=await r.json();if(!r.ok||!d.success)throw new Error(d.error||'Save failed');state.primaryCurrency=a;state.secondaryCurrency=b;state.currency=a;localStorage.setItem('rizq_primary_currency',a);localStorage.setItem('rizq_secondary_currency',b);localStorage.setItem('azret_currency',a);syncCurrencyPairUI();await refreshExchangeRate(true);applyCurrency(a,true);if(msg)msg.style.display='none';toast(`Currency pair saved: ${a} ⇄ ${b}`,'success');
+    }catch(err){if(msg){msg.textContent=(err.message==='rate unavailable'?'Exchange rate is temporarily unavailable. Please try again.':(err.message||'Could not save currencies'));msg.style.display='block';}}});
+}
+
+function dateLabel(d){try{return new Date(d+'T00:00:00').toLocaleDateString(undefined,{month:'short',day:'numeric'});}catch(_){return d;}}
+function drawFxChart(points) {
+  const canvas=document.getElementById('fxChart');if(!canvas)return;const wrap=canvas.parentElement;const dpr=Math.min(window.devicePixelRatio||1,2),w=Math.max(280,wrap.clientWidth),h=Math.max(180,wrap.clientHeight);canvas.width=w*dpr;canvas.height=h*dpr;const ctx=canvas.getContext('2d');ctx.scale(dpr,dpr);ctx.clearRect(0,0,w,h);
+  if(!points||points.length<2){ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--text-muted')||'#718096';ctx.font='13px Manrope, sans-serif';ctx.fillText('Exchange history will appear when reference data is available.',18,h/2);return;}
+  const pad={l:16,r:16,t:18,b:28},vals=points.map(p=>Number(p.rate)),min=Math.min(...vals),max=Math.max(...vals),span=Math.max(max-min,Math.abs(max)*0.006,0.0001);
+  const x=i=>pad.l+(i/(points.length-1))*(w-pad.l-pad.r),y=v=>pad.t+(1-(v-(min-span*.12))/(span*1.24))*(h-pad.t-pad.b);
+  const css=getComputedStyle(document.documentElement),accent=(css.getPropertyValue('--gold-500')||'#d4af6a').trim(),blue=(css.getPropertyValue('--blue-400')||'#4c8dff').trim();
+  ctx.strokeStyle='rgba(127,150,190,.16)';ctx.lineWidth=1;for(let i=0;i<4;i++){const yy=pad.t+i*(h-pad.t-pad.b)/3;ctx.beginPath();ctx.moveTo(pad.l,yy);ctx.lineTo(w-pad.r,yy);ctx.stroke();}
+  const grad=ctx.createLinearGradient(0,pad.t,0,h-pad.b);grad.addColorStop(0,'rgba(76,141,255,.28)');grad.addColorStop(1,'rgba(76,141,255,0)');ctx.beginPath();points.forEach((p,i)=>{const xx=x(i),yy=y(Number(p.rate));i?ctx.lineTo(xx,yy):ctx.moveTo(xx,yy);});ctx.lineTo(x(points.length-1),h-pad.b);ctx.lineTo(x(0),h-pad.b);ctx.closePath();ctx.fillStyle=grad;ctx.fill();
+  ctx.beginPath();points.forEach((p,i)=>{const xx=x(i),yy=y(Number(p.rate));i?ctx.lineTo(xx,yy):ctx.moveTo(xx,yy);});ctx.strokeStyle=blue;ctx.lineWidth=2.6;ctx.lineJoin='round';ctx.lineCap='round';ctx.shadowColor='rgba(76,141,255,.28)';ctx.shadowBlur=10;ctx.stroke();ctx.shadowBlur=0;
+  const last=points[points.length-1];ctx.beginPath();ctx.arc(x(points.length-1),y(Number(last.rate)),4.5,0,Math.PI*2);ctx.fillStyle=accent;ctx.fill();
+  ctx.fillStyle=css.getPropertyValue('--text-muted')||'#718096';ctx.font='11px Manrope, sans-serif';ctx.fillText(dateLabel(points[0].date),pad.l,h-7);const end=dateLabel(last.date);ctx.fillText(end,w-pad.r-ctx.measureText(end).width,h-7);
+  canvas._fx={points,x,y,w,h};
+}
+async function refreshFxChart(range='1M') {
+  state.fxRange=range;document.querySelectorAll('#fxRange button').forEach(b=>b.classList.toggle('active',b.dataset.range===range));const status=document.getElementById('fxStatus');if(status)status.textContent='Updating reference market data…';
+  try{const r=await fetch(`/api/fx/series?base=${state.primaryCurrency}&quote=${state.secondaryCurrency}&range=${range}`,{cache:'no-store'});const d=await r.json();if(!r.ok)throw new Error(d.error||'Exchange history unavailable');const pts=Array.isArray(d.points)?d.points:[];if(!pts.length)throw new Error('No exchange history available');drawFxChart(pts);const pair=currencyPairRate();const current=document.getElementById('fxCurrentRate');if(current)current.textContent=`${currencySymbol(state.secondaryCurrency)} ${pair.toLocaleString(undefined,{maximumFractionDigits:5})}`;let change=0;if(pts.length>1){const first=Number(pts[0].rate),last=Number(pts[pts.length-1].rate);if(first)change=(last-first)/first*100;}const ch=document.getElementById('fxChange');if(ch){ch.textContent=`${change>=0?'+':''}${change.toFixed(2)}%`;ch.className=`fx-change ${change>0?'up':change<0?'down':''}`;}if(status)status.textContent='Latest central-bank reference trend';const upd=document.getElementById('fxUpdated');if(upd)upd.textContent=`Last updated: ${new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}`;}catch(e){drawFxChart([]);if(status)status.textContent='Reference history temporarily unavailable';const upd=document.getElementById('fxUpdated');if(upd)upd.textContent='Last update unavailable';}
+}
+
+function setupFxInteractions(){document.querySelectorAll('#fxRange button').forEach(b=>b.addEventListener('click',()=>refreshFxChart(b.dataset.range)));window.addEventListener('resize',()=>{clearTimeout(setupFxInteractions._t);setupFxInteractions._t=setTimeout(()=>refreshFxChart(state.fxRange),180);});}
+
+function setupDashboardWallpaper() {
+  const layer=document.getElementById('themeBgLayer');if(!layer)return;
+  const apply=()=>{const now=new Date(),key=`${now.getFullYear()}-${now.getMonth()+1}-${now.getDate()}-${now.getHours()}`,url=`https://picsum.photos/seed/rizq-premium-${encodeURIComponent(key)}/1920/1080`;const img=new Image();img.onload=()=>{layer.style.backgroundImage=`url("${url}")`;layer.classList.remove('live-wallpaper-fallback');layer.classList.add('active','live-wallpaper');};img.onerror=()=>{layer.classList.remove('live-wallpaper');layer.classList.add('active','live-wallpaper-fallback');};img.src=url;};
+  apply();const delay=()=>{const n=new Date(),next=new Date(n);next.setMinutes(60,0,0);return next-n+500;};setTimeout(()=>{apply();setInterval(apply,3600000);},delay());
+}
+
+function setAzretAIState(mode) {
+  const orb=document.getElementById('liveOrb'),caption=document.getElementById('azretStateCaption');if(orb)orb.dataset.aiState=mode;
+  const labels={idle:'Idle • ready when you are',listening:'Listening…',thinking:'Thinking…',speaking:'Speaking…',greeting:'Hi 👋'};if(caption)caption.textContent=labels[mode]||mode;
+}
+const _v16UpdateLiveStatus=updateLiveStatus;
+updateLiveStatus=function(text){_v16UpdateLiveStatus(text);const t=String(text||'').toLowerCase();if(t.includes('listening'))setAzretAIState('listening');else if(t.includes('thinking')||t.includes('connecting'))setAzretAIState('thinking');else if(t.includes('speaking'))setAzretAIState('speaking');else if(t.includes('connected'))setAzretAIState('greeting');else setAzretAIState('idle');};
+
+// Softer, more natural browser TTS where available.
+const _v16SpeakVoiceAssistantReply=speakVoiceAssistantReply;
+speakVoiceAssistantReply=function(text,lang,onEndCallback){setAzretAIState('speaking');if(!window.speechSynthesis||!text){setAzretAIState('idle');if(onEndCallback)onEndCallback();return;}speechSynthesis.cancel();const clean=cleanTextForSpeech(text);const u=new SpeechSynthesisUtterance(clean),target=String(lang||'').toLowerCase().startsWith('ml')?'ml-IN':'en-US';u.lang=target;u.rate=1.02;u.pitch=1.03;const voices=speechSynthesis.getVoices(),preferred=voices.find(v=>v.lang.toLowerCase().startsWith(target.toLowerCase())&&/female|samantha|zira|google|microsoft/i.test(v.name))||voices.find(v=>v.lang.toLowerCase().startsWith(target.toLowerCase()))||voices.find(v=>v.lang.toLowerCase().includes(target.split('-')[0]));if(preferred)u.voice=preferred;u.onend=()=>{setAzretAIState('idle');if(onEndCallback)onEndCallback();};u.onerror=u.onend;speechSynthesis.speak(u);};
+
+document.addEventListener('DOMContentLoaded',()=>{setupDashboardWallpaper();setupCurrencyPairSettings();setupFxInteractions();loadCurrencyCatalog();setAzretAIState('idle');});

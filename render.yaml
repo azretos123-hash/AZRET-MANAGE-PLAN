@@ -18,6 +18,6 @@ services:
         sync: false
 
       - key: GEMINI_MODEL
-        value: "gemini-3.6-flash"
+        value: "gemini-3.5-flash-lite"
       - key: AI_LOCAL_FALLBACK
         value: "0"

@@ -23,9 +23,14 @@ app = Flask(__name__)
 # Render terminates HTTPS at its proxy. ProxyFix lets Flask correctly understand
 # the original scheme/host while still serving behind Gunicorn.
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+
+# Initialize the database before resolving the Flask session secret. In production
+# the Neon/PostgreSQL database is persistent, so it can safely hold a generated
+# fallback secret when Render's SECRET_KEY environment variable was not added.
+db.init_db()
 _secret = os.environ.get("SECRET_KEY") or os.environ.get("AZRET_SECRET_KEY")
-if os.environ.get("RENDER") and not _secret:
-    raise RuntimeError("SECRET_KEY must be set in Render environment variables")
+if not _secret and db.IS_POSTGRES:
+    _secret = db.get_or_create_system_secret()
 app.secret_key = _secret or "local-development-only-change-me"
 app.config["SESSION_PERMANENT"] = True
 app.config["PERMANENT_SESSION_LIFETIME"] = 30 * 24 * 60 * 60
@@ -33,9 +38,6 @@ app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["SESSION_COOKIE_SECURE"] = bool(os.environ.get("RENDER") or os.environ.get("RENDER_SERVICE_ID")) or os.environ.get("SESSION_COOKIE_SECURE", "0") == "1"
 app.config["MAX_CONTENT_LENGTH"] = 25 * 1024 * 1024
-
-# Initialize database
-db.init_db()
 
 
 def _get_csrf_token():
@@ -524,11 +526,22 @@ def update_record_route(table_name, record_id):
                     return jsonify({'error': f"'{field}' must be a valid number"}), 400
                 if not math.isfinite(val) or val < 0:
                     return jsonify({'error': f"'{field}' must be zero or greater"}), 400
+                if val > MAX_FINANCE_VALUE:
+                    return jsonify({'error': f"'{field}' is too large"}), 400
                 if field == 'quantity' and val <= 0:
                     return jsonify({'error': "'quantity' must be greater than zero"}), 400
             elif val is None:
                 val = ''
             update_data[field] = val
+
+    # Required fields must remain valid after an edit as well. Frontend HTML
+    # validation is not a security boundary; API clients can call this route
+    # directly and previously could blank required fields on existing records.
+    combined_required = dict(existing)
+    combined_required.update(update_data)
+    for req in cfg['required']:
+        if combined_required.get(req) is None or str(combined_required.get(req)).strip() == '':
+            return jsonify({'error': f"'{req}' is required"}), 400
 
     field_error = _validate_text_dates(update_data)
     if field_error:
@@ -729,7 +742,10 @@ def get_income_profile():
 def gather_financial_context():
     dash = db.get_dashboard_data(session['user_id'])
     income_profile = get_income_profile()
+    display_currency, display_rate = _user_display_currency(session['user_id'])
     return {
+        'display_currency': display_currency,
+        'display_rate': display_rate,
         'total_income': dash['total_income'],
         'total_expenses': dash['total_expenses'],
         'total_savings': dash['total_savings'],
@@ -757,19 +773,20 @@ def local_ai_response(query, context, language_key, user_name='User'):
     answers. Set AI_LOCAL_FALLBACK=1 only if a finance-only fallback is wanted.
     """
     lower = query.lower()
-    currency = 'AED'
+    currency = context.get('display_currency', 'AED')
+    rate = float(context.get('display_rate') or 1.0)
 
     if any(k in lower for k in ['emi', 'loan', 'installment']):
-        return f"{user_name}, you have {context['active_emi_count']} active EMIs totaling {context['total_emi']:.2f} {currency}, with {context['emi_pending']:.2f} {currency} still pending."
+        return f"{user_name}, you have {context['active_emi_count']} active EMIs totaling {context['total_emi'] * rate:.2f} {currency}, with {context['emi_pending'] * rate:.2f} {currency} still pending."
     if any(k in lower for k in ['debt', 'borrow', 'loan balance', 'outstanding debt']):
-        return f"{user_name}, your outstanding debt is {context['outstanding_debt']:.2f} {currency}."
+        return f"{user_name}, your outstanding debt is {context['outstanding_debt'] * rate:.2f} {currency}."
     if any(k in lower for k in ['balance', 'net balance', 'cash', 'available']):
-        return f"{user_name}, your current net balance is {context['net_balance']:.2f} {currency}."
+        return f"{user_name}, your current net balance is {context['net_balance'] * rate:.2f} {currency}."
     if any(k in lower for k in ['savings', 'goal', 'save more', 'save']):
-        return f"{user_name}, you have {context['total_savings']:.2f} {currency} in savings and your saved goal is {context['savings_goal']:.2f} {currency}."
+        return f"{user_name}, you have {context['total_savings'] * rate:.2f} {currency} in savings and your saved goal is {context['savings_goal'] * rate:.2f} {currency}."
     if any(k in lower for k in ['salary', 'income']):
         if context['income_profile']['saved']:
-            return f"{user_name}, your saved monthly income is {context['income_profile']['monthly_income']:.2f} {currency} and other income is {context['income_profile']['other_income']:.2f} {currency}."
+            return f"{user_name}, your saved monthly income is {context['income_profile']['monthly_income'] * rate:.2f} {currency} and other income is {context['income_profile']['other_income'] * rate:.2f} {currency}."
         return f"{user_name}, I do not have a saved salary profile yet."
     return None
 
@@ -785,7 +802,7 @@ def _gemini_models_to_try():
     configured = (os.environ.get('GEMINI_MODEL') or '').strip()
     # Current stable production models first. Old 1.5 models and the shut-down
     # 2.0 alias are deliberately removed.
-    candidates = [configured, 'gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-2.5-flash']
+    candidates = ['gemini-3.5-flash-lite', configured, 'gemini-2.5-flash-lite', 'gemini-3.6-flash', 'gemini-2.5-flash']
     result = []
     for item in candidates:
         if item and item not in result:
@@ -810,14 +827,16 @@ def _build_ai_system_instruction(user_name, language_key, mode):
     )
 
     return (
-        f"You are zuooi Ai, the Gemini-powered assistant inside AZRET Manage Plan for {user_name}. "
+        f"You are Azret AI, the Gemini-powered assistant inside Rizq رزق — Growth نمو for {user_name}. "
         f"{language} {voice_rule} "
         "You are a GENERAL-PURPOSE conversational assistant, not only a finance bot. "
         "Answer questions about everyday knowledge, technology, travel, writing, calculations, ideas, and other normal topics using your model knowledge. "
-        "Use the supplied AZRET financial context ONLY when the user's question is actually about their money, budget, savings, EMI, debt, shopping plan, or app records. "
+        "Use the supplied RIZQ financial context ONLY when the user's question is actually about their money, budget, savings, EMI, debt, shopping plan, or Rizq app records. "
         "For unrelated questions, IGNORE the financial context completely. "
         "Use recent conversation history to understand follow-up questions and pronouns. "
         "Do not repeat a canned greeting or repeat the same financial summary unless it directly answers the new question. "
+        "Personality: warm, friendly, lightly playful and encouraging. Small tasteful jokes or affectionate phrases are welcome in casual conversation, but never overdo them and never let humor reduce financial accuracy. "
+        "For serious finance questions, give the direct accurate answer first, then optional friendly encouragement. Avoid possessive or manipulative language. "
         "Never claim that saved app data is current real-world information. If current/live external information is requested and no live search tool is available, say that limitation clearly."
     )
 
@@ -846,18 +865,21 @@ def _is_finance_related(query, history=None):
 
 def _format_financial_context(context):
     if not context:
-        return "AZRET FINANCIAL CONTEXT: not attached because this conversation is not about saved finance records."
+        return "RIZQ FINANCIAL CONTEXT: not attached because this conversation is not about saved finance records."
+    cur = context.get('display_currency', 'AED')
+    rate = float(context.get('display_rate') or 1.0)
+    cv = lambda x: float(x or 0) * rate
     return (
-        "AZRET PRIVATE FINANCIAL CONTEXT (use only when relevant):\n"
-        f"Total Income: {context['total_income']:.2f} AED\n"
-        f"Total Expenses: {context['total_expenses']:.2f} AED\n"
-        f"Total Savings: {context['total_savings']:.2f} AED\n"
-        f"Savings Goal: {context['savings_goal']:.2f} AED\n"
+        f"RIZQ PRIVATE FINANCIAL CONTEXT (display currency {cur}; use only when relevant):\n"
+        f"Total Income: {cv(context['total_income']):.2f} {cur}\n"
+        f"Total Expenses: {cv(context['total_expenses']):.2f} {cur}\n"
+        f"Total Savings: {cv(context['total_savings']):.2f} {cur}\n"
+        f"Savings Goal: {cv(context['savings_goal']):.2f} {cur}\n"
         f"Active EMIs: {context['active_emi_count']}\n"
-        f"EMI Pending: {context['emi_pending']:.2f} AED\n"
-        f"Outstanding Debt: {context['outstanding_debt']:.2f} AED\n"
-        f"Net Balance: {context['net_balance']:.2f} AED\n"
-        f"Saved Monthly Salary Profile: {context['income_profile']['monthly_income']:.2f} AED"
+        f"EMI Pending: {cv(context['emi_pending']):.2f} {cur}\n"
+        f"Outstanding Debt: {cv(context['outstanding_debt']):.2f} {cur}\n"
+        f"Net Balance: {cv(context['net_balance']):.2f} {cur}\n"
+        f"Saved Monthly Salary Profile: {cv(context['income_profile']['monthly_income']):.2f} {cur}"
     )
 
 
@@ -917,7 +939,7 @@ def ai_assistant():
         return jsonify({'error': 'Message is too long. Please shorten it and try again.'}), 400
 
     user_name = session.get('username', 'User')
-    history = db.get_ai_chat_history(session['user_id'], 20)
+    history = db.get_ai_chat_history(session['user_id'], 12)
     finance_related = _is_finance_related(query, history)
     context = gather_financial_context() if finance_related else None
     gemini_key = _gemini_api_key()
@@ -961,7 +983,7 @@ def ai_assistant():
         # consecutive roles after an interrupted request. Current Gemini chat
         # APIs are stricter about malformed/prefilled model turns.
         normalized_history = []
-        for item in history[-20:]:
+        for item in history[-12:]:
             role = 'user' if item.get('role') == 'user' else 'model'
             text = str(item.get('content') or '').strip()[:3500]
             if not text:
@@ -976,7 +998,7 @@ def ai_assistant():
         # turn in history; drop it if an interrupted prior request left one.
         if normalized_history and normalized_history[-1][0] == 'model':
             pass  # valid completed prior turn before the new user message
-        for role, text in normalized_history[-16:]:
+        for role, text in normalized_history[-10:]:
             chat_history.append(types.Content(role=role, parts=[types.Part(text=text)]))
 
         for mname in _gemini_models_to_try():
@@ -989,7 +1011,7 @@ def ai_assistant():
                         # Gemini 3.6+ deprecates sampling parameters such as
                         # temperature/top_p/top_k. Keeping the config minimal
                         # avoids present/future 400 responses on current models.
-                        max_output_tokens=2048 if mode == 'chat' else 700,
+                        max_output_tokens=900 if mode == 'chat' else 360,
                     ),
                 )
                 response = chat.send_message(message=current_message)
@@ -1010,13 +1032,13 @@ def ai_assistant():
                 transient = any(code in safe_error.lower() for code in ('429', '500', '502', '503', '504', 'temporar', 'unavailable', 'high demand'))
                 if transient:
                     try:
-                        time.sleep(0.35)
+                        time.sleep(0.12)
                         retry_chat = client.chats.create(
                             model=mname,
                             history=chat_history,
                             config=types.GenerateContentConfig(
                                 system_instruction=system_instruction,
-                                max_output_tokens=2048 if mode == 'chat' else 700,
+                                max_output_tokens=900 if mode == 'chat' else 360,
                             ),
                         )
                         retry_response = retry_chat.send_message(message=current_message)
@@ -1112,7 +1134,7 @@ def fetch_product_details():
 @app.route('/api/global-search', methods=['GET'])
 @login_required
 def global_search_api():
-    q = request.args.get('q', '').strip()
+    q = request.args.get('q', '').strip()[:200]
     if not q:
         return jsonify([])
 
@@ -1130,47 +1152,218 @@ def save_settings_api():
     data = request.get_json() or {}
     if not isinstance(data, dict):
         return jsonify({'success': False, 'error': 'Invalid settings payload'}), 400
-    allowed = {'theme', 'default_currency', 'exchange_rate', 'shopping_budget'}
+    allowed = {'theme', 'default_currency', 'primary_currency', 'secondary_currency', 'exchange_rate', 'shopping_budget', 'salary_credit_day'}
     safe = {k: v for k, v in data.items() if k in allowed}
     if not safe:
         return jsonify({'success': False, 'error': 'No supported settings supplied'}), 400
     if 'theme' in safe and safe['theme'] not in {'light', 'dark'}:
         return jsonify({'success': False, 'error': 'Invalid theme'}), 400
-    if 'default_currency' in safe and safe['default_currency'] not in {'AED', 'INR'}:
-        return jsonify({'success': False, 'error': 'Invalid currency'}), 400
+    for cur_key in ('default_currency', 'primary_currency', 'secondary_currency'):
+        if cur_key in safe:
+            code = str(safe[cur_key] or '').upper().strip()
+            if not re.fullmatch(r'[A-Z]{3}', code):
+                return jsonify({'success': False, 'error': f'Invalid {cur_key}'}), 400
+            safe[cur_key] = code
+    # Validate the resulting pair, not only fields present in this one request.
+    # This closes a bug where changing only primary (or only secondary) could
+    # make both saved currencies identical. The active/default currency must
+    # also always belong to the saved pair.
+    existing = db.get_settings(session['user_id'])
+    resulting_primary = safe.get('primary_currency', str(existing.get('primary_currency') or 'AED').upper())
+    resulting_secondary = safe.get('secondary_currency', str(existing.get('secondary_currency') or 'INR').upper())
+    if resulting_primary == resulting_secondary:
+        return jsonify({'success': False, 'error': 'Primary and secondary currencies must be different'}), 400
+    if 'default_currency' in safe and safe['default_currency'] not in {resulting_primary, resulting_secondary}:
+        return jsonify({'success': False, 'error': 'Default currency must be one of the selected currency pair'}), 400
+    if 'salary_credit_day' in safe:
+        try:
+            day = int(safe['salary_credit_day'])
+        except (TypeError, ValueError):
+            return jsonify({'success': False, 'error': 'Invalid salary credit day'}), 400
+        if day < 1 or day > 31:
+            return jsonify({'success': False, 'error': 'Salary credit day must be between 1 and 31'}), 400
+        safe['salary_credit_day'] = str(day)
     for key in ('exchange_rate', 'shopping_budget'):
         if key in safe:
             try:
                 num = float(safe[key])
             except (TypeError, ValueError):
                 return jsonify({'success': False, 'error': f'Invalid {key}'}), 400
-            if not math.isfinite(num) or num < 0:
+            if not math.isfinite(num):
                 return jsonify({'success': False, 'error': f'Invalid {key}'}), 400
+            if key == 'exchange_rate' and num <= 0:
+                return jsonify({'success': False, 'error': 'Exchange rate must be greater than zero'}), 400
+            if key == 'shopping_budget' and num < 0:
+                return jsonify({'success': False, 'error': 'Shopping budget cannot be negative'}), 400
             safe[key] = str(num)
     db.save_settings(safe, session['user_id'])
     return jsonify({'success': True})
 
+# ---------------------------------------------------------------------------
+# Exchange-rate proxy/cache (Frankfurter v2)
+# ---------------------------------------------------------------------------
+_FX_CACHE = {}
+_FX_CACHE_LOCK = threading.Lock()
+
+def _fx_cached(key, ttl, loader):
+    now = time.time()
+    with _FX_CACHE_LOCK:
+        item = _FX_CACHE.get(key)
+        if item and now - item[0] < ttl:
+            return item[1]
+    value = loader()
+    with _FX_CACHE_LOCK:
+        _FX_CACHE[key] = (now, value)
+    return value
+
+def _fx_get_json(path, params=None, timeout=8):
+    url = 'https://api.frankfurter.dev' + path
+    r = requests.get(url, params=params or {}, timeout=timeout, headers={'User-Agent': 'Rizq-Finance/1.0'})
+    r.raise_for_status()
+    return r.json()
+
+@app.route('/api/fx/currencies', methods=['GET'])
+@login_required
+def fx_currencies():
+    try:
+        data = _fx_cached('currencies', 6 * 3600, lambda: _fx_get_json('/v2/currencies'))
+        out = []
+        if isinstance(data, list):
+            for item in data:
+                code = str(item.get('iso_code') or item.get('code') or '').upper()
+                if re.fullmatch(r'[A-Z]{3}', code):
+                    out.append({'code': code, 'name': item.get('name') or code})
+        elif isinstance(data, dict):
+            for code, name in data.items():
+                code = str(code).upper()
+                if re.fullmatch(r'[A-Z]{3}', code):
+                    out.append({'code': code, 'name': name if isinstance(name, str) else code})
+        out.sort(key=lambda x: x['code'])
+        return jsonify({'currencies': out})
+    except Exception:
+        fallback = [('AED','United Arab Emirates Dirham'),('INR','Indian Rupee'),('USD','US Dollar'),('EUR','Euro'),('GBP','British Pound'),('SAR','Saudi Riyal'),('QAR','Qatari Riyal'),('KWD','Kuwaiti Dinar'),('BHD','Bahraini Dinar'),('OMR','Omani Rial'),('CAD','Canadian Dollar'),('AUD','Australian Dollar'),('CHF','Swiss Franc'),('JPY','Japanese Yen'),('CNY','Chinese Yuan'),('SGD','Singapore Dollar'),('NZD','New Zealand Dollar'),('PKR','Pakistani Rupee'),('BDT','Bangladeshi Taka'),('LKR','Sri Lankan Rupee')]
+        return jsonify({'currencies':[{'code':c,'name':n} for c,n in fallback], 'fallback': True})
+
+@app.route('/api/fx/rate', methods=['GET'])
+@login_required
+def fx_rate():
+    base = str(request.args.get('base') or 'AED').upper().strip()
+    quote = str(request.args.get('quote') or 'INR').upper().strip()
+    if not re.fullmatch(r'[A-Z]{3}', base) or not re.fullmatch(r'[A-Z]{3}', quote):
+        return jsonify({'error':'Invalid currency code'}), 400
+    if base == quote:
+        return jsonify({'base':base,'quote':quote,'rate':1.0,'date':datetime.utcnow().strftime('%Y-%m-%d')})
+    try:
+        data = _fx_cached(f'rate:{base}:{quote}', 600, lambda: _fx_get_json(f'/v2/rate/{base}/{quote}'))
+        rate = float(data.get('rate'))
+        rate_date = data.get('date')
+        if not math.isfinite(rate) or rate <= 0:
+            raise ValueError('Invalid exchange rate')
+        # Keep the last known AED->currency rate in the user's persistent
+        # settings. This prevents a new browser/device from silently assuming
+        # a 1:1 conversion during a temporary external API outage.
+        if base == 'AED':
+            db.save_settings({f'fx_rate_{quote}': rate, f'fx_rate_date_{quote}': rate_date or ''}, session['user_id'])
+            if quote == 'INR':
+                db.save_settings({'exchange_rate': rate}, session['user_id'])
+        return jsonify({'base':base,'quote':quote,'rate':rate,'date':rate_date,'provider':'Frankfurter'})
+    except Exception:
+        return jsonify({'error':'Exchange rate temporarily unavailable'}), 503
+
+@app.route('/api/fx/series', methods=['GET'])
+@login_required
+def fx_series():
+    from datetime import timedelta
+    base = str(request.args.get('base') or 'AED').upper().strip()
+    quote = str(request.args.get('quote') or 'INR').upper().strip()
+    range_key = str(request.args.get('range') or '1M').upper()
+    if not re.fullmatch(r'[A-Z]{3}', base) or not re.fullmatch(r'[A-Z]{3}', quote):
+        return jsonify({'error':'Invalid currency code'}), 400
+    days = {'7D':10,'1M':35,'3M':100,'1Y':370}.get(range_key,35)
+    end = datetime.utcnow().date(); start = end - timedelta(days=days)
+    params={'base':base,'quotes':quote,'from':start.isoformat(),'to':end.isoformat()}
+    if range_key == '1Y': params['group']='month'
+    try:
+        data = _fx_cached(f'series:{base}:{quote}:{range_key}', 1800, lambda: _fx_get_json('/v2/rates', params=params))
+        points=[]
+        if isinstance(data,list):
+            for item in data:
+                if str(item.get('quote') or '').upper()==quote and item.get('rate') is not None:
+                    try:
+                        rate = float(item['rate'])
+                    except (TypeError, ValueError):
+                        continue
+                    if math.isfinite(rate) and rate > 0 and item.get('date'):
+                        points.append({'date':item.get('date'),'rate':rate})
+        elif isinstance(data,dict):
+            for d,row in (data.get('rates') or {}).items():
+                if isinstance(row,dict) and quote in row:
+                    try:
+                        rate = float(row[quote])
+                    except (TypeError, ValueError):
+                        continue
+                    if math.isfinite(rate) and rate > 0 and d:
+                        points.append({'date':d,'rate':rate})
+        points.sort(key=lambda x:x['date'])
+        if range_key=='7D': points=points[-7:]
+        return jsonify({'base':base,'quote':quote,'range':range_key,'points':points,'provider':'Frankfurter'})
+    except Exception:
+        return jsonify({'error':'Exchange history temporarily unavailable','points':[]}), 503
+
+def _user_display_currency(user_id):
+    settings = db.get_settings(user_id)
+    code = str(settings.get('default_currency') or settings.get('primary_currency') or 'AED').upper()
+    if not re.fullmatch(r'[A-Z]{3}', code):
+        code = 'AED'
+    rate = 1.0
+    if code != 'AED':
+        try:
+            data = _fx_cached(f'rate:AED:{code}', 600, lambda: _fx_get_json(f'/v2/rate/AED/{code}', timeout=2.5))
+            rate = float(data.get('rate') or 0)
+            if not math.isfinite(rate) or rate <= 0:
+                raise ValueError('Invalid live FX rate')
+            # Persist the last-known rate for every supported display currency,
+            # not just INR. Reports/AI therefore remain consistent during a
+            # temporary reference-rate outage or on a newly restarted server.
+            db.save_settings({f'fx_rate_{code}': rate, f'fx_rate_date_{code}': data.get('date') or ''}, user_id)
+            if code == 'INR':
+                db.save_settings({'exchange_rate': rate}, user_id)
+        except Exception:
+            persisted = settings.get(f'fx_rate_{code}')
+            try:
+                persisted_rate = float(persisted)
+            except (TypeError, ValueError):
+                persisted_rate = 0.0
+            if math.isfinite(persisted_rate) and persisted_rate > 0:
+                rate = persisted_rate
+            elif code == 'INR':
+                try:
+                    legacy_rate = float(settings.get('exchange_rate') or 0)
+                except (TypeError, ValueError):
+                    legacy_rate = 0.0
+                if math.isfinite(legacy_rate) and legacy_rate > 0:
+                    rate = legacy_rate
+                else:
+                    code, rate = 'AED', 1.0
+            else:
+                code, rate = 'AED', 1.0
+    return code, rate
+
+def _display_money(amount_aed, user_id):
+    code, rate = _user_display_currency(user_id)
+    return code, float(amount_aed or 0) * rate
+
 @app.route('/api/branding', methods=['GET'])
 def get_branding():
-    settings = db.get_settings(session['user_id']) if session.get('user_id') else db.get_public_branding()
-    logged_in = bool(session.get('user_id'))
-    def asset_url(kind, legacy_key, default=''):
-        if logged_in and db.get_user_asset(session['user_id'], kind):
-            return f"/api/assets/{kind}"
-        value = settings.get(legacy_key, default)
-        # Old Render-local uploads are ephemeral; only return them if the file
-        # still exists. New uploads are database-backed and persistent.
-        if value and str(value).startswith('/static/'):
-            local_path = str(value).split('?',1)[0].lstrip('/')
-            if not os.path.exists(local_path):
-                return default
-        return value
+    # Branding customization, splash video, and dashboard wallpaper controls
+    # are intentionally disabled. Login wallpapers remain online/random and
+    # are independent from these removed dashboard settings.
     return jsonify({
-        'app_name': settings.get('app_name', 'AZRET MANAGE PLAN'),
-        'logo_url': asset_url('logo', 'logo_url', ''),
-        'splash_video_url': asset_url('splash_video', 'splash_video_url', ''),
-        'theme_image_url': asset_url('theme_image', 'theme_image_url', ''),
-        'theme_video_url': asset_url('theme_video', 'theme_video_url', '')
+        'app_name': 'Rizq رزق — Growth نمو',
+        'logo_url': '/static/icons/logo-mark.png',
+        'splash_video_url': '',
+        'theme_image_url': '',
+        'theme_video_url': ''
     })
 
 @app.route('/api/assets/<kind>', methods=['GET'])
@@ -1192,75 +1385,42 @@ def serve_user_asset(kind):
 @app.route('/api/logo', methods=['POST'])
 @login_required
 def upload_logo():
-    if 'file' not in request.files:
-        return jsonify({'success': False, 'error': 'No file provided'}), 400
-    url, err = _save_asset_upload(request.files['file'], 'logo', ALLOWED_IMAGE_EXTENSIONS)
-    if err:
-        return jsonify({'success': False, 'error': err[0]}), err[1]
-    db.save_settings({'logo_url': url}, session['user_id'])
-    return jsonify({'success': True, 'logo_url': url})
+    return jsonify({'success': False, 'error': 'Branding customization is disabled in Rizq'}), 410
 
 @app.route('/api/logo', methods=['DELETE'])
 @login_required
 def delete_logo():
-    db.delete_user_asset(session['user_id'], 'logo')
-    db.save_settings({'logo_url': ''}, session['user_id'])
-    return jsonify({'success': True})
+    return jsonify({'success': False, 'error': 'Branding customization is disabled in Rizq'}), 410
 
 @app.route('/api/splash-video', methods=['POST'])
 @login_required
 def upload_splash_video():
-    if 'file' not in request.files:
-        return jsonify({'success': False, 'error': 'No file provided'}), 400
-    url, err = _save_asset_upload(request.files['file'], 'splash_video', ALLOWED_VIDEO_EXTENSIONS)
-    if err:
-        return jsonify({'success': False, 'error': err[0]}), err[1]
-    db.save_settings({'splash_video_url': url}, session['user_id'])
-    return jsonify({'success': True, 'splash_video_url': url})
+    return jsonify({'success': False, 'error': 'Branding customization is disabled in Rizq'}), 410
 
 @app.route('/api/splash-video', methods=['DELETE'])
 @login_required
 def delete_splash_video():
-    db.delete_user_asset(session['user_id'], 'splash_video')
-    default_url = ''
-    db.save_settings({'splash_video_url': default_url}, session['user_id'])
-    return jsonify({'success': True, 'splash_video_url': default_url})
+    return jsonify({'success': False, 'error': 'Branding customization is disabled in Rizq'}), 410
 
 @app.route('/api/theme-image', methods=['POST'])
 @login_required
 def upload_theme_image():
-    if 'file' not in request.files:
-        return jsonify({'success': False, 'error': 'No file provided'}), 400
-    url, err = _save_asset_upload(request.files['file'], 'theme_image', ALLOWED_IMAGE_EXTENSIONS)
-    if err:
-        return jsonify({'success': False, 'error': err[0]}), err[1]
-    db.save_settings({'theme_image_url': url}, session['user_id'])
-    return jsonify({'success': True, 'theme_image_url': url})
+    return jsonify({'success': False, 'error': 'Branding customization is disabled in Rizq'}), 410
 
 @app.route('/api/theme-image', methods=['DELETE'])
 @login_required
 def delete_theme_image():
-    db.delete_user_asset(session['user_id'], 'theme_image')
-    db.save_settings({'theme_image_url': ''}, session['user_id'])
-    return jsonify({'success': True})
+    return jsonify({'success': False, 'error': 'Branding customization is disabled in Rizq'}), 410
 
 @app.route('/api/theme-video', methods=['POST'])
 @login_required
 def upload_theme_video():
-    if 'file' not in request.files:
-        return jsonify({'success': False, 'error': 'No file provided'}), 400
-    url, err = _save_asset_upload(request.files['file'], 'theme_video', ALLOWED_VIDEO_EXTENSIONS)
-    if err:
-        return jsonify({'success': False, 'error': err[0]}), err[1]
-    db.save_settings({'theme_video_url': url}, session['user_id'])
-    return jsonify({'success': True, 'theme_video_url': url})
+    return jsonify({'success': False, 'error': 'Branding customization is disabled in Rizq'}), 410
 
 @app.route('/api/theme-video', methods=['DELETE'])
 @login_required
 def delete_theme_video():
-    db.delete_user_asset(session['user_id'], 'theme_video')
-    db.save_settings({'theme_video_url': ''}, session['user_id'])
-    return jsonify({'success': True})
+    return jsonify({'success': False, 'error': 'Branding customization is disabled in Rizq'}), 410
 
 @app.route('/api/export', methods=['GET'])
 @login_required
@@ -1274,7 +1434,7 @@ def export_data():
         dump[table] = db.fetch_all(table, session['user_id'])
     dump['settings'] = db.get_settings(session['user_id'])
 
-    filename = f"azret_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+    filename = f"rizq_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
     buf = io.BytesIO(json.dumps(dump, indent=2, default=str).encode('utf-8'))
     return send_file(buf, mimetype='application/json', as_attachment=True, download_name=filename)
 
@@ -1362,17 +1522,61 @@ def import_data():
 
         settings = content.get('settings')
         if isinstance(settings, dict):
-            # Do not import identity/user_id fields; settings are always written
-            # under the authenticated account by database.save_settings().
+            # Backups are untrusted input. Only import settings that this build
+            # understands, and validate the currency pair before saving it.
+            allowed_import_settings = {
+                'theme', 'default_currency', 'primary_currency', 'secondary_currency',
+                'exchange_rate', 'shopping_budget', 'salary_credit_day',
+                'last_salary_amount', 'income_profile_saved',
+                'income_profile_monthly_income', 'income_profile_other_income',
+                'income_profile_fixed_emi_commitment', 'income_profile_fixed_debt_commitment'
+            }
             safe_settings = {}
             for k, v in settings.items():
                 key = str(k)[:80]
-                if key in {'user_id', 'id'}:
+                if key not in allowed_import_settings:
                     continue
                 value = str(v)
                 if len(value) <= 12000:
                     safe_settings[key] = value
-            db.save_settings(safe_settings, session['user_id'])
+
+            pcur = str(safe_settings.get('primary_currency') or '').upper()
+            scur = str(safe_settings.get('secondary_currency') or '').upper()
+            dcur = str(safe_settings.get('default_currency') or '').upper()
+            if pcur and not re.fullmatch(r'[A-Z]{3}', pcur):
+                safe_settings.pop('primary_currency', None); pcur = ''
+            if scur and not re.fullmatch(r'[A-Z]{3}', scur):
+                safe_settings.pop('secondary_currency', None); scur = ''
+            if pcur and scur and pcur == scur:
+                safe_settings.pop('secondary_currency', None); scur = ''
+            if dcur and not re.fullmatch(r'[A-Z]{3}', dcur):
+                safe_settings.pop('default_currency', None)
+            elif dcur and pcur and scur and dcur not in {pcur, scur}:
+                safe_settings['default_currency'] = pcur
+
+            if 'salary_credit_day' in safe_settings:
+                try:
+                    day = int(safe_settings['salary_credit_day'])
+                    if not 1 <= day <= 31:
+                        raise ValueError
+                    safe_settings['salary_credit_day'] = str(day)
+                except Exception:
+                    safe_settings.pop('salary_credit_day', None)
+
+            for numeric_setting in ('exchange_rate', 'shopping_budget', 'last_salary_amount',
+                                    'income_profile_monthly_income', 'income_profile_other_income',
+                                    'income_profile_fixed_emi_commitment', 'income_profile_fixed_debt_commitment'):
+                if numeric_setting in safe_settings:
+                    try:
+                        num = float(safe_settings[numeric_setting])
+                        if not math.isfinite(num) or num < 0 or num > MAX_FINANCE_VALUE:
+                            raise ValueError
+                        safe_settings[numeric_setting] = str(num)
+                    except Exception:
+                        safe_settings.pop(numeric_setting, None)
+
+            if safe_settings:
+                db.save_settings(safe_settings, session['user_id'])
 
         return jsonify({'success': True})
     except Exception:
@@ -1422,7 +1626,8 @@ def get_advice():
         tips.append(f"Your highest spending category is '{cat_row['category']}'. Look for ways to trim it.")
 
     if outstanding > 0:
-        tips.append(f"You have AED {outstanding:,.2f} in outstanding debt. Prioritise clearing high-interest amounts first.")
+        cur, shown = _display_money(outstanding, session['user_id'])
+        tips.append(f"You have {cur} {shown:,.2f} in outstanding debt. Prioritise clearing high-interest amounts first.")
     else:
         tips.append("You currently have no outstanding debt. Excellent financial discipline.")
 
@@ -1602,11 +1807,12 @@ def salary_plan_route():
     else:
         health = "Critical"
 
+    display_cur, display_rate = _user_display_currency(session['user_id'])
     suggestions = [
-        f"Verified monthly income on file: AED {verified_income:,.2f}"
+        f"Verified monthly income on file: {display_cur} {verified_income * display_rate:,.2f}"
     ]
     if is_projection:
-        suggestions.append(f"This plan is a what-if projection using AED {salary:,.2f} instead of your verified income.")
+        suggestions.append(f"This plan is a what-if projection using {display_cur} {salary * display_rate:,.2f} instead of your verified income.")
 
     money_tips = [
         "Automate a transfer to savings the moment your salary lands — pay yourself first.",
@@ -1690,21 +1896,25 @@ def generate_report(kind):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font('Arial', 'B', 16)
-    pdf.cell(0, 10, 'AZRET MANAGE PLAN', 0, 1, 'C')
+    pdf.cell(0, 10, 'RIZQ / RIZQ - Growth', 0, 1, 'C')
+    pdf.set_font('Arial', '', 9)
+    pdf.cell(0, 6, 'Plan - Manage - Grow | A Smarter Financial Life', 0, 1, 'C')
     pdf.set_font('Arial', '', 12)
     pdf.cell(0, 8, f"{kind.upper()} REPORT - {label}", 0, 1, 'C')
     pdf.ln(10)
 
     pdf.set_font('Arial', '', 11)
-    pdf.cell(0, 8, f"Total Income: AED {income:,.2f}", 0, 1)
-    pdf.cell(0, 8, f"Total Expenses: AED {expenses:,.2f}", 0, 1)
-    pdf.cell(0, 8, f"Total Savings: AED {savings:,.2f}", 0, 1)
-    pdf.cell(0, 8, f"Family Transfers: AED {family:,.2f}", 0, 1)
-    pdf.cell(0, 8, f"EMI Paid: AED {emi_paid:,.2f}", 0, 1)
-    pdf.cell(0, 8, f"Outstanding Debt: AED {debt_out:,.2f}", 0, 1)
-    pdf.cell(0, 8, f"Net Balance: AED {income - expenses - family - emi_paid:,.2f}", 0, 1)
+    report_cur, report_rate = _user_display_currency(session['user_id'])
+    cv = lambda x: float(x or 0) * report_rate
+    pdf.cell(0, 8, f"Total Income: {report_cur} {cv(income):,.2f}", 0, 1)
+    pdf.cell(0, 8, f"Total Expenses: {report_cur} {cv(expenses):,.2f}", 0, 1)
+    pdf.cell(0, 8, f"Total Savings: {report_cur} {cv(savings):,.2f}", 0, 1)
+    pdf.cell(0, 8, f"Family Transfers: {report_cur} {cv(family):,.2f}", 0, 1)
+    pdf.cell(0, 8, f"EMI Paid: {report_cur} {cv(emi_paid):,.2f}", 0, 1)
+    pdf.cell(0, 8, f"Outstanding Debt: {report_cur} {cv(debt_out):,.2f}", 0, 1)
+    pdf.cell(0, 8, f"Net Balance: {report_cur} {cv(income - expenses - family - emi_paid):,.2f}", 0, 1)
 
-    filename = f"AZRET_{kind}_report_{now.strftime('%Y%m%d')}.pdf"
+    filename = f"RIZQ_{kind}_report_{now.strftime('%Y%m%d')}.pdf"
     output = io.BytesIO(pdf.output(dest='S').encode('latin1'))
 
     return send_file(output, mimetype='application/pdf', as_attachment=True, download_name=filename)

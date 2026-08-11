@@ -1,7 +1,7 @@
 {
-  "name": "azret-manage-plan",
+  "name": "rizq-growth-finance",
   "version": "1.0.0",
-  "description": "AZRET MANAGE PLAN - Public multi-user personal finance platform",
+  "description": "Rizq رزق — Growth نمو - Public multi-user personal finance platform",
   "scripts": {
     "dev": "python3 app.py",
     "build": "python3 -c 'import app'",

@@ -32,3 +32,7 @@ Then register/login, add a test Income record, wait/restart/redeploy the Render 
 
 ## Important
 Do not create a new Neon database on every deploy. Keep the same Neon project/database and the same `DATABASE_URL`. Changing `DATABASE_URL` points the app at a different database and the old records will not appear.
+
+## V9 note: SECRET_KEY on an existing Render service
+
+The application no longer fails startup when an existing manually-created Render service does not have `SECRET_KEY` configured. If `DATABASE_URL` is a working Neon/PostgreSQL URL, the app generates a strong secret once and persists it in Neon (`system_config`). An explicit Render `SECRET_KEY` still takes priority when configured.
