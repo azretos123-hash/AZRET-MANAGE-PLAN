@@ -313,8 +313,8 @@ def _send_password_reset_email(email, code):
         timeout=10,
     )
     if not 200 <= response.status_code < 300:
-        app.logger.error('Brevo password reset email failed with status %s', response.status_code)
-        raise RuntimeError('email_send_failed')
+        app.logger.error('Brevo password reset email failed: status=%s body=%s', response.status_code, (response.text or '')[:500])
+        raise RuntimeError(f'email_send_failed:{response.status_code}')
 
 
 @app.route('/api/password-reset/request', methods=['POST'])
@@ -345,7 +345,14 @@ def password_reset_request():
         db.clear_password_reset_codes(user['id'])
         if str(exc) == 'email_service_not_configured':
             return jsonify({'success': False, 'error': 'Password recovery email is not configured yet.'}), 503
-        return jsonify({'success': False, 'error': 'Unable to send the reset email right now. Please try again.'}), 502
+        
+        code = str(exc).split(':', 1)[1] if ':' in str(exc) else ''
+        hint = 'Check Brevo sender verification, API key, and account sending activation.'
+        if code in ('401','403'):
+            hint = 'Brevo rejected the credentials or account sending permission. Check the API key and complete any Brevo phone/account verification.'
+        elif code == '429':
+            hint = 'Brevo rate limit was reached. Wait briefly and try again.'
+        return jsonify({'success': False, 'error': 'Unable to send the reset email right now.', 'provider': 'Brevo', 'provider_status': code, 'hint': hint}), 502
     return jsonify(generic)
 
 
@@ -952,13 +959,43 @@ def _gemini_models_to_try():
     configured = (os.environ.get('GEMINI_MODEL') or '').strip()
     # Current stable production models first. Old 1.5 models and the shut-down
     # 2.0 alias are deliberately removed.
-    candidates = [configured, 'gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite']
+    candidates = [configured, 'gemini-3.5-flash', 'gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-3.1-flash-lite']
     result = []
     for item in candidates:
         if item and item not in result:
             result.append(item)
     return result
 
+
+
+def _gemini_runtime_models(api_key):
+    """Return generateContent models this API key can actually access.
+    Falls back to the static preference list if model discovery is unavailable.
+    """
+    preferred = _gemini_models_to_try()
+    try:
+        res = requests.get(
+            'https://generativelanguage.googleapis.com/v1beta/models',
+            params={'pageSize': 100}, headers={'x-goog-api-key': api_key}, timeout=8
+        )
+        if not (200 <= res.status_code < 300):
+            app.logger.warning('Gemini model discovery failed status=%s body=%s', res.status_code, (res.text or '')[:400])
+            return preferred
+        accessible = []
+        for item in (res.json().get('models') or []):
+            name = str(item.get('name') or '').removeprefix('models/')
+            methods = item.get('supportedGenerationMethods') or []
+            if name and 'generateContent' in methods:
+                accessible.append(name)
+        if not accessible:
+            return preferred
+        ordered = [m for m in preferred if m in accessible]
+        # If the account exposes a newer/different Flash model, use it after preferred stable choices.
+        ordered.extend(m for m in accessible if 'flash' in m.lower() and 'image' not in m.lower() and 'live' not in m.lower() and 'preview' not in m.lower() and m not in ordered)
+        return ordered[:8] or preferred
+    except Exception as exc:
+        app.logger.warning('Gemini model discovery exception: %s', str(exc)[:300])
+        return preferred
 
 def _build_ai_system_instruction(user_name, language_key, mode):
     if language_key.startswith('ml'):
@@ -1109,6 +1146,7 @@ def ai_assistant():
         }), 503
 
     system_instruction = _build_ai_system_instruction(user_name, language_key, mode)
+    runtime_models = _gemini_runtime_models(gemini_key)
     if context:
         current_message = f"{_format_financial_context(context)}\n\nUSER MESSAGE:\n{query}"
     else:
@@ -1151,7 +1189,7 @@ def ai_assistant():
         for role, text in normalized_history[-6:]:
             chat_history.append(types.Content(role=role, parts=[types.Part(text=text)]))
 
-        for mname in _gemini_models_to_try():
+        for mname in runtime_models:
             try:
                 chat = client.chats.create(
                     model=mname,
@@ -1193,6 +1231,51 @@ def ai_assistant():
             except Exception:
                 pass
 
+    # SDK-independent REST fallback. This keeps Azret AI working if the
+    # installed SDK has a transient compatibility problem while the API key is valid.
+    if not response_text and gemini_key:
+        for mname in runtime_models:
+            try:
+                rest_contents = []
+                for item in history[-6:]:
+                    role = 'user' if item.get('role') == 'user' else 'model'
+                    text = str(item.get('content') or '').strip()[:1800]
+                    if not text:
+                        continue
+                    if not rest_contents and role != 'user':
+                        continue
+                    if rest_contents and rest_contents[-1]['role'] == role:
+                        rest_contents[-1]['parts'][0]['text'] += '\n' + text
+                    else:
+                        rest_contents.append({'role': role, 'parts': [{'text': text}]})
+                rest_contents.append({'role': 'user', 'parts': [{'text': current_message}]})
+                rest_payload = {
+                    'system_instruction': {'parts': [{'text': system_instruction}]},
+                    'contents': rest_contents,
+                    'generationConfig': {'maxOutputTokens': 600 if mode == 'chat' else 220}
+                }
+                rest_res = requests.post(
+                    f'https://generativelanguage.googleapis.com/v1beta/models/{mname}:generateContent',
+                    headers={'x-goog-api-key': gemini_key, 'Content-Type': 'application/json'},
+                    json=rest_payload, timeout=25
+                )
+                if 200 <= rest_res.status_code < 300:
+                    payload = rest_res.json()
+                    parts = (((payload.get('candidates') or [{}])[0].get('content') or {}).get('parts') or [])
+                    candidate = ''.join(str(x.get('text') or '') for x in parts).strip()
+                    if candidate:
+                        response_text = candidate
+                        used_model = mname + '-rest'
+                        break
+                else:
+                    body = (rest_res.text or '')[:500]
+                    app.logger.warning('Gemini REST model %s failed status=%s body=%s', mname, rest_res.status_code, body)
+                    errors.append(f"REST {mname}: HTTP {rest_res.status_code} {body}")
+            except Exception as rest_exc:
+                safe_rest_error = str(rest_exc).replace(gemini_key, '[redacted]')[:400]
+                app.logger.warning('Gemini REST fallback failed for %s: %s', mname, safe_rest_error)
+                errors.append(f"REST {mname}: {safe_rest_error}")
+
     if not response_text:
         fallback = None
         if context and os.environ.get('AI_LOCAL_FALLBACK', '0') == '1':
@@ -1203,11 +1286,20 @@ def ai_assistant():
         else:
             # Do not silently pretend that canned financial data came from Gemini.
             # This was the main source of the old repetitive/wrong behaviour.
+            last_error = errors[-1] if errors else ''
+            low = last_error.lower()
+            hint = 'Check the Gemini API key in Render and try again.'
+            if '401' in low or '403' in low or 'api_key' in low or 'permission' in low:
+                hint = 'Gemini rejected the API key. Use a current Google AI Studio auth key, save it only in Render, and redeploy.'
+            elif '429' in low or 'resource_exhausted' in low or 'quota' in low:
+                hint = 'Gemini quota/rate limit was reached. Wait briefly or check AI Studio Usage/Quota.'
+            elif '404' in low or 'not found' in low:
+                hint = 'The configured Gemini model is unavailable to this key. Remove a custom GEMINI_MODEL or use a stable Flash model.'
             return jsonify({
                 'error': 'Gemini could not answer this request right now.',
                 'code': 'GEMINI_CALL_FAILED',
-                'hint': 'Check Render logs, API key permissions/quota, and the configured GEMINI_MODEL.',
-                'tried_models': _gemini_models_to_try()
+                'hint': hint,
+                'tried_models': runtime_models
             }), 502
 
     db.add_ai_chat_message(session['user_id'], 'user', query, mode)

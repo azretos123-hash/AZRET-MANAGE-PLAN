@@ -1334,7 +1334,9 @@ table tbody tr:hover {
 
 
 
-/* ==========================================================================\n   Mobile-first / phone app experience (YARIN public web)\n   ========================================================================== */
+/* ==========================================================================
+   Mobile-first / phone app experience (YARIN public web)
+   ========================================================================== */
 .mobile-bottom-nav{ display:none; }
 
 @media (max-width: 767px){
@@ -1422,7 +1424,9 @@ table tbody tr:hover {
   .topbar{ padding-top:max(10px, env(safe-area-inset-top)); }
 }
 
-/* ==========================================================================\n   V13 — Premium YARIN startup splash\n   ========================================================================== */
+/* ==========================================================================
+   V13 — Premium YARIN startup splash
+   ========================================================================== */
 .premium-splash{
   overflow:hidden;
   isolation:isolate;
@@ -1580,7 +1584,9 @@ table tbody tr:hover {
   .premium-splash *, .premium-splash::before{ animation-duration:.001ms !important; animation-iteration-count:1 !important; }
 }
 
-/* ==========================================================================\n   V14 — Consistent premium bilingual YARIN يارين brand system\n   ========================================================================== */
+/* ==========================================================================
+   V14 — Consistent premium bilingual YARIN يارين brand system
+   ========================================================================== */
 :root{
   --rizq-gold:#e7c36f;
   --rizq-gold-soft:#f2d995;
@@ -1912,7 +1918,50 @@ body{background:var(--bg);}
 @media(max-width:900px){.auth-shell-v26{grid-template-columns:1fr;width:min(680px,92vw);gap:12px;padding:26px 0 36px}.auth-hero-v26{padding:14px 6px 4px}.rizq-word-en{font-size:clamp(4.2rem,18vw,7rem)}.rizq-word-ar{font-size:clamp(4.7rem,20vw,7.8rem)}.hero-feature-row{margin-top:10px}.hero-public-copy{display:none}.auth-card-v26{padding:28px 22px;border-radius:24px}.desktop-only{display:none}}
 @media(max-width:520px){.auth-shell-v26{width:94vw}.hero-feature-row{gap:10px}.hero-feature-row>i{height:40px}.hero-feature{min-width:68px}.hero-feature-icon{font-size:23px}.hero-feature strong{font-size:.98rem}.hero-smart-line{font-size:1.1rem}.auth-options-row{align-items:flex-start}.forgot-password-link{font-size:.82rem}.auth-card-header h2{font-size:2rem}.auth-section-kicker{letter-spacing:.3em}.auth-card-v26{backdrop-filter:blur(16px)}}
 @media(prefers-reduced-motion:reduce){.auth-v26 *,.auth-v26 *:before,.auth-v26 *:after{animation-duration:.001ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important}}
-\n\n/* V27 — official YARIN sidebar brand lockup */\n.sidebar-brand{\n  gap:12px; padding:2px 2px 20px; align-items:center; position:relative;\n}\n.brand-logo-wrap{\n  width:62px; height:62px; min-width:62px; border-radius:50%; overflow:hidden;\n  background:#07553f; border:1px solid rgba(211,164,51,.55);\n  box-shadow:0 8px 22px rgba(3,71,53,.14),0 0 0 3px rgba(211,164,51,.06);\n}\n.brand-logo-wrap img{\n  width:100%; height:100%; object-fit:cover; object-position:center; border-radius:50%;\n}\n.sidebar-brand-text{gap:3px; min-width:0; line-height:1; margin-right:auto;}\n.sidebar-brand-text .brand-name-bilingual{\n  display:flex; align-items:baseline; gap:6px; width:max-content; max-width:100%;\n  font-family:Georgia,"Times New Roman",serif; font-size:20px; font-weight:800;\n  letter-spacing:-.02em; color:#0c315d; position:relative; overflow:hidden;\n  background:linear-gradient(105deg,#0d3769 0%,#174f9b 35%,#d3a433 50%,#174f9b 65%,#0d3769 100%);\n  background-size:240% 100%; -webkit-background-clip:text; background-clip:text;\n  -webkit-text-fill-color:transparent; animation:rizqSidebarShimmer 7s ease-in-out infinite;\n}\n.sidebar-brand-text .brand-name-bilingual b{\n  font-family:"Noto Naskh Arabic","Noto Sans Arabic",Tahoma,Arial,sans-serif;\n  font-size:22px; font-weight:800; color:inherit; -webkit-text-fill-color:transparent;\n}\n.sidebar-brand-text .brand-motto-en{\n  font-size:8px; line-height:1.2; letter-spacing:.025em; color:var(--navy-700);\n  font-weight:700; white-space:nowrap; text-transform:none;\n}\n.sidebar-brand-text .brand-tagline-en{\n  font-size:7px; line-height:1.2; color:var(--text-muted); white-space:nowrap; font-style:italic;\n}\n.brand-theme-toggle{margin-left:auto; flex:0 0 auto;}\n[data-theme="dark"] .sidebar-brand-text .brand-name-bilingual{\n  background:linear-gradient(105deg,#f7fbff 0%,#78aef8 34%,#e1b852 50%,#78aef8 66%,#f7fbff 100%);\n  background-size:240% 100%; -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;\n}\n[data-theme="dark"] .sidebar-brand-text .brand-motto-en{color:#dbeafe;}\n@keyframes rizqSidebarShimmer{0%,68%,100%{background-position:0 0}82%{background-position:100% 0}}\n@media(max-width:1100px){.brand-logo-wrap{width:58px;height:58px;min-width:58px}.sidebar-brand-text .brand-name-bilingual{font-size:19px}.sidebar-brand-text .brand-name-bilingual b{font-size:21px}}\n@media(prefers-reduced-motion:reduce){.sidebar-brand-text .brand-name-bilingual{animation:none!important}}\n
+
+
+/* V27 — official YARIN sidebar brand lockup */
+.sidebar-brand{
+  gap:12px; padding:2px 2px 20px; align-items:center; position:relative;
+}
+.brand-logo-wrap{
+  width:62px; height:62px; min-width:62px; border-radius:50%; overflow:hidden;
+  background:#07553f; border:1px solid rgba(211,164,51,.55);
+  box-shadow:0 8px 22px rgba(3,71,53,.14),0 0 0 3px rgba(211,164,51,.06);
+}
+.brand-logo-wrap img{
+  width:100%; height:100%; object-fit:cover; object-position:center; border-radius:50%;
+}
+.sidebar-brand-text{gap:3px; min-width:0; line-height:1; margin-right:auto;}
+.sidebar-brand-text .brand-name-bilingual{
+  display:flex; align-items:baseline; gap:6px; width:max-content; max-width:100%;
+  font-family:Georgia,"Times New Roman",serif; font-size:20px; font-weight:800;
+  letter-spacing:-.02em; color:#0c315d; position:relative; overflow:hidden;
+  background:linear-gradient(105deg,#0d3769 0%,#174f9b 35%,#d3a433 50%,#174f9b 65%,#0d3769 100%);
+  background-size:240% 100%; -webkit-background-clip:text; background-clip:text;
+  -webkit-text-fill-color:transparent; animation:rizqSidebarShimmer 7s ease-in-out infinite;
+}
+.sidebar-brand-text .brand-name-bilingual b{
+  font-family:"Noto Naskh Arabic","Noto Sans Arabic",Tahoma,Arial,sans-serif;
+  font-size:22px; font-weight:800; color:inherit; -webkit-text-fill-color:transparent;
+}
+.sidebar-brand-text .brand-motto-en{
+  font-size:8px; line-height:1.2; letter-spacing:.025em; color:var(--navy-700);
+  font-weight:700; white-space:nowrap; text-transform:none;
+}
+.sidebar-brand-text .brand-tagline-en{
+  font-size:7px; line-height:1.2; color:var(--text-muted); white-space:nowrap; font-style:italic;
+}
+.brand-theme-toggle{margin-left:auto; flex:0 0 auto;}
+[data-theme="dark"] .sidebar-brand-text .brand-name-bilingual{
+  background:linear-gradient(105deg,#f7fbff 0%,#78aef8 34%,#e1b852 50%,#78aef8 66%,#f7fbff 100%);
+  background-size:240% 100%; -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
+}
+[data-theme="dark"] .sidebar-brand-text .brand-motto-en{color:#dbeafe;}
+@keyframes rizqSidebarShimmer{0%,68%,100%{background-position:0 0}82%{background-position:100% 0}}
+@media(max-width:1100px){.brand-logo-wrap{width:58px;height:58px;min-width:58px}.sidebar-brand-text .brand-name-bilingual{font-size:19px}.sidebar-brand-text .brand-name-bilingual b{font-size:21px}}
+@media(prefers-reduced-motion:reduce){.sidebar-brand-text .brand-name-bilingual{animation:none!important}}
+
 /* V28 — Dashboard YARIN AI live avatar dock. No screenshot/card image is used. */
 #page-dashboard{position:relative;}
 .rizq-ai-dock{position:absolute;z-index:12;right:8px;top:-8px;width:245px;min-height:112px;border:1px solid rgba(76,141,255,.22);border-radius:28px;padding:12px 12px 12px 105px;background:linear-gradient(135deg,rgba(255,255,255,.80),rgba(244,248,255,.62));backdrop-filter:blur(18px) saturate(145%);box-shadow:0 18px 45px rgba(21,58,128,.14);cursor:pointer;text-align:left;color:var(--text);overflow:visible;isolation:isolate;transition:transform .25s ease,box-shadow .25s ease;}
@@ -2282,4 +2331,142 @@ body{background:var(--bg);}
   .sidebar{height:100dvh!important;max-height:100dvh!important;padding-bottom:max(14px,env(safe-area-inset-bottom))!important;overflow:hidden!important}
   .sidebar-nav{min-height:0!important;overflow-y:auto!important;overscroll-behavior:contain;padding-bottom:8px}
   .sidebar-logout{display:flex!important;visibility:visible!important;opacity:1!important;flex:0 0 auto!important;margin-top:8px!important;position:relative!important;bottom:auto!important}
+}
+
+
+/* V44 — real Dubai night photo + mobile navigation reliability */
+.auth-cinematic-bg{
+  background:
+    linear-gradient(90deg,rgba(1,6,17,.55),rgba(1,7,20,.24) 48%,rgba(1,7,19,.60)),
+    url("https://upload.wikimedia.org/wikipedia/commons/1/1f/Dubai_Night_Time_%28Pexels-804915%29.jpg") center center/cover no-repeat,
+    #020713!important;
+}
+/* Photo: Zaib Azhar / Pexels, CC0-era image, via Wikimedia Commons. */
+.mobile-sidebar-logout-v44{display:none!important;color:#ff6b78!important;border:1px solid rgba(255,91,108,.22)!important;background:rgba(255,66,87,.06)!important;margin-top:8px!important}
+@media(max-width:860px){
+  .sidebar{padding-bottom:calc(92px + env(safe-area-inset-bottom))!important;overflow-y:auto!important}
+  .sidebar-nav{overflow:visible!important;flex:0 0 auto!important}
+  .mobile-sidebar-logout-v44{display:flex!important;visibility:visible!important;opacity:1!important}
+  .sidebar>.sidebar-logout{display:none!important}
+}
+
+
+/* ==========================================================================
+   V45 — final login, OTP clarity, and mobile sign-out reliability
+   ========================================================================== */
+.auth-cinematic-bg{
+  background:
+    linear-gradient(90deg,rgba(1,7,21,.43) 0%,rgba(1,8,23,.23) 45%,rgba(1,7,21,.62) 100%),
+    url("https://upload.wikimedia.org/wikipedia/commons/1/1f/Dubai_Night_Time_%28Pexels-804915%29.jpg") center 58%/cover no-repeat,
+    #020713!important;
+  transform:scale(1.015);
+  animation:v45DubaiDrift 24s ease-in-out infinite alternate;
+}
+@keyframes v45DubaiDrift{to{transform:scale(1.055) translate3d(-.5%,.3%,0)}}
+.auth-cinematic-bg:before{opacity:.11!important}
+.auth-cinematic-bg:after{opacity:.18!important}
+.auth-aurora{opacity:.12!important}
+.auth-light-ribbon{opacity:.22}
+
+.yarin-emblem-shell{width:clamp(92px,9vw,132px)!important;height:clamp(92px,9vw,132px)!important;margin-bottom:24px!important}
+.yarin-title-v45{display:flex!important;align-items:center!important;justify-content:center!important;gap:clamp(15px,2.2vw,30px)!important;width:100%;}
+.yarin-name-separator{width:1px;height:clamp(42px,5vw,64px);background:linear-gradient(transparent,rgba(255,215,122,.8),transparent);box-shadow:0 0 12px rgba(65,198,255,.25)}
+.yarin-title-v45 .rizq-word-en,.yarin-title-v45 .rizq-word-ar{
+  margin:0!important;line-height:1!important;font-style:normal!important;
+  background:linear-gradient(100deg,#ffffff 0%,#d8ecff 25%,#63d9f1 48%,#f4c55d 72%,#fff1b2 100%)!important;
+  background-size:220% 100%!important;-webkit-background-clip:text!important;background-clip:text!important;-webkit-text-fill-color:transparent!important;
+  text-shadow:0 0 28px rgba(55,160,255,.18)!important;animation:v45NameIn .9s cubic-bezier(.16,1,.3,1) both,v45NameShine 6s 1.2s ease-in-out infinite!important;
+}
+.yarin-title-v45 .rizq-word-en{font-family:"Avenir Next","Segoe UI",Inter,Arial,sans-serif!important;font-size:clamp(3.4rem,6.2vw,6.2rem)!important;font-weight:850!important;letter-spacing:.10em!important}
+.yarin-title-v45 .rizq-word-ar{font-family:"Noto Sans Arabic","Segoe UI",Tahoma,Arial,sans-serif!important;font-size:clamp(2.8rem,5vw,5rem)!important;font-weight:750!important;letter-spacing:0!important}
+@keyframes v45NameIn{from{opacity:0;filter:blur(10px);transform:translateY(15px) scale(.97)}to{opacity:1;filter:blur(0);transform:none}}
+@keyframes v45NameShine{0%,70%,100%{background-position:0 0}82%{background-position:100% 0}}
+.hero-money-line{font-size:clamp(1.25rem,2.1vw,1.9rem)!important;font-weight:700!important;margin-top:22px!important;color:#fff!important}
+.hero-smart-line{font-family:Inter,ui-sans-serif,system-ui!important;font-size:clamp(1rem,1.45vw,1.3rem)!important;font-weight:650!important;letter-spacing:.08em!important;text-transform:uppercase;color:#54dce9!important;margin-top:8px!important}
+
+.otp-code-grid-v45{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:9px;margin:4px 0 2px;position:relative;z-index:2}
+.otp-digit-v45{width:100%;min-width:0;height:58px;border:1px solid rgba(86,174,255,.48);border-radius:12px;background:#071a35;color:#fff;text-align:center;font-size:1.5rem;font-weight:800;outline:none;box-shadow:inset 0 0 0 1px rgba(255,255,255,.02);transition:.18s}
+.otp-digit-v45:focus{border-color:#55d9ea;box-shadow:0 0 0 3px rgba(85,217,234,.12),0 0 24px rgba(39,143,255,.18);transform:translateY(-1px)}
+.reset-back-v43{position:relative;z-index:2}
+
+.mobile-top-logout-v45{display:none!important;color:#ff6571!important;border-color:rgba(255,101,113,.35)!important;background:rgba(255,77,90,.08)!important}
+@media(max-width:900px){
+  .auth-v26{min-height:100dvh}
+  .auth-shell-v26{width:100%!important;min-height:100dvh!important;padding:18px 12px calc(24px + env(safe-area-inset-bottom))!important;grid-template-columns:minmax(0,1fr)!important;gap:16px!important;align-content:start!important;box-sizing:border-box}
+  .auth-hero-v26{padding:18px 10px 8px!important;min-width:0!important}
+  .yarin-emblem-shell{width:78px!important;height:78px!important;margin-bottom:13px!important}
+  .yarin-title-v45{gap:12px!important}
+  .yarin-name-separator{height:36px}
+  .yarin-title-v45 .rizq-word-en{font-size:clamp(2.2rem,11vw,3.6rem)!important;letter-spacing:.07em!important}
+  .yarin-title-v45 .rizq-word-ar{font-size:clamp(1.9rem,9vw,3.1rem)!important}
+  .hero-money-line{font-size:1.05rem!important;margin:13px 0 0!important}
+  .hero-smart-line{font-size:.78rem!important;margin:5px 0 0!important;letter-spacing:.06em!important}
+  .hero-mini-divider,.hero-public-copy{display:none!important}
+  .auth-card-v26{width:100%!important;max-width:620px!important;margin:0 auto!important;padding:24px 16px 28px!important;border-radius:22px!important;box-sizing:border-box!important;overflow:hidden!important}
+  .auth-card-header{margin-bottom:18px!important}.auth-card-header h2{font-size:2rem!important}
+  .auth-section-kicker{font-size:.69rem!important;letter-spacing:.35em!important}
+  .auth-form-v26,.auth-panel-v26,.auth-input-wrap{min-width:0!important;max-width:100%!important;width:100%!important;box-sizing:border-box!important}
+  .auth-input-wrap input{width:100%!important;min-width:0!important;box-sizing:border-box!important;padding-left:44px!important;font-size:16px!important}
+  .auth-options-row{align-items:center!important;gap:10px!important}.remember-row{font-size:.86rem!important}.forgot-password-link{font-size:.86rem!important}
+  .forgot-dialog{padding:10px!important;align-items:center!important;overflow-y:auto!important}
+  .forgot-dialog-card{width:calc(100vw - 20px)!important;max-width:480px!important;max-height:calc(100dvh - 20px)!important;overflow-y:auto!important;padding:26px 16px 24px!important;border-radius:20px!important;box-sizing:border-box!important}
+  .otp-code-grid-v45{gap:6px}.otp-digit-v45{height:52px;border-radius:10px;font-size:1.25rem}
+}
+@media(max-width:430px){
+  .auth-shell-v26{padding-left:8px!important;padding-right:8px!important}
+  .auth-card-v26{padding-left:13px!important;padding-right:13px!important}
+  .auth-options-row{flex-wrap:wrap!important}.forgot-password-link{margin-left:auto}
+  .otp-code-grid-v45{gap:4px}.otp-digit-v45{height:48px;font-size:1.12rem;padding:0!important}
+}
+
+@media(max-width:860px){
+  .sidebar{height:100dvh!important;max-height:100dvh!important;display:flex!important;flex-direction:column!important;padding-bottom:calc(76px + env(safe-area-inset-bottom))!important;overflow:hidden!important}
+  .sidebar-brand{flex:0 0 auto!important;position:sticky!important;top:0!important;z-index:5!important;background:inherit!important}
+  .sidebar-nav{flex:1 1 auto!important;overflow-y:auto!important;overscroll-behavior:contain!important;padding-bottom:14px!important}
+  .mobile-top-logout-v45{display:inline-flex!important;visibility:visible!important;opacity:1!important;flex:0 0 auto!important}
+  .mobile-sidebar-logout-v44{display:flex!important;position:sticky!important;bottom:0!important;z-index:4!important;background:linear-gradient(135deg,rgba(81,13,25,.96),rgba(45,8,20,.97))!important;border-color:rgba(255,102,115,.42)!important;box-shadow:0 -8px 26px rgba(2,8,20,.35)!important}
+  .sidebar-close{display:inline-flex!important}
+  .mobile-bottom-nav{z-index:50!important}
+}
+
+/* ==========================================================================
+   V46 — audited password reset clarity, premium branding, mobile sign-out
+   ========================================================================== */
+.yarin-title-v45 .rizq-word-en{
+  font-family:"Bodoni 72 Smallcaps","Bodoni 72",Didot,"Times New Roman",Georgia,serif!important;
+  font-weight:700!important;
+  letter-spacing:.065em!important;
+  background:linear-gradient(100deg,#fff7df 0%,#f7d785 24%,#ffffff 48%,#68dff2 72%,#f2c461 100%)!important;
+  background-size:240% 100%!important;
+  -webkit-background-clip:text!important;background-clip:text!important;-webkit-text-fill-color:transparent!important;
+  text-shadow:0 0 22px rgba(67,184,255,.20),0 4px 24px rgba(0,0,0,.30)!important;
+}
+.yarin-title-v45 .rizq-word-ar{
+  font-family:"Noto Naskh Arabic","Amiri","Geeza Pro","Times New Roman",serif!important;
+  font-weight:700!important;
+  background:linear-gradient(100deg,#f8ca58 0%,#fff0ad 35%,#ffffff 50%,#61d8ed 78%,#f2c35a 100%)!important;
+  background-size:240% 100%!important;
+  -webkit-background-clip:text!important;background-clip:text!important;-webkit-text-fill-color:transparent!important;
+  text-shadow:0 0 22px rgba(67,184,255,.20),0 4px 24px rgba(0,0,0,.30)!important;
+}
+
+.reset-progress-v46{display:flex;align-items:center;justify-content:center;gap:8px;margin:14px 0 22px;position:relative;z-index:2}
+.reset-progress-v46>span{display:flex;align-items:center;gap:6px;color:#8098b7;font-size:.74rem;font-weight:700;white-space:nowrap;transition:.2s}
+.reset-progress-v46>span b{display:grid;place-items:center;width:24px;height:24px;border-radius:50%;border:1px solid rgba(104,164,235,.4);background:#07162f;color:#9fb2cb;font-size:.72rem}
+.reset-progress-v46>i{width:28px;height:1px;background:rgba(105,147,198,.28)}
+.reset-progress-v46>span.active{color:#fff}.reset-progress-v46>span.active b{border-color:#54dae9;background:linear-gradient(135deg,#205ed8,#18b9c7);color:#fff;box-shadow:0 0 18px rgba(55,205,229,.25)}
+.reset-progress-v46>span.done{color:#74d9e5}.reset-progress-v46>span.done b{border-color:#48cbd8;color:#07162f;background:#61dae6}
+
+@media(max-width:430px){
+  .reset-progress-v46{gap:4px;margin:10px 0 18px}.reset-progress-v46>i{width:12px}.reset-progress-v46>span{font-size:.66rem;gap:4px}.reset-progress-v46>span b{width:21px;height:21px;font-size:.65rem}
+}
+
+/* One guaranteed mobile sign-out control: keep the main sidebar logout visible
+   below the independently scrolling navigation instead of relying on a nav item
+   that can be pushed beyond the viewport by the mobile bottom bar. */
+@media(max-width:860px){
+  .sidebar>.sidebar-logout{display:flex!important;visibility:visible!important;opacity:1!important;flex:0 0 auto!important;position:relative!important;bottom:auto!important;z-index:8!important;margin:8px 12px max(10px,env(safe-area-inset-bottom))!important;background:linear-gradient(135deg,rgba(90,14,27,.98),rgba(49,7,20,.98))!important;border:1px solid rgba(255,103,118,.42)!important;color:#ff7582!important;box-shadow:0 -8px 24px rgba(1,6,18,.28)!important}
+  .mobile-sidebar-logout-v44{display:none!important}
+  .sidebar{padding-bottom:calc(68px + env(safe-area-inset-bottom))!important}
+  .sidebar-nav{min-height:0!important;flex:1 1 auto!important;overflow-y:auto!important;padding-bottom:10px!important}
 }

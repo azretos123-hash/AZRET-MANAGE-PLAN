@@ -266,10 +266,16 @@ function setupSidebar() {
     overlay.classList.add('show');
   });
 
-  document.getElementById('logoutBtn').addEventListener('click', async () => {
-    await fetch('/api/logout', { method: 'POST' });
+  const performLogout = async () => {
+    try { await fetch('/api/logout', { method: 'POST' }); } catch (_) {}
     window.location.href = '/login';
-  });
+  };
+  const logoutBtn = document.getElementById('logoutBtn');
+  const mobileSidebarLogout = document.getElementById('mobileSidebarLogout');
+  const mobileTopLogout = document.getElementById('mobileTopLogout');
+  if (logoutBtn) logoutBtn.addEventListener('click', performLogout);
+  if (mobileSidebarLogout) mobileSidebarLogout.addEventListener('click', performLogout);
+  if (mobileTopLogout) mobileTopLogout.addEventListener('click', performLogout);
 
   document.getElementById('themeToggle').addEventListener('click', () => {
     setTheme(state.theme === 'light' ? 'dark' : 'light');

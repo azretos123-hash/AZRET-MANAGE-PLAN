@@ -8,7 +8,8 @@
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#06101f">
   <link rel="icon" id="faviconLink" href="{{ url_for('static', filename='icons/icon-192.png') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=43">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=47">
+  <link rel="preload" as="image" href="https://upload.wikimedia.org/wikipedia/commons/1/1f/Dubai_Night_Time_%28Pexels-804915%29.jpg">
 </head>
 <body class="auth-body auth-v26">
   <div class="auth-cinematic-bg" aria-hidden="true">
@@ -23,9 +24,9 @@
   <main class="auth-shell-v26">
     <section class="auth-hero-v26" aria-label="YARIN brand introduction">
       <div class="yarin-emblem-shell" aria-hidden="true"><img src="{{ url_for('static', filename='icons/yarin-emblem.webp') }}" alt=""></div>
-      <div class="rizq-title-lockup">
+      <div class="rizq-title-lockup yarin-title-v45" aria-label="YARIN يارين">
         <h1 class="rizq-word-en">YARIN</h1>
-        <div class="rizq-divider" aria-hidden="true"><span></span><b>✦</b><span></span></div>
+        <div class="yarin-name-separator" aria-hidden="true"></div>
         <div class="rizq-word-ar" lang="ar" dir="rtl">يارين</div>
       </div>
 
@@ -102,6 +103,13 @@
           <div class="reset-badge-v39">YARIN · يارين</div>
           <h3 id="forgotTitle">Reset Password</h3>
           <p id="resetIntro">Enter the email address linked to your account.</p>
+          <div class="reset-progress-v46" id="resetProgress" aria-label="Password reset progress">
+            <span data-reset-step="email" class="active"><b>1</b>Email</span>
+            <i></i>
+            <span data-reset-step="otp"><b>2</b>OTP</span>
+            <i></i>
+            <span data-reset-step="password"><b>3</b>Password</span>
+          </div>
 
           <form id="resetEmailForm" class="reset-step-v39">
             <label for="resetEmail">Email address</label>
@@ -112,8 +120,16 @@
           </form>
 
           <form id="resetOtpForm" class="reset-step-v39" hidden>
-            <label for="resetOtp">6-digit OTP</label>
-            <div class="auth-input-wrap reset-otp-wrap-v39"><span class="auth-input-icon" aria-hidden="true">#</span><input type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" id="resetOtp" placeholder="000000" required autocomplete="one-time-code"></div>
+            <label for="resetOtp">Enter 6-digit OTP</label>
+            <div class="otp-code-grid-v45" id="otpCodeGrid" aria-label="Six digit verification code">
+              <input class="otp-digit-v45" inputmode="numeric" pattern="[0-9]" maxlength="1" aria-label="OTP digit 1" autocomplete="one-time-code">
+              <input class="otp-digit-v45" inputmode="numeric" pattern="[0-9]" maxlength="1" aria-label="OTP digit 2">
+              <input class="otp-digit-v45" inputmode="numeric" pattern="[0-9]" maxlength="1" aria-label="OTP digit 3">
+              <input class="otp-digit-v45" inputmode="numeric" pattern="[0-9]" maxlength="1" aria-label="OTP digit 4">
+              <input class="otp-digit-v45" inputmode="numeric" pattern="[0-9]" maxlength="1" aria-label="OTP digit 5">
+              <input class="otp-digit-v45" inputmode="numeric" pattern="[0-9]" maxlength="1" aria-label="OTP digit 6">
+            </div>
+            <input type="hidden" id="resetOtp" value="">
             <p class="reset-note-v39">Check your inbox and spam folder. Never share this code.</p>
             <p id="resetOtpError" class="form-error auth-error-v26" style="display:none"></p>
             <button type="submit" class="auth-primary-v26"><span>Verify OTP</span><b aria-hidden="true">›</b></button>
@@ -173,9 +189,15 @@ function setResetStep(step){
   resetOtpForm.hidden=step!=='otp';
   resetPasswordForm.hidden=step!=='password';
   resetSuccess.hidden=step!=='success';
+  const order={email:1,otp:2,password:3,success:4};
+  document.querySelectorAll('[data-reset-step]').forEach(el=>{
+    const n=Number(el.querySelector('b')?.textContent||0);
+    el.classList.toggle('active',n===Math.min(order[step]||1,3));
+    el.classList.toggle('done',n<(order[step]||1));
+  });
   const title=document.getElementById('forgotTitle'), intro=document.getElementById('resetIntro');
   if(step==='email'){title.textContent='Reset Password';intro.textContent='Enter the email address linked to your account.';intro.hidden=false;setTimeout(()=>document.getElementById('resetEmail').focus(),50);}
-  if(step==='otp'){title.textContent='Check Your Email';intro.textContent='Enter the 6-digit code sent to your email.';intro.hidden=false;setTimeout(()=>document.getElementById('resetOtp').focus(),50);}
+  if(step==='otp'){title.textContent='Check Your Email';intro.textContent='Enter the 6-digit code sent to your email.';intro.hidden=false;setTimeout(()=>document.querySelector('.otp-digit-v45')?.focus(),50);}
   if(step==='password'){title.textContent='Create New Password';intro.textContent='Choose a strong new password for your account.';intro.hidden=false;setTimeout(()=>document.getElementById('resetNewPassword').focus(),50);}
   if(step==='success'){title.textContent='All Set';intro.hidden=true;}
 }
@@ -200,7 +222,12 @@ async function resetPost(url,payload,errorEl,button){
   try{
     const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':(document.querySelector('meta[name="csrf-token"]')?.content||'')},body:JSON.stringify(payload)});
     let data={};try{data=await res.json();}catch(_e){}
-    if(!res.ok){errorEl.textContent=data.error||'Something went wrong';errorEl.style.display='block';return null;}
+    if(!res.ok){
+      let msg=data.error||'Something went wrong';
+      if(data.hint) msg += ' ' + data.hint;
+      if(data.provider_status) msg += ` (Provider ${data.provider_status})`;
+      errorEl.textContent=msg;errorEl.style.display='block';return null;
+    }
     return data;
   }catch(_e){errorEl.textContent='Unable to reach server.';errorEl.style.display='block';return null;}
   finally{button.classList.remove('loading');button.disabled=false;}
@@ -210,7 +237,7 @@ async function sendResetOtp(button){
   const err=document.getElementById('resetEmailError');
   resetEmailValue=document.getElementById('resetEmail').value.trim().toLowerCase();
   const data=await resetPost('/api/password-reset/request',{email:resetEmailValue},err,button);
-  if(data){setResetStep('otp');}
+  if(data){otpDigits.forEach(x=>x.value='');syncOtpValue();setResetStep('otp');}
 }
 resetEmailForm.addEventListener('submit',async e=>{e.preventDefault();await sendResetOtp(e.currentTarget.querySelector('button[type=submit]'));});
 document.getElementById('resetResendBtn').addEventListener('click',async e=>{
@@ -222,6 +249,13 @@ document.getElementById('resetResendBtn').addEventListener('click',async e=>{
     const data=await res.json();if(!res.ok){err.textContent=data.error||'Unable to resend code';err.style.display='block';}else{btn.textContent='Code sent ✓';setTimeout(()=>btn.textContent='Send code again',1800);}
   }catch(_e){err.textContent='Unable to reach server.';err.style.display='block';}
   finally{btn.disabled=false;if(btn.textContent==='Sending…')btn.textContent='Send code again';}
+});
+const otpDigits=[...document.querySelectorAll('.otp-digit-v45')];
+function syncOtpValue(){document.getElementById('resetOtp').value=otpDigits.map(x=>x.value.replace(/\D/g,'')).join('').slice(0,6);}
+otpDigits.forEach((input,i)=>{
+  input.addEventListener('input',()=>{input.value=input.value.replace(/\D/g,'').slice(-1);syncOtpValue();if(input.value&&i<otpDigits.length-1)otpDigits[i+1].focus();});
+  input.addEventListener('keydown',e=>{if(e.key==='Backspace'&&!input.value&&i>0){otpDigits[i-1].focus();}});
+  input.addEventListener('paste',e=>{const digits=(e.clipboardData?.getData('text')||'').replace(/\D/g,'').slice(0,6);if(!digits)return;e.preventDefault();otpDigits.forEach((el,n)=>el.value=digits[n]||'');syncOtpValue();otpDigits[Math.min(digits.length,6)-1]?.focus();});
 });
 resetOtpForm.addEventListener('submit',async e=>{
   e.preventDefault();const err=document.getElementById('resetOtpError');const btn=e.currentTarget.querySelector('button[type=submit]');
