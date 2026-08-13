@@ -8,7 +8,7 @@
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#06101f">
   <link rel="icon" id="faviconLink" href="{{ url_for('static', filename='icons/icon-192.png') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=42">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=43">
 </head>
 <body class="auth-body auth-v26">
   <div class="auth-cinematic-bg" aria-hidden="true">
@@ -98,6 +98,7 @@
       <div class="forgot-dialog" id="forgotDialog" hidden>
         <div class="forgot-dialog-card reset-card-v39" role="dialog" aria-modal="true" aria-labelledby="forgotTitle">
           <button type="button" class="forgot-close" id="forgotClose" aria-label="Close">×</button>
+          <button type="button" class="reset-back-v43" id="resetStepBack">← Back to Sign In</button>
           <div class="reset-badge-v39">YARIN · يارين</div>
           <h3 id="forgotTitle">Reset Password</h3>
           <p id="resetIntro">Enter the email address linked to your account.</p>
@@ -187,6 +188,11 @@ const closeForgot=()=>{forgotDialog.classList.remove('open');setTimeout(()=>forg
 document.getElementById('forgotPasswordBtn').addEventListener('click',openForgot);
 document.getElementById('forgotClose').addEventListener('click',closeForgot);
 document.getElementById('resetBackToLogin').addEventListener('click',closeForgot);
+document.getElementById('resetStepBack').addEventListener('click',()=>{
+  if(!resetPasswordForm.hidden){setResetStep('otp');return;}
+  if(!resetOtpForm.hidden){setResetStep('email');return;}
+  closeForgot();
+});
 forgotDialog.addEventListener('click',e=>{if(e.target===forgotDialog)closeForgot();});
 
 async function resetPost(url,payload,errorEl,button){

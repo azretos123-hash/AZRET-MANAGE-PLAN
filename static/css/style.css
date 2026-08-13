@@ -2264,3 +2264,22 @@ body{background:var(--bg);}
 
 /* V39 — secure email OTP password recovery */
 .reset-card-v39{width:min(470px,94vw);text-align:left;overflow:hidden}.reset-card-v39:before{content:"";position:absolute;inset:-2px;pointer-events:none;background:linear-gradient(110deg,transparent 25%,rgba(62,205,223,.14),transparent 58%);transform:translateX(-100%);animation:v39ResetSweep 7s ease-in-out infinite}.reset-badge-v39{display:inline-flex;padding:6px 10px;border-radius:999px;border:1px solid rgba(74,207,222,.25);background:rgba(8,39,70,.55);color:#61d8df;font-weight:800;font-size:.7rem;letter-spacing:.16em;margin-bottom:12px}.reset-card-v39 h3{text-align:left}.reset-card-v39>p{margin:0 0 18px}.reset-step-v39{display:grid;gap:11px;position:relative;z-index:1}.reset-step-v39 label{color:#d7e9ff;font-weight:700;font-size:.9rem}.reset-step-v39 .auth-primary-v26{margin-top:4px}.reset-note-v39{margin:0;color:#91a9c6!important;font-size:.79rem!important;line-height:1.45!important}.reset-otp-wrap-v39 input{font-size:1.35rem!important;letter-spacing:.42em;text-align:center;padding-left:48px!important}.reset-text-btn-v39{border:0;background:transparent;color:#56b7ff;cursor:pointer;font-weight:700;padding:7px 4px}.reset-text-btn-v39:disabled{opacity:.55;cursor:wait}.reset-success-v39{text-align:center;position:relative;z-index:1}.reset-success-v39 strong{display:block;color:#f3f8ff;font-size:1.2rem;margin:8px 0}.reset-success-v39 p{color:#9fb3cc}.reset-success-icon-v39{width:68px;height:68px;border-radius:50%;display:grid;place-items:center;margin:4px auto 12px;background:radial-gradient(circle at 35% 30%,#64e7dc,#1675db 60%,#0b2f70);color:#fff;font-size:2rem;box-shadow:0 0 0 8px rgba(62,205,223,.08),0 0 34px rgba(57,156,255,.3);animation:v39ResetSuccess 2.4s ease-in-out infinite}.reset-success-v39 .auth-primary-v26{width:100%;margin-top:15px}@keyframes v39ResetSweep{0%,68%,100%{transform:translateX(-110%)}82%{transform:translateX(110%)}}@keyframes v39ResetSuccess{50%{transform:scale(1.045);box-shadow:0 0 0 12px rgba(62,205,223,.05),0 0 42px rgba(57,156,255,.4)}}
+
+
+/* V43 critical UI fixes */
+/* Keep gradient strictly inside glyphs. The V37 background shorthand reset
+   background-clip on Chromium, producing the large cyan rectangles. */
+.rizq-word-en,.rizq-word-ar{
+  -webkit-background-clip:text!important;
+  background-clip:text!important;
+  -webkit-text-fill-color:transparent!important;
+  color:transparent!important;
+}
+.reset-step-v39[hidden],.reset-success-v39[hidden]{display:none!important;}
+.reset-back-v43{display:inline-flex;align-items:center;gap:7px;border:0;background:transparent;color:#63c9ff;font-weight:750;padding:0 0 12px;cursor:pointer;font-size:.84rem}
+.reset-back-v43:hover{color:#fff}
+@media(max-width:860px){
+  .sidebar{height:100dvh!important;max-height:100dvh!important;padding-bottom:max(14px,env(safe-area-inset-bottom))!important;overflow:hidden!important}
+  .sidebar-nav{min-height:0!important;overflow-y:auto!important;overscroll-behavior:contain;padding-bottom:8px}
+  .sidebar-logout{display:flex!important;visibility:visible!important;opacity:1!important;flex:0 0 auto!important;margin-top:8px!important;position:relative!important;bottom:auto!important}
+}

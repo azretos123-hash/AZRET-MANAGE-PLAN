@@ -952,7 +952,7 @@ def _gemini_models_to_try():
     configured = (os.environ.get('GEMINI_MODEL') or '').strip()
     # Current stable production models first. Old 1.5 models and the shut-down
     # 2.0 alias are deliberately removed.
-    candidates = ['gemini-3.5-flash-lite', configured, 'gemini-3.1-flash-lite', 'gemini-2.5-flash-lite']
+    candidates = [configured, 'gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite']
     result = []
     for item in candidates:
         if item and item not in result:
