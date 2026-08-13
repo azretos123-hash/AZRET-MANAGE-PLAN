@@ -8,11 +8,16 @@
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#06101f">
   <link rel="icon" id="faviconLink" href="{{ url_for('static', filename='icons/icon-192.png') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=47">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=53">
   <link rel="preload" as="image" href="https://upload.wikimedia.org/wikipedia/commons/1/1f/Dubai_Night_Time_%28Pexels-804915%29.jpg">
 </head>
 <body class="auth-body auth-v26">
   <div class="auth-cinematic-bg" aria-hidden="true">
+    <div class="auth-bg-slides-v47">
+      <div class="auth-bg-slide-v47 active" style="background-image:url('https://upload.wikimedia.org/wikipedia/commons/1/1f/Dubai_Night_Time_%28Pexels-804915%29.jpg')"></div>
+      <div class="auth-bg-slide-v47" style="background-image:url('https://imgengine.khaleejtimes.com/khaleejtimes/import/images/3688569a-edc7-4df5-92fb-a236452330be-org.jpg?format=auto&width=1200')"></div>
+      <div class="auth-bg-slide-v47" style="background-image:url('https://marinadubai.ae/.fast_background/8/89/def_89d6cc449fc9dcf894c0547cce40543c84f702a8_2_.jpg')"></div>
+    </div>
     <div class="auth-aurora auth-aurora-blue"></div>
     <div class="auth-aurora auth-aurora-gold"></div>
     <div class="auth-stars"></div>
@@ -293,6 +298,15 @@ document.getElementById('registerForm').addEventListener('submit',e=>{
   if(p!==c){err.textContent='Passwords do not match';err.style.display='block';return;}
   submitJson('/api/register',{username:document.getElementById('regUsername').value.trim(),email:document.getElementById('regEmail').value.trim(),password:p,confirm_password:c},err,e.currentTarget.querySelector('button[type=submit]'));
 });
+
+
+// V47: rotate Dubai login backgrounds without disturbing the form.
+(()=>{
+  const slides=[...document.querySelectorAll('.auth-bg-slide-v47')];
+  if(slides.length<2)return;
+  let i=0;
+  setInterval(()=>{slides[i].classList.remove('active');i=(i+1)%slides.length;slides[i].classList.add('active');},9000);
+})();
 
 if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('/service-worker.js').catch(()=>{}));}
 </script>

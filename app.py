@@ -707,6 +707,23 @@ def update_record_route(table_name, record_id):
     if integrity_error:
         return jsonify({'error': integrity_error}), 400
 
+    # Smart payment history is authoritative once ledger rows exist. Allowing an
+    # edit to set the parent `paid` total below the ledger sum corrupts pending
+    # balances and can allow the same amount to be paid twice.
+    if table_name in {'emi', 'debts'}:
+        paid_field = 'paid' if table_name == 'emi' else 'paid_amount'
+        payment_table = 'emi_payments' if table_name == 'emi' else 'debt_payments'
+        fk_field = 'emi_id' if table_name == 'emi' else 'debt_id'
+        if paid_field in update_data:
+            conn = db.get_db(); cursor = conn.cursor()
+            try:
+                cursor.execute(f"SELECT COALESCE(SUM(amount),0) FROM {payment_table} WHERE user_id=? AND {fk_field}=?", (session['user_id'], record_id))
+                ledger_paid = float(cursor.fetchone()[0] or 0)
+            finally:
+                conn.close()
+            if float(update_data[paid_field] or 0) + 1e-9 < ledger_paid:
+                return jsonify({'error': f"'{paid_field}' cannot be less than logged payment history ({ledger_paid:.2f})"}), 400
+
     if update_data:
         db.update_record(table_name, record_id, update_data, session['user_id'])
 
@@ -765,7 +782,7 @@ def suggest_smart_records(table_name):
 
     conn = db.get_db()
     cursor = conn.cursor()
-    cursor.execute(f"SELECT * FROM {cfg['header_table']} WHERE user_id = ? AND {cfg['name_field']} LIKE ? ORDER BY date DESC, time DESC, id DESC LIMIT 8", (session['user_id'], f"%{q}%"))
+    cursor.execute(f"SELECT * FROM {cfg['header_table']} WHERE user_id = ? AND LOWER(COALESCE({cfg['name_field']},'')) LIKE LOWER(?) ORDER BY date DESC, time DESC, id DESC LIMIT 8", (session['user_id'], f"%{q}%"))
     rows = cursor.fetchall()
     conn.close()
 
@@ -868,7 +885,10 @@ def add_smart_payment(table_name, record_id):
 @app.route('/api/dashboard', methods=['GET'])
 @login_required
 def dashboard_api():
-    data = db.get_dashboard_data(session['user_id'])
+    local_today = str(request.args.get('today') or '').strip()
+    if local_today and not _valid_date(local_today):
+        local_today = ''
+    data = db.get_dashboard_data(session['user_id'], reference_date=local_today or None)
     return jsonify(data)
 
 # AI Assistant Context
@@ -959,7 +979,7 @@ def _gemini_models_to_try():
     configured = (os.environ.get('GEMINI_MODEL') or '').strip()
     # Current stable production models first. Old 1.5 models and the shut-down
     # 2.0 alias are deliberately removed.
-    candidates = [configured, 'gemini-3.5-flash', 'gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-3.1-flash-lite']
+    candidates = [configured, 'gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-3.5-flash', 'gemini-3.1-flash-lite']
     result = []
     for item in candidates:
         if item and item not in result:
@@ -991,7 +1011,7 @@ def _gemini_runtime_models(api_key):
             return preferred
         ordered = [m for m in preferred if m in accessible]
         # If the account exposes a newer/different Flash model, use it after preferred stable choices.
-        ordered.extend(m for m in accessible if 'flash' in m.lower() and 'image' not in m.lower() and 'live' not in m.lower() and 'preview' not in m.lower() and m not in ordered)
+        ordered.extend(m for m in accessible if 'flash' in m.lower() and m not in ordered)
         return ordered[:8] or preferred
     except Exception as exc:
         app.logger.warning('Gemini model discovery exception: %s', str(exc)[:300])
@@ -1147,10 +1167,24 @@ def ai_assistant():
 
     system_instruction = _build_ai_system_instruction(user_name, language_key, mode)
     runtime_models = _gemini_runtime_models(gemini_key)
+    coach_context = data.get('coach_context') if isinstance(data.get('coach_context'), dict) else {}
+    # Client coach context contains only aggregate values from YARIN's new local planning tools.
+    # Bound and sanitize it before adding it to the model prompt.
+    coach_lines = []
+    for key in ('financial_health_score','net_worth','goal_count','bill_count','gold_saved_grams'):
+        value = coach_context.get(key)
+        if isinstance(value, (int, float)):
+            coach_lines.append(f"{key}: {value}")
+    alerts = coach_context.get('upcoming_alerts')
+    if isinstance(alerts, list):
+        safe_alerts = [str(x).replace('\n',' ')[:160] for x in alerts[:5] if str(x).strip()]
+        if safe_alerts:
+            coach_lines.append('upcoming_alerts: ' + ' | '.join(safe_alerts))
+    extra_coach = ('\nYARIN COACH SUMMARY:\n' + '\n'.join(coach_lines)) if coach_lines else ''
     if context:
-        current_message = f"{_format_financial_context(context)}\n\nUSER MESSAGE:\n{query}"
+        current_message = f"{_format_financial_context(context)}{extra_coach}\n\nUSER MESSAGE:\n{query}"
     else:
-        current_message = query
+        current_message = f"{extra_coach}\n\nUSER MESSAGE:\n{query}" if extra_coach else query
 
     response_text = None
     used_model = None
@@ -1268,13 +1302,9 @@ def ai_assistant():
                         used_model = mname + '-rest'
                         break
                 else:
-                    body = (rest_res.text or '')[:500]
-                    app.logger.warning('Gemini REST model %s failed status=%s body=%s', mname, rest_res.status_code, body)
-                    errors.append(f"REST {mname}: HTTP {rest_res.status_code} {body}")
+                    app.logger.warning('Gemini REST model %s failed status=%s body=%s', mname, rest_res.status_code, (rest_res.text or '')[:500])
             except Exception as rest_exc:
-                safe_rest_error = str(rest_exc).replace(gemini_key, '[redacted]')[:400]
-                app.logger.warning('Gemini REST fallback failed for %s: %s', mname, safe_rest_error)
-                errors.append(f"REST {mname}: {safe_rest_error}")
+                app.logger.warning('Gemini REST fallback failed for %s: %s', mname, str(rest_exc)[:400])
 
     if not response_text:
         fallback = None
@@ -1367,7 +1397,10 @@ def global_search_api():
 @app.route('/api/settings', methods=['GET'])
 @login_required
 def get_settings_api():
-    return jsonify(db.get_settings(session['user_id']))
+    settings = db.get_settings(session['user_id'])
+    settings.pop('finance_suite_json', None)
+    settings.pop('finance_suite_updated_at', None)
+    return jsonify(settings)
 
 @app.route('/api/settings', methods=['POST'])
 @login_required
@@ -1492,6 +1525,51 @@ def fx_rate():
         return jsonify({'base':base,'quote':quote,'rate':rate,'date':rate_date,'provider':'Frankfurter'})
     except Exception:
         return jsonify({'error':'Exchange rate temporarily unavailable'}), 503
+
+@app.route('/api/gold/rate', methods=['GET'])
+@login_required
+def gold_rate():
+    """Return XAU spot converted to a supported user currency, per gram.
+
+    Keeping this server-side avoids browser CORS failures and prevents the client
+    from silently using stale hard-coded FX values. This is a reference rate only.
+    """
+    currency = str(request.args.get('currency') or 'AED').upper().strip()
+    supported = {'AED', 'INR', 'SAR', 'QAR', 'GBP', 'USD'}
+    if currency not in supported:
+        return jsonify({'error': 'Unsupported gold market currency'}), 400
+    try:
+        def load_gold_usd_oz():
+            response = requests.get('https://api.gold-api.com/price/XAU', timeout=6)
+            response.raise_for_status()
+            payload = response.json()
+            price = float(payload.get('price'))
+            if not math.isfinite(price) or price <= 0:
+                raise ValueError('Invalid gold price')
+            return price
+
+        usd_oz = float(_fx_cached('gold:xau:usd_oz', 120, load_gold_usd_oz))
+        fx_rate_value = 1.0
+        fx_date = datetime.utcnow().strftime('%Y-%m-%d')
+        if currency != 'USD':
+            fx_payload = _fx_cached(f'rate:USD:{currency}', 600, lambda: _fx_get_json(f'/v2/rate/USD/{currency}'))
+            fx_rate_value = float(fx_payload.get('rate'))
+            fx_date = fx_payload.get('date') or fx_date
+            if not math.isfinite(fx_rate_value) or fx_rate_value <= 0:
+                raise ValueError('Invalid FX rate')
+        per_gram = (usd_oz / 31.1034768) * fx_rate_value
+        return jsonify({
+            'currency': currency,
+            'usd_per_oz': usd_oz,
+            'fx_rate': fx_rate_value,
+            'per_gram': round(per_gram, 6),
+            'date': fx_date,
+            'provider': 'Gold API + Frankfurter',
+            'reference_only': True,
+        })
+    except Exception:
+        return jsonify({'error': 'Gold reference rate temporarily unavailable'}), 503
+
 
 @app.route('/api/fx/series', methods=['GET'])
 @login_required
@@ -1645,17 +1723,246 @@ def upload_theme_video():
 def delete_theme_video():
     return jsonify({'success': False, 'error': 'Branding customization is disabled in YARIN'}), 410
 
+# Server-backed finance-suite state (Calendar, Net Worth, Goals, Bills, Gold Saver).
+# The Document Vault intentionally remains browser-local because it may contain files.
+FINANCE_SUITE_LIST_LIMITS = {
+    'calendar': 500,
+    'networth': 500,
+    'goals': 500,
+    'bills': 500,
+    'gold_savings': 1000,
+}
+FINANCE_SUITE_COUNTRIES = {'AE', 'IN', 'SA', 'QA', 'GB', 'US'}
+# Currency codes published by the same Frankfurter v2 provider used by YARIN.
+# Keeping this local makes backup/suite validation deterministic even when the
+# external FX service is temporarily unavailable. Includes active + archived
+# provider codes so older backups are not corrupted on import.
+FINANCE_SUITE_CURRENCIES = set(
+    'AED AFN ALL AMD ANG AOA ARS ATS AUD AWG AZN BAM BBD BDT BEF BGN BHD BIF BMD BND BOB BRL BSD BTN BWP BYN BYR BZD '
+    'CAD CDF CHF CLP CNH CNY COP CRC CUC CUP CVE CYP CZK DEM DJF DKK DOP DZD EEK EGP ERN ESP ETB EUR FIM FJD FKP FRF '
+    'GBP GEL GGP GHC GHS GIP GMD GNF GRD GTQ GYD HKD HNL HRK HTG HUF IDR IEP ILS IMP INR IQD IRR ISK ITL JEP JMD '
+    'JOD JPY KES KGS KHR KMF KPW KRW KWD KYD KZT LAK LBP LKR LRD LSL LTL LUF LVL LYD MAD MDL MGA MKD MMK MNT MOP '
+    'MRO MRU MTL MUR MVR MWK MXN MYR MZN NAD NGN NIO NLG NOK NPR NZD OMR PAB PEN PGK PHP PKR PLN PTE PYG QAR ROL '
+    'RON RSD RUB RWF SAR SBD SCR SDG SEK SGD SHP SIT SKK SLE SLL SOS SRD SSP STD STN SVC SYP SZL THB TJS TMM TMT TND '
+    'TOP TRL TRY TTD TWD TZS UAH UGX USD UYU UZS VEF VES VND VUV WST XAF XAG XAU XCD XCG XDR XEU XOF XPD XPF XPT '
+    'YER ZAR ZMK ZMW ZWD ZWG ZWL ZWN ZWR'.split()
+)
+
+
+def _suite_text(value, limit=200):
+    return str(value or '').strip()[:limit]
+
+
+def _suite_currency(value, fallback='AED'):
+    cur = str(value or fallback).strip().upper()
+    return cur if cur in FINANCE_SUITE_CURRENCIES else fallback
+
+
+def _suite_number(value, *, minimum=0.0, maximum=MAX_FINANCE_VALUE, positive=False):
+    try:
+        n = float(value)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(n) or n < minimum or n > maximum or (positive and n <= 0):
+        return None
+    return round(n, 8)
+
+
+def _sanitize_finance_suite(raw):
+    """Validate untrusted browser/backup finance-suite JSON before persistence."""
+    if raw is None:
+        return {}
+    if not isinstance(raw, dict):
+        raise ValueError('finance suite must be an object')
+
+    out = {}
+
+    calendar = []
+    for item in raw.get('calendar', []) if isinstance(raw.get('calendar', []), list) else []:
+        if not isinstance(item, dict):
+            continue
+        title = _suite_text(item.get('title'), 200)
+        date = _suite_text(item.get('date'), 10)
+        if not title or not _valid_date(date):
+            continue
+        calendar.append({'title': title, 'date': date, 'type': _suite_text(item.get('type'), 60) or 'Reminder'})
+        if len(calendar) >= FINANCE_SUITE_LIST_LIMITS['calendar']:
+            break
+    out['calendar'] = calendar
+
+    networth = []
+    for item in raw.get('networth', []) if isinstance(raw.get('networth', []), list) else []:
+        if not isinstance(item, dict):
+            continue
+        name = _suite_text(item.get('name'), 200)
+        amount = _suite_number(item.get('amount'))
+        item_type = str(item.get('type') or '').lower()
+        if not name or amount is None or item_type not in {'asset', 'liability'}:
+            continue
+        networth.append({'name': name, 'amount': amount, 'type': item_type, 'cur': _suite_currency(item.get('cur'))})
+        if len(networth) >= FINANCE_SUITE_LIST_LIMITS['networth']:
+            break
+    out['networth'] = networth
+
+    goals = []
+    for item in raw.get('goals', []) if isinstance(raw.get('goals', []), list) else []:
+        if not isinstance(item, dict):
+            continue
+        name = _suite_text(item.get('name'), 200)
+        target = _suite_number(item.get('target'), positive=True)
+        saved = _suite_number(item.get('saved', 0))
+        date = _suite_text(item.get('date'), 10)
+        if date and not _valid_date(date):
+            date = ''
+        if not name or target is None or saved is None:
+            continue
+        goals.append({'name': name, 'target': target, 'saved': saved, 'date': date, 'cur': _suite_currency(item.get('cur'))})
+        if len(goals) >= FINANCE_SUITE_LIST_LIMITS['goals']:
+            break
+    out['goals'] = goals
+
+    bills = []
+    for item in raw.get('bills', []) if isinstance(raw.get('bills', []), list) else []:
+        if not isinstance(item, dict):
+            continue
+        name = _suite_text(item.get('name'), 200)
+        amount = _suite_number(item.get('amount'))
+        try:
+            day = int(item.get('day'))
+        except (TypeError, ValueError):
+            day = 0
+        if not name or amount is None or not 1 <= day <= 31:
+            continue
+        bills.append({'name': name, 'amount': amount, 'day': day, 'kind': _suite_text(item.get('kind'), 60) or 'Bill', 'cur': _suite_currency(item.get('cur'))})
+        if len(bills) >= FINANCE_SUITE_LIST_LIMITS['bills']:
+            break
+    out['bills'] = bills
+
+    gold_savings = []
+    for item in raw.get('gold_savings', []) if isinstance(raw.get('gold_savings', []), list) else []:
+        if not isinstance(item, dict):
+            continue
+        amount = _suite_number(item.get('amount'), positive=True)
+        grams = _suite_number(item.get('grams'), minimum=0.0, maximum=1_000_000, positive=True)
+        rate = _suite_number(item.get('rate'), positive=True)
+        cc = str(item.get('cc') or 'AE').upper()
+        if cc not in FINANCE_SUITE_COUNTRIES:
+            cc = 'AE'
+        cur = _suite_currency(item.get('cur'))
+        local_date = _suite_text(item.get('localDate'), 10)
+        if local_date and not _valid_date(local_date):
+            local_date = ''
+        date = _suite_text(item.get('date'), 40)
+        if amount is None or grams is None or rate is None:
+            continue
+        gold_savings.append({'amount': amount, 'grams': grams, 'rate': rate, 'cc': cc, 'cur': cur, 'date': date, 'localDate': local_date})
+        if len(gold_savings) >= FINANCE_SUITE_LIST_LIMITS['gold_savings']:
+            break
+    out['gold_savings'] = gold_savings
+
+    goal = _suite_number(raw.get('gold_goal', 10), minimum=0.01, maximum=1_000_000, positive=True)
+    out['gold_goal'] = goal if goal is not None else 10.0
+
+    targets = {}
+    raw_targets = raw.get('gold_targets', {})
+    if isinstance(raw_targets, dict):
+        for key, value in list(raw_targets.items())[:50]:
+            cur = _suite_currency(key, '')
+            target = _suite_number(value, positive=True)
+            if cur and target is not None:
+                targets[cur] = target
+    out['gold_targets'] = targets
+
+    country = str(raw.get('gold_country') or 'AE').upper()
+    out['gold_country'] = country if country in FINANCE_SUITE_COUNTRIES else 'AE'
+
+    encoded = json.dumps(out, ensure_ascii=False, separators=(',', ':'), allow_nan=False)
+    if len(encoded.encode('utf-8')) > 250_000:
+        raise ValueError('finance suite is too large')
+    return out
+
+
+def _merge_finance_suite(existing, incoming):
+    """Merge imported suite records while keeping existing account records."""
+    a = _sanitize_finance_suite(existing or {})
+    b = _sanitize_finance_suite(incoming or {})
+    merged = {}
+    for key in ('calendar', 'networth', 'goals', 'bills', 'gold_savings'):
+        seen = set()
+        rows = []
+        for item in list(a.get(key, [])) + list(b.get(key, [])):
+            token = json.dumps(item, sort_keys=True, ensure_ascii=False, separators=(',', ':'))
+            if token in seen:
+                continue
+            seen.add(token)
+            rows.append(item)
+        merged[key] = rows
+    merged['gold_goal'] = b.get('gold_goal', a.get('gold_goal', 10))
+    merged['gold_targets'] = {**(a.get('gold_targets') or {}), **(b.get('gold_targets') or {})}
+    merged['gold_country'] = b.get('gold_country') or a.get('gold_country') or 'AE'
+    return _sanitize_finance_suite(merged)
+
+
+def _get_finance_suite(user_id):
+    settings = db.get_settings(user_id)
+    raw = settings.get('finance_suite_json')
+    if not raw:
+        return {}, 0
+    try:
+        suite = _sanitize_finance_suite(json.loads(raw))
+    except Exception:
+        suite = {}
+    try:
+        updated_at = int(settings.get('finance_suite_updated_at') or 0)
+    except (TypeError, ValueError):
+        updated_at = 0
+    return suite, max(0, updated_at)
+
+
+def _save_finance_suite(user_id, suite):
+    safe = _sanitize_finance_suite(suite)
+    updated_at = int(time.time() * 1000)
+    db.save_settings({
+        'finance_suite_json': json.dumps(safe, ensure_ascii=False, separators=(',', ':'), allow_nan=False),
+        'finance_suite_updated_at': str(updated_at),
+    }, user_id)
+    return safe, updated_at
+
+
+@app.route('/api/finance-suite', methods=['GET'])
+@login_required
+def get_finance_suite_api():
+    suite, updated_at = _get_finance_suite(session['user_id'])
+    return jsonify({'suite': suite, 'updated_at': updated_at})
+
+
+@app.route('/api/finance-suite', methods=['POST'])
+@login_required
+def save_finance_suite_api():
+    data = request.get_json(silent=True) or {}
+    try:
+        suite, updated_at = _save_finance_suite(session['user_id'], data.get('suite', {}))
+    except ValueError as exc:
+        return jsonify({'success': False, 'error': str(exc)}), 400
+    return jsonify({'success': True, 'suite': suite, 'updated_at': updated_at})
+
+
 @app.route('/api/export', methods=['GET'])
 @login_required
 def export_data():
     # A backup must include payment history too, otherwise EMI/debt ledgers cannot
     # be reconstructed after an import. Everything remains scoped to this user.
-    dump = {'backup_version': 2}
+    dump = {'backup_version': 3}
     for table in TABLE_CONFIGS:
         dump[table] = db.fetch_all(table, session['user_id'])
     for table in ('emi_payments', 'debt_payments'):
         dump[table] = db.fetch_all(table, session['user_id'])
-    dump['settings'] = db.get_settings(session['user_id'])
+    export_settings = db.get_settings(session['user_id'])
+    suite, _suite_updated_at = _get_finance_suite(session['user_id'])
+    export_settings.pop('finance_suite_json', None)
+    export_settings.pop('finance_suite_updated_at', None)
+    dump['settings'] = export_settings
+    dump['finance_suite'] = suite
 
     filename = f"yarin_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
     buf = io.BytesIO(json.dumps(dump, indent=2, default=str).encode('utf-8'))
@@ -1711,10 +2018,11 @@ def import_data():
                     id_maps[table][str(old_id)] = new_id
 
         payment_specs = {
-            'emi_payments': ('emi_id', 'emi'),
-            'debt_payments': ('debt_id', 'debts')
+            'emi_payments': ('emi_id', 'emi', 'paid'),
+            'debt_payments': ('debt_id', 'debts', 'paid_amount')
         }
-        for table, (fk_field, parent_table) in payment_specs.items():
+        imported_payment_totals = {}
+        for table, (fk_field, parent_table, paid_field) in payment_specs.items():
             rows = content.get(table, [])
             if not isinstance(rows, list):
                 continue
@@ -1732,6 +2040,20 @@ def import_data():
                     continue
                 if not math.isfinite(amount) or amount <= 0 or amount > MAX_FINANCE_VALUE:
                     continue
+                parent = db.fetch_one(parent_table, mapped_parent, session['user_id'])
+                if not parent:
+                    continue
+                try:
+                    parent_paid = float(parent.get(paid_field) or 0)
+                except (TypeError, ValueError):
+                    parent_paid = 0.0
+                total_key = (table, mapped_parent)
+                next_ledger_total = imported_payment_totals.get(total_key, 0.0) + amount
+                # The parent paid total is authoritative in the exported record.
+                # Never import a ledger whose rows exceed it, or pending balances
+                # become internally inconsistent after restore.
+                if next_ledger_total > parent_paid + 1e-9:
+                    continue
                 payload = {
                     fk_field: mapped_parent,
                     'amount': amount,
@@ -1742,6 +2064,7 @@ def import_data():
                 if _validate_text_dates(payload):
                     continue
                 db.insert_record(table, payload, session['user_id'])
+                imported_payment_totals[total_key] = next_ledger_total
 
         settings = content.get('settings')
         if isinstance(settings, dict):
@@ -1752,7 +2075,8 @@ def import_data():
                 'exchange_rate', 'shopping_budget', 'salary_credit_day',
                 'last_salary_amount', 'income_profile_saved',
                 'income_profile_monthly_income', 'income_profile_other_income',
-                'income_profile_fixed_emi_commitment', 'income_profile_fixed_debt_commitment'
+                'income_profile_fixed_emi_commitment', 'income_profile_fixed_debt_commitment',
+                'income_profile_notes', 'income_profile_updated_at'
             }
             safe_settings = {}
             for k, v in settings.items():
@@ -1801,6 +2125,14 @@ def import_data():
             if safe_settings:
                 db.save_settings(safe_settings, session['user_id'])
 
+        if 'finance_suite' in content:
+            try:
+                existing_suite, _ = _get_finance_suite(session['user_id'])
+                merged_suite = _merge_finance_suite(existing_suite, content.get('finance_suite') or {})
+                _save_finance_suite(session['user_id'], merged_suite)
+            except ValueError:
+                raise ValueError('Invalid finance suite in backup')
+
         return jsonify({'success': True})
     except Exception:
         return jsonify({'success': False, 'error': 'Invalid or incompatible JSON backup'}), 400
@@ -1818,7 +2150,10 @@ def clear_all_data_api():
 @app.route('/api/advice', methods=['GET'])
 @login_required
 def get_advice():
-    dash = db.get_dashboard_data(session['user_id'])
+    local_today = str(request.args.get('today') or '').strip()
+    if local_today and not _valid_date(local_today):
+        local_today = ''
+    dash = db.get_dashboard_data(session['user_id'], reference_date=local_today or None)
     income = dash['total_income']
     expenses = dash['total_expenses']
     savings = dash['total_savings']
@@ -1831,19 +2166,20 @@ def get_advice():
     conn.close()
 
     tips = []
-    savings_rate = 0.0
-    if income > 0:
-        savings_rate = round(((income - expenses) / income) * 100, 1)
+    monthly_income = float(dash.get('monthly_income') or 0)
+    monthly_expense = float(dash.get('monthly_expense') or 0)
+    monthly_saved = float(dash.get('monthly_savings') or 0)
+    savings_rate = round((monthly_saved / monthly_income) * 100, 1) if monthly_income > 0 else 0.0
 
-    if income == 0:
-        tips.append("Add your income records to unlock personalised financial insights.")
+    if monthly_income <= 0:
+        tips.append("Add this month's income records to unlock personalised financial insights.")
     else:
-        if savings_rate < 0:
-            tips.append("Your expenses currently exceed your income. Review non-essential spending this month.")
-        elif savings_rate < 20:
-            tips.append(f"Your savings rate is {savings_rate}%. Aim for at least 20% of income saved each month.")
+        if monthly_expense > monthly_income:
+            tips.append("Your expenses currently exceed your income this month. Review non-essential spending.")
+        if savings_rate < 20:
+            tips.append(f"Your recorded savings rate this month is {savings_rate}%. Aim for a sustainable regular saving habit.")
         else:
-            tips.append(f"Great job — you're saving {savings_rate}% of your income. Keep this momentum going.")
+            tips.append(f"Great job — you've recorded {savings_rate}% of this month's income as savings. Keep this momentum going.")
 
     if cat_row and cat_row['t'] > 0:
         tips.append(f"Your highest spending category is '{cat_row['category']}'. Look for ways to trim it.")
@@ -2068,7 +2404,11 @@ def salary_plan_route():
 @app.route('/api/report/<kind>', methods=['GET'])
 @login_required
 def generate_report(kind):
-    now = datetime.now()
+    local_today = str(request.args.get('today') or '').strip()
+    try:
+        now = datetime.strptime(local_today, '%Y-%m-%d') if local_today else datetime.now()
+    except ValueError:
+        now = datetime.now()
     if kind == 'monthly':
         date_filter = f"{now.strftime('%Y-%m')}%"
         label = now.strftime('%B %Y')
@@ -2114,6 +2454,21 @@ def generate_report(kind):
 
     cursor.execute("SELECT COALESCE(SUM(total_amount - paid_amount),0) FROM debts WHERE user_id=?", (session['user_id'],))
     debt_out = cursor.fetchone()[0]
+
+    # Debt repayments are also cash outflows. Reconstruct period activity from
+    # the debt payment ledger plus any initial paid amount recorded on creation.
+    cursor.execute("SELECT id, COALESCE(paid_amount,0) AS paid_amount, date FROM debts WHERE user_id=?", (session['user_id'],))
+    debt_rows = [dict(r) for r in cursor.fetchall()]
+    cursor.execute("SELECT debt_id, COALESCE(amount,0) AS amount, date FROM debt_payments WHERE user_id=?", (session['user_id'],))
+    debt_payment_rows = [dict(r) for r in cursor.fetchall()]
+    paid_by_debt = {}
+    for row in debt_payment_rows:
+        paid_by_debt[row['debt_id']] = paid_by_debt.get(row['debt_id'], 0.0) + float(row.get('amount') or 0)
+    debt_paid_period = sum(float(r.get('amount') or 0) for r in debt_payment_rows if str(r.get('date') or '').startswith(prefix))
+    for row in debt_rows:
+        initial_paid = max(0.0, float(row.get('paid_amount') or 0) - paid_by_debt.get(row['id'], 0.0))
+        if str(row.get('date') or '').startswith(prefix):
+            debt_paid_period += initial_paid
     conn.close()
 
     pdf = FPDF()
@@ -2134,8 +2489,9 @@ def generate_report(kind):
     pdf.cell(0, 8, f"Total Savings: {report_cur} {cv(savings):,.2f}", 0, 1)
     pdf.cell(0, 8, f"Family Transfers: {report_cur} {cv(family):,.2f}", 0, 1)
     pdf.cell(0, 8, f"EMI Paid: {report_cur} {cv(emi_paid):,.2f}", 0, 1)
+    pdf.cell(0, 8, f"Debt Paid: {report_cur} {cv(debt_paid_period):,.2f}", 0, 1)
     pdf.cell(0, 8, f"Outstanding Debt: {report_cur} {cv(debt_out):,.2f}", 0, 1)
-    pdf.cell(0, 8, f"Net Balance: {report_cur} {cv(income - expenses - family - emi_paid):,.2f}", 0, 1)
+    pdf.cell(0, 8, f"Net Balance: {report_cur} {cv(income - expenses - family - emi_paid - debt_paid_period):,.2f}", 0, 1)
 
     filename = f"YARIN_{kind}_report_{now.strftime('%Y%m%d')}.pdf"
     output = io.BytesIO(pdf.output(dest='S').encode('latin1'))

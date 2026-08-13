@@ -774,7 +774,13 @@ def clear_ai_chat_history(user_id):
     return count
 
 
-def get_dashboard_data(user_id):
+def get_dashboard_data(user_id, reference_date=None):
+    """Return dashboard totals for one user.
+
+    `reference_date` may be a local YYYY-MM-DD supplied by the browser. Using it
+    avoids a UTC-hosted server showing the previous/next month for users in a
+    different timezone around midnight/month boundaries.
+    """
     conn=get_db(); c=conn.cursor()
     def scalar(sql, params=()):
         c.execute(sql, params); row=c.fetchone(); return row[0] if row else 0
@@ -792,10 +798,20 @@ def get_dashboard_data(user_id):
     debt_paid=scalar("SELECT COALESCE(SUM(paid_amount),0) FROM debts WHERE user_id=?",uid)
     total_shopping=scalar("SELECT COALESCE(SUM(total),0) FROM shopping WHERE user_id=?",uid)
     outstanding_debt=max(0,total_debt-debt_paid)
-    net_balance=total_income-total_expenses-total_family-emi_paid
-    now=datetime.now(); this_month=now.strftime('%Y-%m')
+    # Debt repayments are cash outflows just like EMI payments; omitting them
+    # overstated the user's available net balance.
+    net_balance=total_income-total_expenses-total_family-emi_paid-debt_paid
+
+    try:
+        now = datetime.strptime(str(reference_date), '%Y-%m-%d') if reference_date else datetime.now()
+    except (TypeError, ValueError):
+        now = datetime.now()
+    this_month=now.strftime('%Y-%m')
     monthly_income=scalar("SELECT COALESCE(SUM(amount),0) FROM income WHERE user_id=? AND date LIKE ?",(user_id,f"{this_month}%"))
     monthly_expense=scalar("SELECT COALESCE(SUM(amount),0) FROM expenses WHERE user_id=? AND date LIKE ?",(user_id,f"{this_month}%"))
+    monthly_savings=scalar("SELECT COALESCE(SUM(amount),0) FROM savings WHERE user_id=? AND date LIKE ?",(user_id,f"{this_month}%"))
+    monthly_available=monthly_income-monthly_expense
+
     months=[]; income_series=[]; expense_series=[]
     for i in range(5,-1,-1):
         year=now.year; month=now.month-i
@@ -814,7 +830,8 @@ def get_dashboard_data(user_id):
         'emi_paid':emi_paid,'emi_pending':emi_pending,'active_emi_count':active_emi_count,
         'total_debt':total_debt,'debt_paid':debt_paid,'outstanding_debt':outstanding_debt,
         'total_shopping':total_shopping,'net_balance':net_balance,
-        'monthly_income':monthly_income,'monthly_expense':monthly_expense,'monthly_savings':monthly_income-monthly_expense,
+        'monthly_income':monthly_income,'monthly_expense':monthly_expense,'monthly_savings':monthly_savings,
+        'monthly_available':monthly_available,
         'chart_months':months,'chart_income':income_series,'chart_expense':expense_series,
         'chart_savings_growth':savings_series,'chart_categories':categories,'chart_category_totals':category_totals}
 
@@ -897,7 +914,27 @@ def save_settings(data, user_id):
 
 
 def clear_all_data(user_id):
+    """Delete all finance content for one account while preserving login/profile preferences."""
     conn=get_db(); c=conn.cursor()
-    for t in PAYMENT_TABLES + DATA_TABLES:
-        c.execute(f"DELETE FROM {t} WHERE user_id=?",(user_id,))
-    conn.commit(); conn.close()
+    try:
+        for t in PAYMENT_TABLES + DATA_TABLES:
+            c.execute(f"DELETE FROM {t} WHERE user_id=?",(user_id,))
+        c.execute("DELETE FROM ai_chat_history WHERE user_id=?", (user_id,))
+        # Financial profile/suite values must not survive an explicit 'clear all'.
+        c.execute(
+            "DELETE FROM settings WHERE user_id=? AND ("
+            "key LIKE 'income_profile_%' OR key IN ('last_salary_amount','shopping_budget','finance_suite_json','finance_suite_updated_at'))",
+            (user_id,)
+        )
+        # Keep the non-sensitive UI setting row present with a neutral value.
+        c.execute(
+            "INSERT INTO settings (user_id,key,value) VALUES (?,?,?) "
+            "ON CONFLICT(user_id,key) DO UPDATE SET value=excluded.value",
+            (user_id, 'shopping_budget', '0')
+        )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()

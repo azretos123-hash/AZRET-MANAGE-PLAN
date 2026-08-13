@@ -1,9 +1,11 @@
-# YARIN V47 final recheck
+# YARIN V47 Final UX/Support Audit
 
-- Rechecked Python/JS/JSON/HTML/static references.
-- Fixed Render Gemini default mismatch: production now defaults to gemini-3.5-flash, which has an official free tier.
-- Disabled local AI fallback in Render so provider failures are not disguised as Gemini answers.
-- Filtered discovered Gemini models to exclude image/live/preview models from text chat fallback.
-- REST Gemini failures now feed the real HTTP status/body into safe diagnostic hints.
-- Synchronized .env.example and render.yaml model defaults.
-- Bumped service worker cache to V47.
+- Mobile login converted to natural responsive vertical flow.
+- Dubai login background rotates across three night scenes with cross-fade.
+- Splash intro extended to 4.8 seconds.
+- Forgot-password OTP remains Email -> OTP -> Password -> Success with six visible OTP boxes.
+- Dashboard AI launcher reduced on desktop/mobile.
+- Contact Us page added below About with three support emails.
+- About page expanded with platform/features summary.
+- Mobile sidebar scrolling and Sign Out visibility reinforced.
+- Service-worker cache bumped to V47.

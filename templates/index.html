@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="YARIN يارين">
 <link rel="icon" id="faviconLink" href="{{ url_for('static', filename='icons/icon-192.png') }}">
 <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/icon-192.png') }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=47">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=53">
 </head>
 <body data-theme="light">
 <script>window.START_SPLASH = {{ start_splash|tojson }};</script>
@@ -107,6 +107,13 @@
         <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 12h6M12 9v6"/></svg>
         <span>Debt</span>
       </button>
+      <button class="nav-item" data-page="gold-saver"><span class="v48-nav-emoji">◈</span><span>Gold Saver</span></button>
+      <button class="nav-item" data-page="financial-calendar"><span class="v48-nav-emoji">▣</span><span>Financial Calendar</span></button>
+      <button class="nav-item" data-page="net-worth"><span class="v48-nav-emoji">◇</span><span>Net Worth</span></button>
+      <button class="nav-item" data-page="goals"><span class="v48-nav-emoji">◎</span><span>Goals Center</span></button>
+      <button class="nav-item" data-page="bills"><span class="v48-nav-emoji">▤</span><span>Bills & Subscriptions</span></button>
+      <button class="nav-item" data-page="vault"><span class="v48-nav-emoji">▦</span><span>Document Vault</span></button>
+      <button class="nav-item" data-page="health"><span class="v48-nav-emoji">✦</span><span>Financial Health</span></button>
       <button class="nav-item" data-page="calculator">
         <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8M8 11h1M12 11h1M16 11h1M8 15h1M12 15h1M16 15h1M8 19h1M12 19h1"/></svg>
         <span>Calculator</span>
@@ -126,6 +133,10 @@
       <button class="nav-item" data-page="about">
         <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01"/></svg>
         <span>About</span>
+      </button>
+      <button class="nav-item" data-page="contact">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><path d="M4 6l8 6 8-6"/></svg>
+        <span>Contact Us</span>
       </button>
       <button id="mobileSidebarLogout" class="nav-item mobile-sidebar-logout-v44" type="button">
         <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
@@ -191,7 +202,7 @@
         <div class="page-head dashboard-hero-head">
           <div>
             <p class="page-eyebrow">YARIN يارين • Your Money. Your Future.</p>
-            <h2>Dashboard</h2>
+            <div class="v48-dashboard-title-row"><h2>Dashboard</h2><button type="button" id="financeNotifBtn" class="v48-notif-btn" aria-label="Open financial notifications">🔔<span id="financeNotifCount">0</span></button></div><div id="financeNotifPanel" class="v48-notif-panel" hidden><div class="v48-notif-head"><strong>Smart Reminders</strong><button type="button" id="financeNotifClose">×</button></div><div id="financeNotifList"></div></div>
           </div>
           <div class="rate-card glass">
             <div class="rate-label">
@@ -1055,6 +1066,26 @@
         </div>
       </section>
 
+
+      <!-- ============ YARIN V48 SMART FINANCE SUITE ============ -->
+      <section class="page" id="page-gold-saver">
+        <div class="page-head"><div><p class="page-eyebrow">Precious Metal Planning</p><h2>Gold Saver</h2><p class="v48-sub">Save toward gold in small steps. Live spot reference is converted to the selected country currency.</p></div></div>
+        <div class="v48-kpi-grid"><div class="card glass v48-kpi"><small>Saved Value</small><strong id="goldSavedValue">—</strong></div><div class="card glass v48-kpi"><small>Estimated Gold</small><strong id="goldSavedGrams">0.000 g</strong></div><div class="card glass v48-kpi"><small>24K Spot / gram</small><strong id="goldGramRate">—</strong></div><div class="card glass v48-kpi"><small>Goal Progress</small><strong id="goldGoalProgress">0%</strong></div></div>
+        <div class="module-grid v48-two"><div class="card glass form-card"><h3>Add Gold Saving</h3><label>Country / market</label><select id="goldCountry"><option value="AE">UAE — AED</option><option value="IN">India — INR</option><option value="SA">Saudi Arabia — SAR</option><option value="QA">Qatar — QAR</option><option value="GB">United Kingdom — GBP</option><option value="US">United States — USD</option></select><label>Amount</label><input id="goldContribution" type="number" min="0" step="0.01" placeholder="Enter amount"><label>Gold goal (grams)</label><input id="goldGoalGrams" type="number" min="0" step="0.1" value="10"><button class="btn primary" type="button" id="addGoldSaving">Add to Gold Saver</button><p class="field-hint">Tracking only — YARIN does not execute gold trades. Weight is an estimate based on reference spot price.</p></div><div class="card glass"><div class="v48-section-head"><div><p class="page-eyebrow">Gold Market</p><h3>Live XAU Reference</h3></div><button class="btn ghost small" id="refreshGoldRate" type="button">Refresh</button></div><div class="v48-market-price"><strong id="goldMarketPrice">—</strong><span id="goldMarketStatus">Loading…</span></div><canvas id="goldMiniChart" height="210"></canvas><div class="v48-row"><input id="goldTargetPrice" type="number" placeholder="Target price / gram"><button id="saveGoldTarget" class="btn secondary" type="button">Set Alert</button></div><p class="field-hint">Chart shows rate snapshots saved by this browser. Spot source: Gold API; currency conversion uses YARIN reference FX.</p></div></div>
+        <div class="card glass"><h3>Gold Saving History</h3><div id="goldHistory" class="v48-list"></div></div>
+      </section>
+
+      <section class="page" id="page-financial-calendar"><div class="page-head"><div><p class="page-eyebrow">Plan Ahead</p><h2>Financial Calendar</h2><p class="v48-sub">Salary, EMI, bills and your own reminders in one place.</p></div></div><div class="module-grid v48-two"><div class="card glass form-card"><h3>Add Reminder</h3><input id="calTitle" placeholder="e.g. Rent / Insurance"><input id="calDate" type="date"><select id="calType"><option>Bill</option><option>Salary</option><option>EMI</option><option>Savings</option><option>Gold Saver</option><option>Other</option></select><button id="addCalEvent" class="btn primary" type="button">Add Reminder</button></div><div class="card glass"><h3>Upcoming</h3><div id="calendarList" class="v48-list"></div></div></div></section>
+
+      <section class="page" id="page-net-worth"><div class="page-head"><div><p class="page-eyebrow">Your Financial Position</p><h2>Net Worth Tracker</h2></div></div><div class="v48-kpi-grid"><div class="card glass v48-kpi"><small>Total Assets</small><strong id="nwAssets">—</strong></div><div class="card glass v48-kpi"><small>Total Liabilities</small><strong id="nwLiabilities">—</strong></div><div class="card glass v48-kpi accent"><small>Net Worth</small><strong id="nwTotal">—</strong></div></div><div class="module-grid v48-two"><div class="card glass form-card"><h3>Add Asset / Liability</h3><input id="nwName" placeholder="e.g. Bank balance, car loan"><label>Amount (<span class="suite-cur-unit">AED</span>)</label><input id="nwAmount" type="number" min="0" step="0.01" placeholder="Amount"><select id="nwType"><option value="asset">Asset</option><option value="liability">Liability</option></select><button id="addNetWorth" class="btn primary" type="button">Add Item</button></div><div class="card glass"><h3>Items</h3><div id="nwList" class="v48-list"></div></div></div></section>
+
+      <section class="page" id="page-goals"><div class="page-head"><div><p class="page-eyebrow">Dream → Plan → Progress</p><h2>Goals Center</h2></div></div><div class="module-grid v48-two"><div class="card glass form-card"><h3>Create Goal</h3><input id="goalName" placeholder="House, Car, Hajj, Emergency Fund…"><label>Target (<span class="suite-cur-unit">AED</span>)</label><input id="goalTarget" type="number" min="0" step="0.01" placeholder="Target amount"><label>Already saved (<span class="suite-cur-unit">AED</span>)</label><input id="goalSaved" type="number" min="0" step="0.01" placeholder="Already saved"><input id="goalDate" type="date"><button id="addGoal" class="btn primary" type="button">Create Goal</button></div><div class="card glass"><h3>Your Goals</h3><div id="goalsList" class="v48-list"></div></div></div></section>
+
+      <section class="page" id="page-bills"><div class="page-head"><div><p class="page-eyebrow">Recurring Commitments</p><h2>Bills & Subscriptions</h2></div></div><div class="module-grid v48-two"><div class="card glass form-card"><h3>Add Bill / Subscription</h3><input id="billName" placeholder="Internet, Netflix, Mobile…"><label>Amount (<span class="suite-cur-unit">AED</span>)</label><input id="billAmount" type="number" min="0" step="0.01" placeholder="Amount"><input id="billDay" type="number" min="1" max="31" placeholder="Due day (1–31)"><select id="billKind"><option>Bill</option><option>Subscription</option></select><button id="addBill" class="btn primary" type="button">Add</button></div><div class="card glass"><h3>Recurring Payments</h3><div id="billsList" class="v48-list"></div></div></div></section>
+
+      <section class="page" id="page-vault"><div class="page-head"><div><p class="page-eyebrow">Private Records</p><h2>Document Vault</h2><p class="v48-sub">Store selected files locally in this browser using IndexedDB. They are not uploaded by this feature.</p></div></div><div class="card glass form-card"><input id="vaultFile" type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.txt"><button id="vaultAdd" class="btn primary" type="button">Save to Vault</button><p class="field-hint">Use only on a trusted device. Browser storage can be cleared by the user or device.</p></div><div class="card glass"><h3>Saved Documents</h3><div id="vaultList" class="v48-list"></div></div></section>
+
+      <section class="page" id="page-health"><div class="page-head"><div><p class="page-eyebrow">Financial Wellness</p><h2>Financial Health Score</h2></div></div><div class="card glass v48-health-card"><div class="v48-score-ring"><strong id="healthScore">—</strong><span>/ 100</span></div><div><h3 id="healthLabel">Calculating…</h3><p id="healthAdvice">Add financial data to receive a useful score.</p></div></div><div id="healthBreakdown" class="v48-health-grid"></div></section>
       <!-- ============ CALCULATOR ============ -->
       <section class="page" id="page-calculator">
         <div class="page-head"><h2>Calculator</h2></div>
@@ -1121,7 +1152,28 @@
               <div class="about-brand-tagline">Tomorrow Starts Today.</div>
               <div class="about-brand-tagline-ar" lang="ar" dir="rtl">لحياة مالية أذكى</div>
             </div>
-            <p>YARIN يارين is a public multi-user personal finance platform designed to help people take control of their money and build a better financial future. Anyone can create an account and use the service online, while each account's financial records remain securely separated in the database.</p>
+            <p>YARIN يارين is a public multi-user personal finance platform designed to help people plan, track and understand their financial life from one secure place. It brings together income, expenses, savings, shopping planning, family transfers, EMI, debt, notes, reports, calculators, exchange-rate tools and Azret AI assistance while keeping each account's records separated.</p><div class="about-feature-list-v47"><span>✓ Responsive on phone, tablet and desktop</span><span>✓ Local device time automatically follows the user's country</span><span>✓ AED / INR currency tools and reports</span><span>✓ Secure password-reset flow with email OTP</span><span>✓ Backup, export and personal finance insights</span></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ CONTACT ============ -->
+      <section class="page" id="page-contact">
+        <div class="page-head"><h2>Contact Us</h2></div>
+        <div class="contact-grid-v47">
+          <div class="card glass contact-card-v47">
+            <div class="about-brand-lockup"><h3><span>YARIN</span> <b lang="ar" dir="rtl">يارين</b></h3><div class="about-brand-motto">Your Money. Your Future.</div><div class="about-brand-tagline">Tomorrow Starts Today.</div></div>
+            <p>Need help with your account, password reset, YARIN features or Azret AI? Contact us using any of the email addresses below.</p>
+            <div class="contact-links-v47">
+              <a href="mailto:ijasap9@gmail.com">✉ <span>ijasap9@gmail.com</span></a>
+              <a href="mailto:azretos123@gmail.com">✉ <span>azretos123@gmail.com</span></a>
+              <a href="mailto:zabeeltechnology@gmail.com">✉ <span>zabeeltechnology@gmail.com</span></a>
+            </div>
+          </div>
+          <div class="card glass contact-card-v47">
+            <h3>Help &amp; Support</h3>
+            <p>For login problems, OTP delivery issues, data questions or technical support, include your username and a short description of the issue. Never send your password, OTP or API keys.</p>
+            <div class="support-note-v47">Security tip: YARIN support will never ask for your password or one-time code.</div>
           </div>
         </div>
       </section>
@@ -1347,8 +1399,8 @@
 
 <div id="toast" class="toast"></div>
 
-<script src="{{ url_for('static', filename='js/charts.js') }}?v=47"></script>
-<script src="/static/js/app.js?v=45"></script>
+<script src="{{ url_for('static', filename='js/charts.js') }}?v=53"></script>
+<script src="/static/js/app.js?v=53"></script>
 
   <!-- Mobile bottom navigation -->
   <nav class="mobile-bottom-nav" id="mobileBottomNav" aria-label="Mobile navigation">

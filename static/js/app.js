@@ -241,7 +241,7 @@ function setupSidebar() {
     overlay.classList.remove('show');
   }
 
-  document.querySelectorAll('.nav-item').forEach(btn => {
+  document.querySelectorAll('.nav-item[data-page]').forEach(btn => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
@@ -428,7 +428,7 @@ async function playSplashIntro() {
     };
 
     // Long enough to see the reveal, short enough to keep startup feeling fast.
-    setTimeout(cleanup, 3300);
+    setTimeout(cleanup, 4800);
   });
 }
 
@@ -671,7 +671,7 @@ function getNextSalaryDate() {
   let month = now.getMonth();
   let day = effectiveSalaryDay(year, month);
   let target = new Date(year, month, day, 0, 0, 0);
-  if (now > target) {
+  if (now.getFullYear() !== target.getFullYear() || now.getMonth() !== target.getMonth() || now.getDate() > target.getDate()) {
     month += 1;
     if (month > 11) { month = 0; year += 1; }
     day = effectiveSalaryDay(year, month);
@@ -1681,10 +1681,11 @@ function checkSalaryNotification() {
    ========================================================================== */
 async function loadDashboard() {
   try {
-    const res = await fetch('/api/dashboard');
+    const res = await fetch(`/api/dashboard?today=${encodeURIComponent(localDateISO())}`, {cache:'no-store'});
     const data = await res.json();
     state.dashboard = data;
     renderDashboard(data);
+    if (typeof window.refreshYarinFinanceSuite === 'function') window.refreshYarinFinanceSuite();
   } catch (e) { toast('Could not load dashboard', 'error'); }
 }
 
@@ -1732,7 +1733,7 @@ function renderDashboard(d) {
     <div class="qs-row"><span>Savings Goal Progress</span><span>${goalPct}%</span></div>
     <div class="qs-row"><span>EMI Pending</span><span>${fmt(d.emi_pending)}</span></div>
     <div class="qs-row"><span>Active EMIs</span><span>${d.active_emi_count}</span></div>
-    <div class="qs-row"><span>This Month's Balance</span><span>${fmt(d.monthly_income - d.monthly_expense)}</span></div>
+    <div class="qs-row"><span>This Month's Balance</span><span>${fmt(Number.isFinite(Number(d.monthly_available)) ? Number(d.monthly_available) : (Number(d.monthly_income||0)-Number(d.monthly_expense||0)))}</span></div>
   `;
 
   if (d.total_emi > 0 && d.emi_pending <= 0 && !state.emiFullyPaidAlertShown) {
@@ -2292,7 +2293,7 @@ function setupReportButtons() {
     btn.addEventListener('click', () => {
       const kind = btn.dataset.report;
       toast('Generating PDF report…');
-      window.open(`/api/report/${kind}`, '_blank');
+      window.open(`/api/report/${kind}?today=${encodeURIComponent(localDateISO())}`, '_blank', 'noopener');
     });
   });
 }
@@ -2302,7 +2303,7 @@ function setupReportButtons() {
    ========================================================================== */
 async function loadAbout() {
   try {
-    const res = await fetch('/api/advice');
+    const res = await fetch(`/api/advice?today=${encodeURIComponent(localDateISO())}`, {cache:'no-store'});
     const data = await res.json();
     document.getElementById('healthBadge').textContent = data.health;
     document.getElementById('motivationalText').textContent = `"${data.motivational}"`;
@@ -2648,11 +2649,15 @@ function setupSettingsPage() {
     }
   });
 
-  document.getElementById('btnBackup').addEventListener('click', () => {
-    window.open('/api/export', '_blank');
+  document.getElementById('btnBackup').addEventListener('click', async () => {
+    const ok = typeof window.prepareYarinSuiteServerAction === 'function' ? await window.prepareYarinSuiteServerAction({flush:true}) : true;
+    if (!ok) return toast('Could not sync the latest finance-suite changes. Backup was not started.', 'error');
+    window.location.href='/api/export';
   });
-  document.getElementById('btnExport').addEventListener('click', () => {
-    window.open('/api/export', '_blank');
+  document.getElementById('btnExport').addEventListener('click', async () => {
+    const ok = typeof window.prepareYarinSuiteServerAction === 'function' ? await window.prepareYarinSuiteServerAction({flush:true}) : true;
+    if (!ok) return toast('Could not sync the latest finance-suite changes. Export was not started.', 'error');
+    window.location.href='/api/export';
   });
 
   document.getElementById('restoreFile').addEventListener('change', async (e) => {
@@ -2662,11 +2667,12 @@ function setupSettingsPage() {
     const formData = new FormData();
     formData.append('file', file);
     try {
+      if (typeof window.prepareYarinSuiteServerAction === 'function') await window.prepareYarinSuiteServerAction({flush:false});
       const res = await fetch('/api/import', { method: 'POST', body: formData });
       const data = await res.json();
-      if (data.success) { toast('Account backup imported', 'success'); await loadDashboard(); }
-      else toast(data.error || 'Restore failed', 'error');
-    } catch (err) { toast('Restore failed', 'error'); }
+      if (data.success) { toast('Account backup imported', 'success'); if (typeof window.reloadYarinFinanceSuite === 'function') await window.reloadYarinFinanceSuite(true); else window.dispatchEvent(new CustomEvent('yarin-suite-refresh', {detail:{forceRemote:true}})); await loadDashboard(); }
+      else { if (typeof window.resumeYarinFinanceSuite === 'function') window.resumeYarinFinanceSuite(); toast(data.error || 'Restore failed', 'error'); }
+    } catch (err) { if (typeof window.resumeYarinFinanceSuite === 'function') window.resumeYarinFinanceSuite(); toast('Restore failed', 'error'); }
     e.target.value = '';
   });
 
@@ -2676,33 +2682,42 @@ function setupSettingsPage() {
     const formData = new FormData();
     formData.append('file', file);
     try {
+      if (typeof window.prepareYarinSuiteServerAction === 'function') await window.prepareYarinSuiteServerAction({flush:false});
       const res = await fetch('/api/import', { method: 'POST', body: formData });
       const data = await res.json();
       if (data.success) {
         toast('Data imported successfully', 'success');
+        if (typeof window.reloadYarinFinanceSuite === 'function') await window.reloadYarinFinanceSuite(true);
+        else window.dispatchEvent(new CustomEvent('yarin-suite-refresh', {detail:{forceRemote:true}}));
         await loadDashboard();
       } else {
+        if (typeof window.resumeYarinFinanceSuite === 'function') window.resumeYarinFinanceSuite();
         toast(data.error || 'Import failed', 'error');
       }
-    } catch (err) { toast('Import failed', 'error'); }
+    } catch (err) { if (typeof window.resumeYarinFinanceSuite === 'function') window.resumeYarinFinanceSuite(); toast('Import failed', 'error'); }
   });
 
   document.getElementById('btnClearAll').addEventListener('click', async () => {
     const confirmText = prompt('This will permanently delete ALL financial data. Type DELETE to confirm:');
     if (confirmText !== 'DELETE') return;
     try {
+      if (typeof window.prepareYarinSuiteServerAction === 'function') await window.prepareYarinSuiteServerAction({flush:false});
       const res = await fetch('/api/clear-all-data', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ confirm: 'DELETE' })
       });
       const data = await res.json();
       if (data.success) {
+        if (typeof window.clearYarinLocalFinanceSuite === 'function') await window.clearYarinLocalFinanceSuite();
+        state.tables = {}; state.editing = {}; state.salaryPlan = null; state.shoppingBudget = 0; state.lastSalaryAED = 0;
+        updateShoppingBudgetUI(0);
         toast('All data cleared', 'success');
         await loadDashboard();
       } else {
+        if (typeof window.resumeYarinFinanceSuite === 'function') window.resumeYarinFinanceSuite();
         toast(data.error || 'Could not clear data', 'error');
       }
-    } catch (e) { toast('Could not clear data', 'error'); }
+    } catch (e) { if (typeof window.resumeYarinFinanceSuite === 'function') window.resumeYarinFinanceSuite(); toast('Could not clear data', 'error'); }
   });
 
   document.getElementById('usernameForm').addEventListener('submit', async (e) => {
@@ -3178,7 +3193,7 @@ function toAED(amount, code = state.currency) {
 }
 function currencyPairRate(base = state.primaryCurrency, quote = state.secondaryCurrency) {
   const b = rateFromAED(base), q = rateFromAED(quote);
-  return b > 0 ? q / b : 1;
+  return Number.isFinite(b) && b > 0 && Number.isFinite(q) && q > 0 ? q / b : NaN;
 }
 function otherCurrency(code = state.currency) {
   return code === state.primaryCurrency ? state.secondaryCurrency : state.primaryCurrency;
@@ -3251,6 +3266,7 @@ function applyCurrency(cur, rerender) {
     Object.keys(state.editing).forEach(convertVisibleAmountInputs);
     updateAllAmountHints();
     updateShoppingBudgetUI((state.tables.shopping || []).reduce((a,r)=>a+(Number(r.total)||0),0));
+    if (typeof window.refreshYarinFinanceSuite === 'function') window.refreshYarinFinanceSuite();
   }
 }
 
@@ -3335,7 +3351,7 @@ async function refreshExchangeRate(silent=false) {
     await refreshCurrencyRates();
     const rate=currencyPairRate();
     const rateEl=document.getElementById('rateValue');
-    if(rateEl) rateEl.textContent=`1 ${state.primaryCurrency} = ${currencySymbol(state.secondaryCurrency)} ${rate.toLocaleString(undefined,{maximumFractionDigits:4})}`;
+    if(rateEl) rateEl.textContent=Number.isFinite(rate)?`1 ${state.primaryCurrency} = ${currencySymbol(state.secondaryCurrency)} ${rate.toLocaleString(undefined,{maximumFractionDigits:4})}`:'Exchange rate unavailable';
     if(!silent) toast('Exchange reference rate updated','success');
     await refreshFxChart(state.fxRange||'1M');
   } catch(e) { if(!silent) toast('Rate service unavailable — using last known values','error'); }
@@ -3346,7 +3362,7 @@ function updateAmountHint(table,field) {
   const el=document.getElementById(`${table}-${field}`),tag=document.getElementById(`${table}-${field}-tag`),value=document.getElementById(`${table}-${field}-value`),box=document.getElementById(`${table}-${field}-box`); if(!el||!value)return;
   const typed=Number(el.value)||0, other=otherCurrency(state.currency); const converted=fromAED(toAED(typed,state.currency),other);
   if(tag) tag.textContent=`≈ ${other}`;
-  const txt=converted.toLocaleString(undefined,{maximumFractionDigits:2,minimumFractionDigits:2});
+  const txt=Number.isFinite(converted)?converted.toLocaleString(undefined,{maximumFractionDigits:2,minimumFractionDigits:2}):'—';
   if(value.textContent!==txt){value.textContent=txt;if(box&&typed>0){box.classList.remove('pulse');void box.offsetWidth;box.classList.add('pulse');}}
 }
 function buildAutoNote(amountAED,dateVal,timeVal) {
@@ -3358,12 +3374,12 @@ function updateDualHint(inputId) {
   const el=document.getElementById(inputId),tag=document.getElementById(`${inputId}-tag`),value=document.getElementById(`${inputId}-value`),box=document.getElementById(`${inputId}-box`); if(!el||!value)return;
   const entry=el.dataset.entryCur||state.primaryCurrency, other=entry===state.primaryCurrency?state.secondaryCurrency:state.primaryCurrency, typed=Number(el.value)||0;
   const converted=fromAED(toAED(typed,entry),other); if(tag)tag.textContent=`≈ ${other}`;
-  const txt=converted.toLocaleString(undefined,{maximumFractionDigits:2,minimumFractionDigits:2}); if(value.textContent!==txt){value.textContent=txt;if(box&&typed>0){box.classList.remove('pulse');void box.offsetWidth;box.classList.add('pulse');}}
+  const txt=Number.isFinite(converted)?converted.toLocaleString(undefined,{maximumFractionDigits:2,minimumFractionDigits:2}):'—'; if(value.textContent!==txt){value.textContent=txt;if(box&&typed>0){box.classList.remove('pulse');void box.offsetWidth;box.classList.add('pulse');}}
 }
 function setEntryCurrency(inputId,cur) {
   const el=document.getElementById(inputId); if(!el)return; cur=String(cur||state.primaryCurrency).toUpperCase();
   if (![state.primaryCurrency, state.secondaryCurrency].includes(cur)) cur = state.currency || state.primaryCurrency;
-  const old=[state.primaryCurrency, state.secondaryCurrency].includes(el.dataset.entryCur) ? el.dataset.entryCur : (state.currency || state.primaryCurrency); if(old!==cur){const typed=Number(el.value);if(Number.isFinite(typed)&&typed>0)el.value=Number(fromAED(toAED(typed,old),cur).toFixed(2));} el.dataset.entryCur=cur;
+  const old=[state.primaryCurrency, state.secondaryCurrency].includes(el.dataset.entryCur) ? el.dataset.entryCur : (state.currency || state.primaryCurrency); if(old!==cur){const typed=Number(el.value);if(Number.isFinite(typed)&&typed>0){const converted=fromAED(toAED(typed,old),cur);if(!Number.isFinite(converted)){toast(`Exchange rate unavailable for ${old} ⇄ ${cur}`,'error');return;}el.value=Number(converted.toFixed(2));}} el.dataset.entryCur=cur;
   const toggle=document.querySelector(`.dual-currency-toggle[data-field="${inputId}"]`); if(toggle)toggle.querySelectorAll('.dc-btn').forEach(b=>b.classList.toggle('active',b.dataset.cur===cur));
   const unit=document.getElementById(`${inputId}-unit`); if(unit)unit.textContent=cur; updateDualHint(inputId);
 }
@@ -3413,7 +3429,7 @@ function drawFxChart(points) {
 }
 async function refreshFxChart(range='1M') {
   state.fxRange=range;document.querySelectorAll('#fxRange button').forEach(b=>b.classList.toggle('active',b.dataset.range===range));const status=document.getElementById('fxStatus');if(status)status.textContent='Updating reference market data…';
-  try{const r=await fetch(`/api/fx/series?base=${state.primaryCurrency}&quote=${state.secondaryCurrency}&range=${range}`,{cache:'no-store'});const d=await r.json();if(!r.ok)throw new Error(d.error||'Exchange history unavailable');const pts=Array.isArray(d.points)?d.points:[];if(!pts.length)throw new Error('No exchange history available');drawFxChart(pts);const pair=currencyPairRate();const current=document.getElementById('fxCurrentRate');if(current)current.textContent=`${currencySymbol(state.secondaryCurrency)} ${pair.toLocaleString(undefined,{maximumFractionDigits:5})}`;let change=0;if(pts.length>1){const first=Number(pts[0].rate),last=Number(pts[pts.length-1].rate);if(first)change=(last-first)/first*100;}const ch=document.getElementById('fxChange');if(ch){ch.textContent=`${change>=0?'+':''}${change.toFixed(2)}%`;ch.className=`fx-change ${change>0?'up':change<0?'down':''}`;}if(status)status.textContent='Latest central-bank reference trend';const upd=document.getElementById('fxUpdated');if(upd)upd.textContent=`Last updated: ${new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}`;}catch(e){drawFxChart([]);if(status)status.textContent='Reference history temporarily unavailable';const upd=document.getElementById('fxUpdated');if(upd)upd.textContent='Last update unavailable';}
+  try{const r=await fetch(`/api/fx/series?base=${state.primaryCurrency}&quote=${state.secondaryCurrency}&range=${range}`,{cache:'no-store'});const d=await r.json();if(!r.ok)throw new Error(d.error||'Exchange history unavailable');const pts=Array.isArray(d.points)?d.points:[];if(!pts.length)throw new Error('No exchange history available');drawFxChart(pts);const pair=currencyPairRate();const current=document.getElementById('fxCurrentRate');if(current)current.textContent=Number.isFinite(pair)?`${currencySymbol(state.secondaryCurrency)} ${pair.toLocaleString(undefined,{maximumFractionDigits:5})}`:'—';let change=0;if(pts.length>1){const first=Number(pts[0].rate),last=Number(pts[pts.length-1].rate);if(first)change=(last-first)/first*100;}const ch=document.getElementById('fxChange');if(ch){ch.textContent=`${change>=0?'+':''}${change.toFixed(2)}%`;ch.className=`fx-change ${change>0?'up':change<0?'down':''}`;}if(status)status.textContent='Latest central-bank reference trend';const upd=document.getElementById('fxUpdated');if(upd)upd.textContent=`Last updated: ${new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}`;}catch(e){drawFxChart([]);if(status)status.textContent='Reference history temporarily unavailable';const upd=document.getElementById('fxUpdated');if(upd)upd.textContent='Last update unavailable';}
 }
 
 function setupFxInteractions(){document.querySelectorAll('#fxRange button').forEach(b=>b.addEventListener('click',()=>refreshFxChart(b.dataset.range)));window.addEventListener('resize',()=>{clearTimeout(setupFxInteractions._t);setupFxInteractions._t=setTimeout(()=>refreshFxChart(state.fxRange),180);});}
@@ -3433,3 +3449,248 @@ updateLiveStatus=function(text){_v16UpdateLiveStatus(text);const t=String(text||
 
 
 document.addEventListener('DOMContentLoaded',()=>{setupDashboardWallpaper();setupCurrencyPairSettings();setupFxInteractions();loadCurrencyCatalog();setAzretAIState('idle');});
+
+/* === YARIN V53 — Gold Saver, Smart Reminders & Finance Suite === */
+(() => {
+  const LEGACY_KEY = 'yarin_v48_';
+  const SUITE_SYNC_KEYS = ['calendar','networth','goals','bills','gold_savings','gold_goal','gold_targets','gold_country'];
+  const SUITE_LOCAL_KEYS = ['gold_rate','gold_snapshots','gold_target'];
+  const SUITE_MAX_MONEY = 1e15;
+  let suiteScope = 'account';
+  let suiteReady = false;
+  let suiteSyncTimer = null;
+  let suitePushPromise = null;
+  let suiteDirty = false;
+  const scopedKey = k => `yarin_v48_u${suiteScope}_${k}`;
+  const read = (k, fallback=[]) => { try { return JSON.parse(localStorage.getItem(scopedKey(k))) ?? fallback; } catch (_) { return fallback; } };
+  const rawWrite = (k,v) => localStorage.setItem(scopedKey(k), JSON.stringify(v));
+  const suiteFallback = k => k==='gold_goal' ? 10 : k==='gold_targets' ? {} : k==='gold_country' ? 'AE' : [];
+  const suiteSnapshot = () => Object.fromEntries(SUITE_SYNC_KEYS.map(k => [k, read(k, suiteFallback(k))]));
+  const hasSuiteData = obj => !!(obj && (
+    ['calendar','networth','goals','bills','gold_savings'].some(k => Array.isArray(obj[k]) && obj[k].length) ||
+    Number(obj.gold_goal || 10) !== 10 || Object.keys(obj.gold_targets || {}).length || (obj.gold_country && obj.gold_country !== 'AE')
+  ));
+  async function pushSuiteToServer(){
+    if(!suiteReady) return;
+    if(suitePushPromise){suiteDirty=true;return suitePushPromise;}
+    suiteDirty=false;
+    const snapshot=suiteSnapshot();
+    suitePushPromise=(async()=>{
+      let ok=false;
+      try{
+        const r=await fetch('/api/finance-suite',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({suite:snapshot})});
+        const d=await r.json();
+        if(!r.ok||!d.success) throw new Error(d.error||'Finance suite sync failed');
+        if(Number(d.updated_at)>0) rawWrite('_updated_at',Number(d.updated_at));
+        ok=true;
+      }catch(e){ suiteDirty=true; console.warn('Finance suite sync failed', e); }
+      finally{
+        suitePushPromise=null;
+        if(suiteReady&&suiteDirty) scheduleSuiteSync();
+      }
+      return ok;
+    })();
+    return suitePushPromise;
+  }
+  function scheduleSuiteSync(){
+    if(!suiteReady) return;
+    clearTimeout(suiteSyncTimer);
+    suiteSyncTimer=setTimeout(pushSuiteToServer,450);
+  }
+  const write = (k,v) => {
+    rawWrite(k,v);
+    if(suiteReady && SUITE_SYNC_KEYS.includes(k)){
+      rawWrite('_updated_at',Date.now());
+      suiteDirty=true;
+      scheduleSuiteSync();
+    }
+  };
+  async function hydrateSuite(forceRemote=false){
+    try{
+      const r=await fetch('/api/finance-suite',{cache:'no-store'});
+      const d=await r.json();
+      if(!r.ok) return;
+      const remote=d.suite&&typeof d.suite==='object'?d.suite:{};
+      const remoteAt=Math.max(0,Number(d.updated_at)||0);
+      const localAt=Math.max(0,Number(read('_updated_at',0))||0);
+      const local=suiteSnapshot();
+      if(remoteAt>0 && (forceRemote || remoteAt>localAt || (!localAt && hasSuiteData(remote)))){
+        SUITE_SYNC_KEYS.forEach(k=>rawWrite(k,Object.prototype.hasOwnProperty.call(remote,k)?remote[k]:suiteFallback(k)));
+        rawWrite('_updated_at',remoteAt);
+      }else if(hasSuiteData(local) && (!remoteAt || localAt>=remoteAt)){
+        suiteReady=true;
+        suiteDirty=true;
+        await pushSuiteToServer();
+        suiteReady=false;
+      }
+    }catch(e){ console.warn('Finance suite hydrate failed', e); }
+  }
+  async function ensureSuiteScope(){
+    if(!state.userId){
+      try{const r=await fetch('/api/profile',{cache:'no-store'});const d=await r.json();if(r.ok&&d.user_id!=null)state.userId=String(d.user_id);}catch(_){}
+    }
+    if(!state.userId)return false;
+    suiteScope=String(state.userId).replace(/[^a-zA-Z0-9_-]/g,'_').slice(0,80);
+    if(!suiteScope)return false;
+    const migrateKeys=['calendar','networth','goals','bills','gold_savings','gold_rate','gold_snapshots','gold_goal','gold_target','gold_targets'];
+    for(const k of migrateKeys){const oldKey=LEGACY_KEY+k,newKey=scopedKey(k);if(localStorage.getItem(newKey)==null&&localStorage.getItem(oldKey)!=null)localStorage.setItem(newKey,localStorage.getItem(oldKey));localStorage.removeItem(oldKey);}
+    const oldCountry=localStorage.getItem(LEGACY_KEY+'gold_country');if(localStorage.getItem(scopedKey('gold_country'))==null&&oldCountry)localStorage.setItem(scopedKey('gold_country'),JSON.stringify(oldCountry));localStorage.removeItem(LEGACY_KEY+'gold_country');
+    const legacyTarget=Number(read('gold_target',0));if(Number.isFinite(legacyTarget)&&legacyTarget>0){const cc=read('gold_country','AE');const cur=(countryMap[cc]||countryMap.AE).currency;const targets=read('gold_targets',{});if(!Number(targets?.[cur]))write('gold_targets',{...(targets&&typeof targets==='object'?targets:{}),[cur]:legacyTarget});rawWrite('gold_target',0);}
+    return true;
+  }
+  const $ = id => document.getElementById(id);
+  const h = value => escapeHtml(value == null ? '' : String(value));
+  const money = (n,cur) => `${cur || state.currency || 'AED'} ${Number(n||0).toLocaleString(undefined,{maximumFractionDigits:2})}`;
+  const suiteCurrency = () => state.currency || state.primaryCurrency || 'AED';
+  const suiteRate = cur => cur==='AED' ? 1 : Number(state.aedRates?.[cur]);
+  const validSuiteMoney = (n, allowZero=true) => Number.isFinite(Number(n)) && Number(n) >= (allowZero?0:Number.EPSILON) && Number(n) <= SUITE_MAX_MONEY;
+  const convertSuite = (amount, fromCur, toCur=suiteCurrency()) => {
+    const n=Number(amount); if(!Number.isFinite(n)) return NaN;
+    fromCur=String(fromCur||toCur).toUpperCase(); toCur=String(toCur||suiteCurrency()).toUpperCase();
+    if(fromCur===toCur) return n;
+    const fr=suiteRate(fromCur), tr=suiteRate(toCur);
+    return fr>0&&tr>0 ? (n/fr)*tr : NaN;
+  };
+  const sumSuiteConverted = (items, type, base=suiteCurrency()) => {
+    let total=0, complete=true;
+    items.filter(x=>!type||x.type===type).forEach(x=>{const v=convertSuite(x.amount,x.cur||base,base);if(Number.isFinite(v))total+=v;else complete=false;});
+    return {total,complete};
+  };
+  const localDateKey = (d=new Date()) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  const countryMap={AE:{currency:'AED',name:'UAE'},IN:{currency:'INR',name:'India'},SA:{currency:'SAR',name:'Saudi Arabia'},QA:{currency:'QAR',name:'Qatar'},GB:{currency:'GBP',name:'United Kingdom'},US:{currency:'USD',name:'United States'}};
+  const readList = k => { const v=read(k,[]); return Array.isArray(v)?v:[]; };
+  const goldTargetFor = cur => { const all=read('gold_targets',{}); const v=Number(all&&typeof all==='object'?all[cur]:0); return Number.isFinite(v)&&v>0?v:0; };
+  const setGoldTargetFor = (cur,value) => { const all=read('gold_targets',{}); const next={...(all&&typeof all==='object'&&!Array.isArray(all)?all:{})}; const v=Number(value); if(validSuiteMoney(v,false)) next[cur]=v; else delete next[cur]; write('gold_targets',next); };
+
+  function removeItem(key,idx,render){ const a=readList(key); if(!Number.isInteger(idx)||idx<0||idx>=a.length) return; a.splice(idx,1); write(key,a); render(); renderHealth(); refreshNotifications(); }
+  function empty(text){ return `<div class="v48-empty">${text}</div>`; }
+  async function initSuite(){
+    if(!(await ensureSuiteScope())){setTimeout(initSuite,1500);return;}
+    await hydrateSuite(false);
+    suiteReady=true;
+    // Existing logout item is also .nav-item; never route it to an undefined page.
+    document.querySelectorAll('.nav-item:not([data-page])').forEach(b=>b.dataset.v48NoRoute='1');
+    bindGold(); bindCalendar(); bindNetWorth(); bindGoals(); bindBills(); bindVault(); bindNotifications();
+    renderAll(); refreshGold();
+    setInterval(refreshNotifications, 60000); setTimeout(refreshNotifications, 1800);
+  }
+
+  async function refreshGold(){
+    if(!$('goldCountry')) return;
+    let cc=read('gold_country','AE')||$('goldCountry').value||'AE'; if(!countryMap[cc]) cc='AE'; $('goldCountry').value=cc;
+    const cur=countryMap[cc].currency; $('goldMarketStatus').textContent='Refreshing live reference…';
+    try{
+      const r=await fetch(`/api/gold/rate?currency=${encodeURIComponent(cur)}`,{cache:'no-store'});
+      const j=await r.json(); const perGram=Number(j.per_gram),usdOz=Number(j.usd_per_oz); if(!r.ok||!(perGram>0)||!(usdOz>0)) throw new Error(j.error||'No live gold price');
+      write('gold_rate',{perGram,cur,usdOz,at:Date.now(),cc});
+      let snaps=readList('gold_snapshots'); snaps.push({at:Date.now(),rate:perGram,cur}); snaps=snaps.filter(x=>Date.now()-Number(x.at||0)<1000*60*60*24*30).slice(-60); write('gold_snapshots',snaps);
+      $('goldMarketStatus').textContent='Live reference • updated now'; renderGold();
+    }catch(e){ const g=read('gold_rate',{}); const sameMarket=Number(g.perGram)>0&&g.cc===cc&&g.cur===cur; $('goldMarketStatus').textContent=sameMarket?'Offline • showing last saved reference':'Live rate unavailable for this market — try Refresh'; renderGold(); }
+  }
+  function bindGold(){
+    $('goldCountry')?.addEventListener('change',()=>{write('gold_country',$('goldCountry').value);refreshGold();});
+    $('refreshGoldRate')?.addEventListener('click',refreshGold);
+    $('addGoldSaving')?.addEventListener('click',()=>{ const amt=Number($('goldContribution').value), g=read('gold_rate',{}),cc=$('goldCountry')?.value||read('gold_country','AE'); if(!validSuiteMoney(amt,false)) return toast('Enter a valid saving amount','error'); if(!(g.perGram>0)||g.cc!==cc) return toast('Refresh the gold rate for the selected market first','error'); const a=readList('gold_savings'); a.unshift({id:Date.now(),amount:amt,grams:amt/g.perGram,rate:g.perGram,cur:g.cur,cc:g.cc,date:new Date().toISOString(),localDate:localDateKey()}); write('gold_savings',a); $('goldContribution').value=''; {const gg=Number($('goldGoalGrams').value);write('gold_goal',Number.isFinite(gg)&&gg>0&&gg<=1000000?gg:10);} renderGold(); refreshNotifications(); toast('Gold saving recorded','success'); });
+    $('goldGoalGrams')?.addEventListener('change',()=>{const v=Number($('goldGoalGrams').value);write('gold_goal',Number.isFinite(v)&&v>0&&v<=1000000?v:10);renderGold();});
+    $('saveGoldTarget')?.addEventListener('click',()=>{const cc=$('goldCountry')?.value||read('gold_country','AE'),cur=(countryMap[cc]||countryMap.AE).currency,v=Number($('goldTargetPrice').value),valid=validSuiteMoney(v,false);setGoldTargetFor(cur,v);toast(valid?`Gold price alert saved for ${cur}`:'Gold price alert cleared','success');refreshNotifications();});
+  }
+  function renderGold(){
+    if(!$('goldSavedValue')) return; const a=readList('gold_savings'), g=read('gold_rate',{}), rawGoal=Number(read('gold_goal',10)), goal=Number.isFinite(rawGoal)&&rawGoal>0?rawGoal:10; $('goldGoalGrams').value=goal;
+    let persistedCc=read('gold_country','AE');if(!countryMap[persistedCc])persistedCc='AE';if($('goldCountry').value!==persistedCc)$('goldCountry').value=persistedCc;
+    const grams=a.reduce((s,x)=>s+Math.max(0,Number(x.grams)||0),0); const selectedCc=countryMap[$('goldCountry').value] ? $('goldCountry').value : 'AE'; const cur=countryMap[selectedCc].currency; const rateOk=Number(g.perGram)>0&&g.cc===selectedCc&&g.cur===cur; const current=grams*(rateOk?Number(g.perGram):0);
+    $('goldSavedValue').textContent=rateOk?money(current,cur):'—'; $('goldSavedGrams').textContent=`${grams.toFixed(3)} g`; $('goldGramRate').textContent=rateOk?money(g.perGram,cur):'—'; $('goldGoalProgress').textContent=`${Math.min(100,grams/goal*100).toFixed(0)}%`; $('goldMarketPrice').textContent=rateOk?`${money(g.perGram,cur)} / g`:'—'; $('goldTargetPrice').value=goldTargetFor(cur)||'';
+    $('goldHistory').innerHTML=a.length?a.slice(0,30).map((x,i)=>`<div class="v48-list-item"><div><strong>${Number(x.grams).toFixed(3)} g</strong><small>${new Date(x.date).toLocaleDateString()} • ${money(x.amount,x.cur)} @ ${money(x.rate,x.cur)}/g</small></div><button data-gold-del="${i}">Delete</button></div>`).join(''):empty('No gold savings recorded yet.');
+    document.querySelectorAll('[data-gold-del]').forEach(b=>b.onclick=()=>removeItem('gold_savings',Number(b.dataset.goldDel),renderGold)); drawGoldChart();
+  }
+  function drawGoldChart(){ const c=$('goldMiniChart'); if(!c||typeof AzretCharts==='undefined') return; const cc=$('goldCountry')?.value||read('gold_country','AE'),cur=(countryMap[cc]||countryMap.AE).currency; const pts=readList('gold_snapshots').filter(x=>x.cur===cur&&Number.isFinite(Number(x.rate))).slice(-30); AzretCharts.lineChart('goldMiniChart',pts.map(x=>new Date(Number(x.at)||Date.now()).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})),[{data:pts.map(x=>Number(x.rate))}]); }
+
+  function bindCalendar(){ $('addCalEvent')?.addEventListener('click',()=>{if(!$('calTitle').value.trim()||!$('calDate').value)return toast('Add a title and date','error');const a=readList('calendar');a.push({title:$('calTitle').value.trim(),date:$('calDate').value,type:$('calType').value});write('calendar',a);$('calTitle').value='';$('calDate').value='';renderCalendar();refreshNotifications();}); }
+  function renderCalendar(){ if(!$('calendarList'))return;const a=readList('calendar').map((x,_idx)=>({...x,_idx})).sort((x,y)=>String(x.date||'').localeCompare(String(y.date||'')));const now=new Date(),configuredSalaryDay=Math.max(1,Math.min(31,Number(state.salaryCreditDay)||27));let sy=now.getFullYear(),sm=now.getMonth(),salaryDay=Math.min(configuredSalaryDay,new Date(sy,sm+1,0).getDate());if(now.getDate()>salaryDay){sm++;if(sm>11){sm=0;sy++;}salaryDay=Math.min(configuredSalaryDay,new Date(sy,sm+1,0).getDate());}const salaryDate=new Date(sy,sm,salaryDay);const auto=`<div class="v48-list-item"><div><strong>Salary credit day</strong><small>Automatic • ${salaryDate.toLocaleDateString()} • from Settings</small></div><span>↻</span></div>`;$('calendarList').innerHTML=auto+(a.length?a.map(x=>`<div class="v48-list-item"><div><strong>${h(x.title)}</strong><small>${h(x.type)} • ${new Date(x.date+'T12:00:00').toLocaleDateString()}</small></div><button data-cal-del="${x._idx}">Delete</button></div>`).join(''):empty('No extra reminders yet.'));document.querySelectorAll('[data-cal-del]').forEach(b=>b.onclick=()=>removeItem('calendar',Number(b.dataset.calDel),renderCalendar)); }
+
+  function bindNetWorth(){ $('addNetWorth')?.addEventListener('click',()=>{const n=$('nwName').value.trim(),v=Number($('nwAmount').value);if(!n||!validSuiteMoney(v,true))return toast('Enter item and a valid amount','error');const a=readList('networth');a.push({name:n,amount:v,type:$('nwType').value,cur:suiteCurrency()});write('networth',a);$('nwName').value='';$('nwAmount').value='';renderNetWorth();renderHealth();}); }
+  function renderNetWorth(){if(!$('nwList'))return;const a=readList('networth'),base=suiteCurrency(),assetSum=sumSuiteConverted(a,'asset',base),liabSum=sumSuiteConverted(a,'liability',base),complete=assetSum.complete&&liabSum.complete,assets=assetSum.total,liab=liabSum.total;$('nwAssets').textContent=complete?money(assets,base):'—';$('nwLiabilities').textContent=complete?money(liab,base):'—';$('nwTotal').textContent=complete?money(assets-liab,base):'—';$('nwList').innerHTML=a.length?a.map((x,i)=>`<div class="v48-list-item"><div><strong>${h(x.name)}</strong><small>${x.type==='asset'?'Asset':'Liability'} • ${money(x.amount,x.cur||base)}</small></div><button data-nw-del="${i}">Delete</button></div>`).join(''):empty('Add assets and liabilities to calculate net worth.');if(!complete)$('nwList').insertAdjacentHTML('afterbegin','<div class="v48-empty">A saved currency rate is unavailable. Refresh exchange rates to calculate totals safely.</div>');document.querySelectorAll('[data-nw-del]').forEach(b=>b.onclick=()=>removeItem('networth',Number(b.dataset.nwDel),renderNetWorth));}
+
+  function bindGoals(){ $('addGoal')?.addEventListener('click',()=>{const n=$('goalName').value.trim(),t=Number($('goalTarget').value),sv=Number($('goalSaved').value||0);if(!n||!validSuiteMoney(t,false)||!validSuiteMoney(sv,true))return toast('Enter a valid goal name, target and saved amount','error');const a=readList('goals');a.push({name:n,target:t,saved:sv,date:$('goalDate').value,cur:suiteCurrency()});write('goals',a);['goalName','goalTarget','goalSaved','goalDate'].forEach(id=>$(id).value='');renderGoals();renderHealth();refreshNotifications();}); }
+  function renderGoals(){if(!$('goalsList'))return;const a=readList('goals');$('goalsList').innerHTML=a.length?a.map((x,i)=>{const p=Math.max(0,Math.min(100,Number(x.saved||0)/Math.max(1,Number(x.target)||1)*100));return `<div class="v48-list-item"><div style="flex:1"><strong>${h(x.name)} — ${p.toFixed(0)}%</strong><small>${money(x.saved,x.cur||suiteCurrency())} of ${money(x.target,x.cur||suiteCurrency())}${x.date?' • target '+new Date(x.date+'T12:00:00').toLocaleDateString():''}</small><div class="v48-progress"><i style="width:${p}%"></i></div></div><button data-goal-del="${i}">Delete</button></div>`}).join(''):empty('Create your first financial goal.');document.querySelectorAll('[data-goal-del]').forEach(b=>b.onclick=()=>removeItem('goals',Number(b.dataset.goalDel),renderGoals));}
+
+  function bindBills(){ $('addBill')?.addEventListener('click',()=>{const n=$('billName').value.trim(),a=Number($('billAmount').value),d=Number($('billDay').value);if(!n||!validSuiteMoney(a,true)||!Number.isInteger(d)||d<1||d>31)return toast('Enter bill name, amount and valid due day','error');const v=readList('bills');v.push({name:n,amount:a,day:d,kind:$('billKind').value,cur:suiteCurrency()});write('bills',v);$('billName').value=$('billAmount').value=$('billDay').value='';renderBills();renderHealth();refreshNotifications();}); }
+  function renderBills(){if(!$('billsList'))return;const a=readList('bills').map((x,_idx)=>({...x,_idx})).sort((x,y)=>Number(x.day)-Number(y.day));$('billsList').innerHTML=a.length?a.map(x=>`<div class="v48-list-item"><div><strong>${h(x.name)}</strong><small>${h(x.kind)} • ${money(x.amount,x.cur||suiteCurrency())} • due day ${Number(x.day)}</small></div><button data-bill-del="${x._idx}">Delete</button></div>`).join(''):empty('No recurring bills or subscriptions yet.');document.querySelectorAll('[data-bill-del]').forEach(b=>b.onclick=()=>removeItem('bills',Number(b.dataset.billDel),renderBills));}
+
+  function vaultDb(){return new Promise((resolve,reject)=>{const q=indexedDB.open(`yarin_vault_v2_u${suiteScope}`,1);q.onupgradeneeded=()=>{if(!q.result.objectStoreNames.contains('docs'))q.result.createObjectStore('docs',{keyPath:'id'});};q.onsuccess=()=>resolve(q.result);q.onerror=()=>reject(q.error);});}
+  function bindVault(){ $('vaultAdd')?.addEventListener('click',async()=>{const f=$('vaultFile').files?.[0];if(!f)return toast('Choose a document first','error');if(f.size>8*1024*1024)return toast('Keep vault files under 8 MB','error');try{const db=await vaultDb(),tx=db.transaction('docs','readwrite');tx.objectStore('docs').put({id:Date.now(),name:f.name,type:f.type,size:f.size,added:Date.now(),blob:f});tx.oncomplete=()=>{db.close();$('vaultFile').value='';renderVault();toast('Document saved locally','success');};tx.onerror=()=>db.close();}catch(e){toast('Vault storage is unavailable in this browser','error');}}); }
+  async function renderVault(){if(!$('vaultList'))return;try{const db=await vaultDb(),tx=db.transaction('docs','readonly'),q=tx.objectStore('docs').getAll();q.onsuccess=()=>{$('vaultList').innerHTML=q.result.length?q.result.map(x=>`<div class="v48-list-item"><div><strong>${h(x.name)}</strong><small>${(x.size/1024).toFixed(0)} KB • ${new Date(x.added).toLocaleDateString()}</small></div><span><button data-vault-open="${x.id}">Open</button> <button data-vault-del="${x.id}">Delete</button></span></div>`).join(''):empty('Your local document vault is empty.');document.querySelectorAll('[data-vault-open]').forEach(b=>b.onclick=()=>vaultOpen(Number(b.dataset.vaultOpen)));document.querySelectorAll('[data-vault-del]').forEach(b=>b.onclick=()=>vaultDelete(Number(b.dataset.vaultDel)));};tx.oncomplete=()=>db.close();tx.onerror=()=>db.close();}catch(_){$('vaultList').innerHTML=empty('Vault unavailable in this browser.');}}
+  async function vaultOpen(id){const db=await vaultDb(),tx=db.transaction('docs','readonly'),q=tx.objectStore('docs').get(id);q.onsuccess=()=>{if(q.result?.blob){const url=URL.createObjectURL(q.result.blob),a=document.createElement('a');a.href=url;a.target='_blank';a.rel='noopener';a.style.display='none';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);}};tx.oncomplete=()=>db.close();tx.onerror=()=>db.close();}
+  async function vaultDelete(id){const db=await vaultDb(),tx=db.transaction('docs','readwrite');tx.objectStore('docs').delete(id);tx.oncomplete=()=>{db.close();renderVault();};tx.onerror=()=>db.close();}
+
+  function healthData(){
+    const nw=readList('networth'),goals=readList('goals'),bills=readList('bills'),gold=readList('gold_savings'),calendar=readList('calendar'),dash=state.dashboard||{};
+    const base=suiteCurrency(),assetSum=sumSuiteConverted(nw,'asset',base),liabSum=sumSuiteConverted(nw,'liability',base),conversionComplete=assetSum.complete&&liabSum.complete,assets=Math.max(0,assetSum.total),liab=Math.max(0,liabSum.total);
+    const debt=Math.max(0,liab),ratio=conversionComplete?(assets>0?debt/assets:debt?1:0):0;
+    const goalProgress=goals.length?goals.reduce((s,x)=>s+Math.min(1,Math.max(0,Number(x.saved)||0)/Math.max(1,Number(x.target)||1)),0)/goals.length:0;
+    const income=Math.max(0,Number(dash.monthly_income)||0),savings=Math.max(0,Number(dash.monthly_savings)||0),savingsRate=income>0?Math.min(1,savings/income):0;
+    const evidence=(nw.length?1:0)+(goals.length?1:0)+(bills.length?1:0)+(gold.length?1:0)+(calendar.length?1:0)+(income>0?1:0);
+    if(!evidence)return{score:0,ratio:0,goalProgress:0,assets:0,liab:0,savingsRate:0,hasData:false};
+    let score=20;
+    score+=conversionComplete?Math.round((1-Math.min(1,ratio))*25):0;
+    score+=Math.round(goalProgress*20);
+    score+=Math.round(savingsRate*15);
+    score+=Math.min(10,((assets>0?1:0)+(gold.length?1:0)+(goals.length?1:0))*4);
+    score+=bills.length?5:0; score+=calendar.length?5:0;
+    score=Math.max(0,Math.min(100,score));
+    return{score,ratio,goalProgress,assets,liab,savingsRate,hasData:true,conversionComplete};
+  }
+  function renderHealth(){
+    if(!$('healthScore'))return; const h=healthData();
+    $('healthScore').textContent=h.hasData?h.score:'—'; document.querySelector('.v48-score-ring')?.style.setProperty('--score',(h.hasData?h.score:0)+'%');
+    if(!h.hasData){$('healthLabel').textContent='Add data to calculate your score';$('healthAdvice').textContent='Record income, assets, goals, bills or gold savings to build a meaningful financial health score.';$('healthBreakdown').innerHTML='<div class="v48-health-chip">Status<b>Waiting for financial data</b></div>';return;}
+    $('healthLabel').textContent=h.score>=80?'Strong financial foundation':h.score>=60?'Healthy — keep improving':h.score>=40?'Building momentum':'Needs attention';
+    $('healthAdvice').textContent=h.conversionComplete===false?'Refresh exchange rates to include all saved currencies in your Net Worth score.':h.ratio>.6?'Liabilities are high relative to recorded assets. Focus on debt reduction and emergency savings.':h.goalProgress<.3?'Your debt position looks manageable; increase regular goal contributions to improve the score.':'Good progress. Keep bills planned, goals funded and records current.';
+    $('healthBreakdown').innerHTML=`<div class="v48-health-chip">Debt / Asset ratio<b>${(h.ratio*100).toFixed(0)}%</b></div><div class="v48-health-chip">Average goal progress<b>${(h.goalProgress*100).toFixed(0)}%</b></div><div class="v48-health-chip">Savings rate<b>${(h.savingsRate*100).toFixed(0)}%</b></div><div class="v48-health-chip">Recorded net worth<b>${money(h.assets-h.liab)}</b></div>`;
+  }
+
+
+  function localDayNumber(date){return Date.UTC(date.getFullYear(),date.getMonth(),date.getDate())/86400000;}
+  function daysFromToday(date,now=new Date()){return Math.round(localDayNumber(date)-localDayNumber(now));}
+  function notifications(){const out=[],now=new Date(),today=now.getDate(),effectiveDay=Math.min(Math.max(1,Number(state.salaryCreditDay)||27),new Date(now.getFullYear(),now.getMonth()+1,0).getDate());const dash=state.dashboard||{};if(today>=effectiveDay&&Number(dash.monthly_income||0)<=0)out.push({page:'income',text:'Salary date has passed but no monthly income is recorded',sub:'Tap to review Income'});if(Number(dash.monthly_income||0)>0&&Number(dash.monthly_savings||0)<=0)out.push({page:'savings',text:'No monthly savings recorded yet',sub:'Tap to add this month’s saving'});readList('bills').forEach(x=>{const dueDay=Math.max(1,Math.min(31,Number(x.day)||1));let due=new Date(now.getFullYear(),now.getMonth(),Math.min(dueDay,new Date(now.getFullYear(),now.getMonth()+1,0).getDate()),23,59,59);if(due<now){const nm=now.getMonth()+1,ny=now.getFullYear()+Math.floor(nm/12),mm=nm%12;due=new Date(ny,mm,Math.min(dueDay,new Date(ny,mm+1,0).getDate()),23,59,59);}const delta=daysFromToday(due,now);if(delta>=0&&delta<=3)out.push({page:'bills',text:`${x.name} is due ${delta===0?'today':`in ${delta} day${delta===1?'':'s'}`}`,sub:`${money(x.amount,x.cur||suiteCurrency())} • ${x.kind}`});});readList('calendar').forEach(x=>{const d=new Date(x.date+'T12:00:00'),days=daysFromToday(d,now);if(days>=0&&days<=5)out.push({page:'financial-calendar',text:`${x.title} ${days===0?'is today':`in ${days} days`}`,sub:x.type});});const month=now.getMonth(),year=now.getFullYear();if(!readList('gold_savings').some(x=>{const d=x.localDate?new Date(x.localDate+'T12:00:00'):new Date(x.date);return !isNaN(d)&&d.getMonth()===month&&d.getFullYear()===year;}))out.push({page:'gold-saver',text:'No Gold Saver contribution recorded this month',sub:'Tap to review your gold goal'});const g=read('gold_rate',{}),cc=read('gold_country','AE'),cur=(countryMap[cc]||countryMap.AE).currency,target=goldTargetFor(cur);if(target>0&&g.perGram>0&&g.cc===cc&&g.cur===cur&&g.perGram<=target)out.push({page:'gold-saver',text:'Gold target price reached',sub:`Current reference ${money(g.perGram,g.cur)} / g`});readList('goals').forEach(x=>{if(x.date){const days=daysFromToday(new Date(x.date+'T12:00:00'),now),p=Number(x.saved||0)/Math.max(1,Number(x.target)||1);if(days>=0&&days<=30&&p<1)out.push({page:'goals',text:`${x.name} target date is approaching`,sub:`${Math.round(p*100)}% funded • ${days} days left`});}});return out.slice(0,12);}
+  function bindNotifications(){$('financeNotifBtn')?.addEventListener('click',()=>{$('financeNotifPanel').hidden=!$('financeNotifPanel').hidden;refreshNotifications();});$('financeNotifClose')?.addEventListener('click',()=>$('financeNotifPanel').hidden=true);}
+  function refreshNotifications(){if(!$('financeNotifCount'))return;const a=notifications();$('financeNotifCount').textContent=a.length;$('financeNotifCount').style.display=a.length?'block':'none';$('financeNotifList').innerHTML=a.length?a.map((x,i)=>`<button class="v48-notif-item" data-v48-notif="${i}">${h(x.text)}<small>${h(x.sub)}</small></button>`).join(''):empty('You are all caught up.');document.querySelectorAll('[data-v48-notif]').forEach(b=>b.onclick=()=>{const x=a[Number(b.dataset.v48Notif)];document.querySelector(`.nav-item[data-page="${x.page}"]`)?.click();$('financeNotifPanel').hidden=true;});}
+  function renderAll(){document.querySelectorAll('.suite-cur-unit').forEach(el=>el.textContent=suiteCurrency());renderGold();renderCalendar();renderNetWorth();renderGoals();renderBills();renderVault();renderHealth();refreshNotifications();}
+
+  window.refreshYarinFinanceSuite=()=>{if(suiteReady)renderAll();};
+  window.prepareYarinSuiteServerAction=async({flush=false}={})=>{
+    clearTimeout(suiteSyncTimer); suiteSyncTimer=null;
+    if(!flush){
+      suiteReady=false; suiteDirty=false;
+      if(suitePushPromise) await suitePushPromise;
+      return true;
+    }
+    // Backups should include the latest local suite changes. Drain an in-flight
+    // write first, then make one follow-up write if a newer edit arrived.
+    let ok=true;
+    if(suitePushPromise) ok=(await suitePushPromise)!==false;
+    if(suiteDirty && suiteReady) ok=((await pushSuiteToServer())!==false)&&ok;
+    return ok && !suiteDirty;
+  };
+  window.resumeYarinFinanceSuite=()=>{suiteReady=true;renderAll();};
+  window.clearYarinLocalFinanceSuite=async()=>{
+    clearTimeout(suiteSyncTimer); suiteSyncTimer=null; suiteDirty=false; suiteReady=false;
+    [...SUITE_SYNC_KEYS,...SUITE_LOCAL_KEYS,'_updated_at'].forEach(k=>localStorage.removeItem(scopedKey(k)));
+    try{
+      if(window.indexedDB){const db=await vaultDb();await new Promise(resolve=>{const tx=db.transaction('docs','readwrite');tx.objectStore('docs').clear();tx.oncomplete=()=>{db.close();resolve();};tx.onerror=()=>{db.close();resolve();};});}
+    }catch(_){}
+    suiteReady=true; renderAll();
+  };
+  window.reloadYarinFinanceSuite=async(forceRemote=false)=>{
+    if(!suiteScope)return;
+    suiteReady=false;
+    await hydrateSuite(!!forceRemote);
+    suiteReady=true;
+    renderAll();
+  };
+  window.addEventListener('yarin-suite-refresh',e=>{window.reloadYarinFinanceSuite?.(!!e.detail?.forceRemote);});
+
+  // Add personal coach context from the new suite to every AI request without exposing files.
+  const originalFetch=window.fetch.bind(window);window.fetch=async function(input,init){try{if(typeof input==='string'&&input==='/api/ai-assistant'&&init?.body){const body=JSON.parse(init.body);const h=healthData();body.coach_context={financial_health_score:h.score,net_worth:h.assets-h.liab,goal_count:readList('goals').length,bill_count:readList('bills').length,gold_saved_grams:Number(readList('gold_savings').reduce((s,x)=>s+Number(x.grams||0),0).toFixed(3)),upcoming_alerts:notifications().slice(0,5).map(x=>x.text)};init={...init,body:JSON.stringify(body)};}}catch(_){}return originalFetch(input,init);};
+
+  document.addEventListener('DOMContentLoaded',initSuite);
+})();

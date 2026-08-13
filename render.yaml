@@ -11,7 +11,7 @@ services:
       - key: SECRET_KEY
         generateValue: true
       - key: SESSION_COOKIE_SECURE
-        value: "0"
+        value: "1"
       - key: DATABASE_URL
         sync: false
       - key: GEMINI_API_KEY
@@ -26,6 +26,6 @@ services:
         sync: false
 
       - key: GEMINI_MODEL
-        value: "gemini-3.5-flash"
+        value: "gemini-3.6-flash"
       - key: AI_LOCAL_FALLBACK
-        value: "0"
+        value: "1"
