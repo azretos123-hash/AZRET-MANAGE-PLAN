@@ -1,4 +1,4 @@
-/* RIZQ رزق — Service Worker
+/* YARIN يارين — Service Worker
    Public multi-user safe caching policy:
    - Never cache authenticated HTML/navigation responses.
    - Never cache API responses.
@@ -7,7 +7,7 @@
    from being replayed after logout on the same device.
 */
 
-const CACHE_NAME = 'rizq-cache-v33';
+const CACHE_NAME = 'yarin-cache-v42';
 const STATIC_ASSETS = [
   '/manifest.json',
   '/static/css/style.css',
@@ -15,8 +15,8 @@ const STATIC_ASSETS = [
   '/static/js/charts.js',
   '/static/icons/icon-192.png',
   '/static/icons/icon-512.png',
-  '/static/icons/logo-mark.png',
-  '/static/icons/rizq-ai-avatar.webp',
+  '/static/icons/yarin-emblem.webp',
+  '/static/icons/rizq-ai-wave.webp',
 ];
 
 self.addEventListener('install', (event) => {

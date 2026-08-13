@@ -1,5 +1,5 @@
 /* ==========================================================================
-   RIZQ رزق — Application Logic
+   YARIN يارين — Application Logic
    ========================================================================== */
 
 /* Security: attach CSRF token to every same-origin state-changing fetch. */
@@ -877,7 +877,7 @@ function speakDashboardSummary() {
 }
 
 /* ==========================================================================
-   RIZQ Voice Assistant — simplified, single mic-button workflow
+   YARIN Voice Assistant — simplified, single mic-button workflow
    --------------------------------------------------------------------------
    1. Tap the mic button -> browser starts listening (Web Speech API
       SpeechRecognition), supports English and Malayalam.
@@ -889,7 +889,7 @@ function speakDashboardSummary() {
    ========================================================================== */
 
 /* ==========================================================================
-   RIZQ Gemini AI Assistant — Chat & Live Voice Call
+   YARIN Gemini AI Assistant — Chat & Live Voice Call
    ========================================================================== */
 
 let liveCallActive = false;
@@ -942,7 +942,7 @@ function setupVoiceAssistant() {
         const welcomeEl = document.getElementById('geminiWelcomeText');
         if (welcomeEl) {
           if (state.voiceLanguage === 'ml-IN') {
-            welcomeEl.textContent = 'ഹായ്! ഞാൻ Azret AI ✨ നിങ്ങളുടെ Rizq ഫിനാൻസ് കാര്യങ്ങളോ സാധാരണ ചോദ്യങ്ങളോ മലയാളത്തിലോ ഇംഗ്ലീഷിലോ ചോദിക്കാം.';
+            welcomeEl.textContent = 'ഹായ്! ഞാൻ Azret AI ✨ നിങ്ങളുടെ YARIN ഫിനാൻസ് കാര്യങ്ങളോ സാധാരണ ചോദ്യങ്ങളോ മലയാളത്തിലോ ഇംഗ്ലീഷിലോ ചോദിക്കാം.';
           } else {
             welcomeEl.textContent = 'Hi! I’m Azret AI. Ask me anything in English or Malayalam — finance, ideas, travel, tech, or everyday questions.';
           }
@@ -959,11 +959,16 @@ function setupVoiceAssistant() {
 
   // The girl herself is the natural voice trigger. Opening the window never starts the microphone.
   const liveAvatar = document.getElementById('liveOrb');
-  const triggerVoice = () => document.getElementById('liveMainCallBtn')?.click();
+  const heroAvatar = document.getElementById('aiHeroAvatar');
+  const triggerVoice = () => {
+    switchGeminiMode('live');
+    if (!liveCallActive) document.getElementById('liveMainCallBtn')?.click();
+  };
   if (liveAvatar) {
     liveAvatar.addEventListener('click', triggerVoice);
     liveAvatar.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); triggerVoice(); } });
   }
+  if (heroAvatar) heroAvatar.addEventListener('click', triggerVoice);
 }
 
 function openVoiceAssistantModal() {
@@ -971,7 +976,7 @@ function openVoiceAssistantModal() {
   if (!modal) return;
   modal.style.display = 'flex';
   document.body.classList.add('modal-open');
-  setVoiceAssistantStatus('Tap the mic and ask Rizq رزق about your finances.');
+  setVoiceAssistantStatus('Tap the mic and ask YARIN يارين about your finances.');
   setVoiceAssistantTranscript('');
 }
 
@@ -992,7 +997,7 @@ function openGeminiModal() {
   document.getElementById('assistantBtn')?.classList.add('ai-launcher-hidden');
   document.body.classList.add('modal-open');
   loadGeminiHistory();
-  switchGeminiMode('live');
+  switchGeminiMode('chat');
   updateLiveStatus('Azret AI Ready');
   if (typeof setAzretAIState === 'function') setAzretAIState('greeting');
 }
@@ -1382,7 +1387,7 @@ function endLiveCall() {
     mainBtn.classList.remove('end');
     mainBtn.classList.add('start');
   }
-  if (btnLabel) btnLabel.textContent = 'Start Call';
+  if (btnLabel) btnLabel.textContent = 'Start Voice';
 
   const orb = document.getElementById('liveOrb');
   if (orb) orb.classList.remove('active', 'speaking');
@@ -1521,7 +1526,7 @@ function startLiveCallTurn() {
     const code = event && event.error;
     if (code === 'not-allowed' || code === 'service-not-allowed') {
       updateLiveStatus('Microphone permission required');
-      updateLiveTranscript('Allow microphone access in your browser, then tap the avatar or Start Call again.');
+      updateLiveTranscript('Allow microphone access in your browser, then tap the avatar or Start Voice again.');
       liveCallActive = false;
       updateLiveTimerDisplay();
       return;
@@ -3139,7 +3144,7 @@ function setupSmartTracking() {
 
 
 /* ========================================================================
-   RIZQ V22 — Final hardening: safe FX, persistence, UI reliability
+   YARIN V22 — Final hardening: safe FX, persistence, UI reliability
    ======================================================================== */
 function currencySymbol(code) { return CURRENCY_SYMBOL[code] || code; }
 function hasCurrencyRate(code) {

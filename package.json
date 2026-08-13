@@ -1,7 +1,7 @@
 {
-  "name": "rizq-finance",
-  "version": "1.0.32",
-  "description": "Rizq رزق — Plan • Manage • Grow — public multi-user personal finance platform",
+  "name": "yarin-finance",
+  "version": "1.0.42",
+  "description": "YARIN يارين — Your Money. Your Future. — public multi-user personal finance platform",
   "scripts": {
     "dev": "python3 app.py",
     "build": "python3 -c 'import app'",

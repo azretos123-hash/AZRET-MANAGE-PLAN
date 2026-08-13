@@ -4,16 +4,16 @@
   <meta name="csrf-token" content="{{ csrf_token }}">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Rizq رزق — A Smarter Financial Life</title>
+<title>YARIN يارين — Tomorrow Starts Today.</title>
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#1E4DB7">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="Rizq رزق">
+<meta name="apple-mobile-web-app-title" content="YARIN يارين">
 <link rel="icon" id="faviconLink" href="{{ url_for('static', filename='icons/icon-192.png') }}">
 <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/icon-192.png') }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=42">
 </head>
 <body data-theme="light">
 <script>window.START_SPLASH = {{ start_splash|tojson }};</script>
@@ -23,7 +23,7 @@
 </div>
 <div id="themeBgLayer" class="theme-bg-layer"></div>
 
-<div id="appLoader" class="app-loader premium-splash" aria-label="Rizq رزق loading">
+<div id="appLoader" class="app-loader premium-splash" aria-label="YARIN يارين loading">
   <div class="splash-ambient splash-ambient-one"></div>
   <div class="splash-ambient splash-ambient-two"></div>
   <div class="splash-grid" aria-hidden="true"></div>
@@ -32,16 +32,16 @@
   </div>
   <div class="loader-mark premium-splash-mark" id="splashLogo">
     <span class="splash-logo-halo" aria-hidden="true"></span>
-    <img src="{{ url_for('static', filename='icons/logo-mark.png') }}" alt="RIZQ finance logo">
+    <img src="{{ url_for('static', filename='icons/yarin-emblem.webp') }}" alt="YARIN finance logo">
   </div>
   <div id="splashAppName" class="splash-brand-stack premium-splash-brand">
     <strong class="splash-rizq">
-      <span class="splash-rizq-latin">Rizq</span>
-      <span class="splash-rizq-arabic" lang="ar" dir="rtl">رزق</span>
+      <span class="splash-rizq-latin">YARIN</span>
+      <span class="splash-rizq-arabic" lang="ar" dir="rtl">يارين</span>
     </strong>
     <small class="splash-motto">Plan <i>•</i> Manage <i>•</i> Grow</small>
     <small class="splash-motto-ar" lang="ar" dir="rtl">خطّط <i>•</i> أدر <i>•</i> نمُ</small>
-    <em class="splash-tagline">A Smarter Financial Life</em>
+    <em class="splash-tagline">Tomorrow Starts Today.</em>
     <em class="splash-tagline-ar" lang="ar" dir="rtl">لحياة مالية أذكى</em>
   </div>
   <div class="splash-progress" aria-hidden="true"><span></span></div>
@@ -53,12 +53,12 @@
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-brand">
       <div class="brand-logo-wrap" id="sidebarLogo">
-        <img src="{{ url_for('static', filename='icons/logo-mark.png') }}" alt="RIZQ finance logo">
+        <img src="{{ url_for('static', filename='icons/yarin-emblem.webp') }}" alt="YARIN finance logo">
       </div>
       <div class="sidebar-brand-text">
-        <strong class="brand-name-bilingual" aria-label="Rizq رزق"><span>Rizq</span><b lang="ar" dir="rtl">رزق</b></strong>
-        <small class="brand-motto-en">Plan • Manage • Grow</small>
-        <em class="brand-tagline-en">A Smarter Financial Life</em>
+        <strong class="brand-name-bilingual" aria-label="YARIN يارين"><span>YARIN</span><b lang="ar" dir="rtl">يارين</b></strong>
+        <small class="brand-motto-en">Your Money. Your Future.</small>
+        <em class="brand-tagline-en">Tomorrow Starts Today.</em>
       </div>
       <button id="themeToggle" class="icon-btn brand-theme-toggle" aria-label="Toggle theme">
         <svg id="themeIconSun" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
@@ -173,7 +173,7 @@
         <button id="assistantBtn" class="rizq-ai-dock" aria-label="Open Azret AI" title="Talk to Azret AI">
           <span class="rizq-ai-halo" aria-hidden="true"></span>
           <span class="rizq-ai-avatar-wrap">
-            <img src="/static/icons/rizq-ai-avatar.webp" alt="Rizq AI hijabi assistant" class="rizq-ai-avatar">
+            <img src="/static/icons/rizq-ai-wave.webp" alt="Azret AI hijabi assistant waving hello" class="rizq-ai-avatar">
             <span class="rizq-ai-blink" aria-hidden="true"></span>
             <span class="rizq-ai-smile" aria-hidden="true"></span>
             <svg class="rizq-ai-wave" viewBox="0 0 64 64" aria-hidden="true"><path d="M19 33V15c0-3 4-3 4 0v13-18c0-3 4-3 4 0v18-20c0-3 4-3 4 0v20-17c0-3 4-3 4 0v20l4-8c2-4 7-1 5 3l-7 16c-2 5-7 9-13 9h-2c-9 0-15-7-15-16v-8c0-4 6-4 6 0v6z" fill="currentColor"/></svg>
@@ -183,7 +183,7 @@
 
         <div class="page-head dashboard-hero-head">
           <div>
-            <p class="page-eyebrow">Rizq رزق • Smart Financial Overview</p>
+            <p class="page-eyebrow">YARIN يارين • Your Money. Your Future.</p>
             <h2>Dashboard</h2>
           </div>
           <div class="rate-card glass">
@@ -1108,13 +1108,13 @@
           </div>
           <div class="card glass about-card">
             <div class="about-brand-lockup">
-              <h3><span>Rizq</span> <b lang="ar" dir="rtl">رزق</b></h3>
-              <div class="about-brand-motto">Plan • Manage • Grow</div>
+              <h3><span>YARIN</span> <b lang="ar" dir="rtl">يارين</b></h3>
+              <div class="about-brand-motto">Your Money. Your Future.</div>
               <div class="about-brand-motto-ar" lang="ar" dir="rtl">خطّط • أدر • نمُ</div>
-              <div class="about-brand-tagline">A Smarter Financial Life</div>
+              <div class="about-brand-tagline">Tomorrow Starts Today.</div>
               <div class="about-brand-tagline-ar" lang="ar" dir="rtl">لحياة مالية أذكى</div>
             </div>
-            <p>Rizq رزق is a public multi-user personal finance platform designed to help people plan, manage and grow their financial life. Anyone can create an account and use the service online, while each account's financial records remain securely separated in the database.</p>
+            <p>YARIN يارين is a public multi-user personal finance platform designed to help people take control of their money and build a better financial future. Anyone can create an account and use the service online, while each account's financial records remain securely separated in the database.</p>
           </div>
         </div>
       </section>
@@ -1218,7 +1218,7 @@
     </main>
 
     <footer class="app-footer">
-      <span class="footer-brand-name">Rizq <b lang="ar" dir="rtl">رزق</b></span> · Plan • Manage • Grow · A Smarter Financial Life · <span id="footerYear"></span>
+      <span class="footer-brand-name">YARIN <b lang="ar" dir="rtl">يارين</b></span> · Your Money. Your Future. · Tomorrow Starts Today. · <span id="footerYear"></span>
     </footer>
   </div>
 </div>
@@ -1235,104 +1235,91 @@
   </div>
 </div>
 
-<!-- Gemini AI Assistant Modal: Chat & Live Voice Call -->
+<!-- Azret AI Assistant Modal — integrated avatar/chat/voice experience -->
 <div id="voiceAssistantModal" class="ai-modal-overlay" style="display:none">
-  <div class="ai-modal card glass gemini-assistant-modal">
-    <div class="ai-modal-head">
-      <div class="ai-modal-head-left">
-        <div style="display:inline-block;vertical-align:middle">
-          <h3 style="margin:0;font-size:16px;display:flex;align-items:center;gap:6px;">
-            Azret AI <span class="gemini-badge">Live AI</span>
-          </h3>
-        </div>
+  <div class="ai-modal gemini-assistant-modal v34-ai-modal">
+    <div class="v34-ai-header">
+      <div class="v34-ai-title">
+        <strong>AZRET AI</strong>
+        <span>AI Assistant</span>
       </div>
-      
-      <div class="ai-modal-mode-selector">
-        <button type="button" class="gemini-mode-btn active" id="modeChatBtn" data-mode="chat">
-          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
-          <span>Chat</span>
-        </button>
-        <button type="button" class="gemini-mode-btn" id="modeLiveBtn" data-mode="live">
-          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z"/></svg>
-          <span>Live Call</span>
-        </button>
-      </div>
-
-      <div class="ai-modal-head-right">
-        <button type="button" class="ph-modal-close" id="clearGeminiChatBtn" aria-label="Clear Azret AI conversation" title="Clear conversation & AI memory" style="font-size:15px;width:auto;padding:0 10px;">Clear</button>
-        <button type="button" class="ph-modal-close ai-minimize-btn" id="voiceAssistantMinimize" aria-label="Minimize" title="Minimize">−</button>
-        <button type="button" class="ph-modal-close" id="voiceAssistantClose" aria-label="Close">&times;</button>
+      <div class="v34-ai-header-actions">
+        <span class="v34-online"><i></i> Online</span>
+        <button type="button" id="clearGeminiChatBtn" class="v34-icon-btn v34-clear" aria-label="Clear conversation" title="Clear conversation">↺</button>
+        <button type="button" id="voiceAssistantMinimize" class="v34-icon-btn" aria-label="Minimize" title="Minimize">−</button>
+        <button type="button" id="voiceAssistantClose" class="v34-icon-btn" aria-label="Close" title="Close">×</button>
       </div>
     </div>
 
-    <!-- Mode 1: Gemini Chat View -->
-    <div id="geminiChatView" class="gemini-view-container">
-      <div id="geminiChatMessages" class="gemini-chat-messages">
-        <div class="gemini-msg bot">
-          <div class="gemini-avatar">✨</div>
-          <div class="gemini-bubble">
-            <p id="geminiWelcomeText">Hi! I’m Azret AI ✨ Ask me about your Rizq finances or anything else. I can chat in English or Malayalam.</p>
+    <div class="v34-ai-body">
+      <aside class="v34-ai-avatar-pane">
+        <button type="button" id="aiHeroAvatar" class="v34-avatar-button" aria-label="Start voice conversation with Azret AI" title="Tap to talk">
+          <span class="v34-avatar-halo"></span>
+          <img src="/static/icons/rizq-ai-wave.webp" alt="Azret AI hijabi assistant waving hello" class="v34-avatar-image">
+          <span class="v34-avatar-glow"></span>
+        </button>
+        <div class="v34-avatar-copy">
+          <h3>Hi there! <span>👋</span></h3>
+          <p>I’m Azret AI, your smart financial assistant.</p>
+          <p class="v34-help-line">How can I help you today?</p>
+        </div>
+        <div class="v34-quick-grid">
+          <button type="button" class="suggest-chip" data-query="Give me financial advice based on my current data">💡 Financial Advice</button>
+          <button type="button" class="suggest-chip" data-query="Show me a summary of my finance reports">📊 Reports &amp; Summary</button>
+          <button type="button" class="suggest-chip" data-query="Help me plan my budget this month">💸 Budget Help</button>
+          <button type="button" class="suggest-chip" data-query="What should I remember about upcoming payments?">📅 Reminders</button>
+        </div>
+      </aside>
+
+      <section class="v34-ai-conversation-pane">
+        <div class="v34-mode-row" aria-label="Azret AI mode">
+          <button type="button" class="gemini-mode-btn active" id="modeChatBtn" data-mode="chat">Chat</button>
+          <button type="button" class="gemini-mode-btn" id="modeLiveBtn" data-mode="live">Voice</button>
+        </div>
+
+        <div id="geminiChatView" class="gemini-view-container v34-chat-view">
+          <div id="geminiChatMessages" class="gemini-chat-messages">
+            <div class="gemini-msg bot">
+              <div class="gemini-bubble">
+                <p id="geminiWelcomeText">Hello! 👋 I’m Azret AI, your personal financial assistant. How can I help you today?</p>
+              </div>
+            </div>
+          </div>
+          <form id="geminiChatForm" class="gemini-chat-input-row v34-input-row">
+            <input type="text" id="geminiChatInput" placeholder="Ask me anything…" autocomplete="off">
+            <button type="button" id="geminiMicBtn" class="v34-mic-btn" title="Speak message" aria-label="Speak message">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1.5a4.5 4.5 0 00-4.5 4.5v3a4.5 4.5 0 009 0V6a4.5 4.5 0 00-4.5-4.5z"/><path d="M5.5 10.5A6.5 6.5 0 0012 17a6.5 6.5 0 006.5-6.5"/><path d="M12 17v4M8 21h8"/></svg>
+            </button>
+            <button type="submit" id="geminiSendBtn" class="v34-send-btn" aria-label="Send message">➜</button>
+          </form>
+        </div>
+
+        <div id="geminiLiveView" class="gemini-view-container v34-live-view" style="display:none">
+          <div class="v34-live-status-head">
+            <div><span class="v34-live-kicker">VOICE CONVERSATION</span><h3 id="liveCallStatus">Azret AI Ready</h3></div>
+            <div id="liveCallTimer" class="live-call-timer">00:00</div>
+          </div>
+          <div id="liveOrb" class="v34-live-wave" data-ai-state="idle" role="button" tabindex="0" aria-label="Talk to Azret AI">
+            <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+          </div>
+          <div id="azretStateCaption" class="azret-state-caption">Idle • tap the girl or microphone to talk</div>
+          <div id="liveTranscriptBox" class="live-transcript-box v34-transcript"><p id="liveTranscriptText">Tap the girl or microphone and talk naturally with Azret AI.</p></div>
+          <div class="live-call-controls v34-live-controls">
+            <button type="button" id="liveMuteBtn" class="live-ctrl-btn" title="Toggle microphone">
+              <svg id="iconMicOn" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2M12 19v3M8 22h8"/></svg>
+              <svg id="iconMicOff" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M1 1l22 22M9 9v3a3 3 0 005.12 2.12M15 9.34V4a3 3 0 00-5.94-.6M17 11a5 5 0 01-1.8 3.82M12 19v3M8 22h8"/></svg>
+            </button>
+            <button type="button" id="liveMainCallBtn" class="live-ctrl-btn main-call-btn start v34-main-call">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2M12 19v3M8 22h8"/></svg>
+              <span id="liveCallBtnLabel">Start Voice</span>
+            </button>
+            <button type="button" id="liveSpeakerBtn" class="live-ctrl-btn active" title="Toggle speaker">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 010 14.14M15.54 8.46a5 5 0 010 7.07"/></svg>
+            </button>
           </div>
         </div>
-      </div>
-
-      <div class="gemini-suggestions">
-        <button type="button" class="suggest-chip" data-query="What is my current net balance?">💰 Net Balance</button>
-        <button type="button" class="suggest-chip" data-query="Summary of my pending EMIs and debts">📊 EMI &amp; Debts</button>
-        <button type="button" class="suggest-chip" data-query="എന്റെ മാസത്തെ വരുമാനവും ചിലവും എത്രയാണ്?">Malayalam Status</button>
-        <button type="button" class="suggest-chip" data-query="How can I save more this month?">💡 Budget Advice</button>
-      </div>
-
-      <form id="geminiChatForm" class="gemini-chat-input-row">
-        <button type="button" id="geminiMicBtn" class="icon-btn chat-mic-btn" title="Speak message">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 1.5a4.5 4.5 0 00-4.5 4.5v3a4.5 4.5 0 009 0V6a4.5 4.5 0 00-4.5-4.5z"/>
-            <path d="M5.5 10.5A6.5 6.5 0 0012 17a6.5 6.5 0 006.5-6.5"/>
-            <path d="M12 17v4M8 21h8"/>
-          </svg>
-        </button>
-        <input type="text" id="geminiChatInput" placeholder="Ask Azret AI anything… (Malayalam/English)" autocomplete="off">
-        <button type="submit" id="geminiSendBtn" class="btn-primary chat-send-btn">
-          <span>Send</span>
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
-        </button>
-      </form>
+      </section>
     </div>
-
-    <!-- Mode 2: Gemini Live Voice Call View -->
-    <div id="geminiLiveView" class="gemini-view-container" style="display:none">
-      <div class="live-call-body">
-        <div class="live-orb-wrapper">
-          <div id="liveOrb" class="live-orb azret-avatar-stage" data-ai-state="idle" role="button" tabindex="0" aria-label="Talk to Azret AI"><div class="live-wave-ring r1"></div><div class="live-wave-ring r2"></div><div class="live-wave-ring r3"></div><div class="ai-orbit orbit-one"></div><div class="ai-orbit orbit-two"></div><div class="azret-avatar-frame"><img src="/static/icons/rizq-ai-avatar.webp" alt="Azret AI hijabi voice assistant" class="azret-live-avatar"><span class="azret-blink-overlay"></span><span class="azret-mouth-pulse"></span></div></div></div>
-        </div>
-
-        <div class="live-status-wrap">
-          <div id="liveCallStatus" class="live-status-title">Azret AI Ready</div><div id="azretStateCaption" class="azret-state-caption">Idle • tap Start Call</div>
-          <div id="liveCallTimer" class="live-call-timer">00:00</div>
-        </div>
-
-        <div id="liveTranscriptBox" class="live-transcript-box">
-          <p id="liveTranscriptText">Tap “Start Call” and talk naturally with Azret AI.</p>
-        </div>
-
-        <div class="live-call-controls">
-          <button type="button" id="liveMuteBtn" class="live-ctrl-btn" title="Toggle Mute Mic">
-            <svg id="iconMicOn" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2M12 19v3M8 22h8"/></svg>
-            <svg id="iconMicOff" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M1 1l22 22M9 9v3a3 3 0 005.12 2.12M15 9.34V4a3 3 0 00-5.94-.6M17 11a5 5 0 01-1.8 3.82M12 19v3M8 22h8"/></svg>
-          </button>
-
-          <button type="button" id="liveMainCallBtn" class="live-ctrl-btn main-call-btn start">
-            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z"/></svg>
-            <span id="liveCallBtnLabel">Start Call</span>
-          </button>
-
-          <button type="button" id="liveSpeakerBtn" class="live-ctrl-btn active" title="Toggle Speaker Sound">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 010 14.14M15.54 8.46a5 5 0 010 7.07"/></svg>
-          </button>
-        </div>
-      </div>
-    </div>
-
   </div>
 </div>
 
@@ -1353,8 +1340,8 @@
 
 <div id="toast" class="toast"></div>
 
-<script src="{{ url_for('static', filename='js/charts.js') }}"></script>
-<script src="/static/js/app.js?v=33"></script>
+<script src="{{ url_for('static', filename='js/charts.js') }}?v=42"></script>
+<script src="/static/js/app.js?v=42"></script>
 
   <!-- Mobile bottom navigation -->
   <nav class="mobile-bottom-nav" id="mobileBottomNav" aria-label="Mobile navigation">

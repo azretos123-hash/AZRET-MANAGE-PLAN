@@ -247,6 +247,15 @@ def _create_schema_postgres(c):
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(user_id, kind)
     )''')
+    c.execute('''CREATE TABLE IF NOT EXISTS password_reset_codes (
+        id BIGSERIAL PRIMARY KEY,
+        user_id BIGINT NOT NULL,
+        code_hash TEXT NOT NULL,
+        expires_at TIMESTAMPTZ NOT NULL,
+        attempts INTEGER NOT NULL DEFAULT 0,
+        consumed INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    )''')
     c.execute('''CREATE TABLE IF NOT EXISTS system_config (
         key TEXT PRIMARY KEY,
         value TEXT NOT NULL,
@@ -334,6 +343,15 @@ def _create_schema_sqlite(c):
         data BLOB NOT NULL,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(user_id, kind)
+    )''')
+    c.execute('''CREATE TABLE IF NOT EXISTS password_reset_codes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        code_hash TEXT NOT NULL,
+        expires_at TIMESTAMP NOT NULL,
+        attempts INTEGER NOT NULL DEFAULT 0,
+        consumed INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )''')
     c.execute('''CREATE TABLE IF NOT EXISTS system_config (
         key TEXT PRIMARY KEY,
@@ -431,7 +449,7 @@ def init_db():
 
         defaults = {
             'theme': 'light', 'default_currency': 'AED', 'primary_currency': 'AED', 'secondary_currency': 'INR', 'exchange_rate': '22.60',
-            'app_name': 'Rizq رزق — Growth نمو', 'shopping_budget': '0',
+            'app_name': 'YARIN يارين', 'shopping_budget': '0',
             'splash_video_url': '',
             'theme_image_url': '', 'theme_video_url': '', 'logo_url': ''
         }
@@ -448,6 +466,7 @@ def init_db():
         c.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_lower_email ON users(LOWER(email))")
         c.execute("CREATE INDEX IF NOT EXISTS idx_ai_chat_history_user_id ON ai_chat_history(user_id, id)")
         c.execute("CREATE INDEX IF NOT EXISTS idx_user_assets_user_id ON user_assets(user_id, kind)")
+        c.execute("CREATE INDEX IF NOT EXISTS idx_password_reset_user_id ON password_reset_codes(user_id, id)")
 
         conn.commit()
     except Exception:
@@ -518,7 +537,7 @@ def create_user(username, email, password):
 
         defaults = {
             'theme': 'light', 'default_currency': 'AED', 'primary_currency': 'AED', 'secondary_currency': 'INR', 'exchange_rate': '22.60',
-            'app_name': 'Rizq رزق — Growth نمو', 'shopping_budget': '0',
+            'app_name': 'YARIN يارين', 'shopping_budget': '0',
             'splash_video_url': '',
             'theme_image_url': '', 'theme_video_url': '', 'logo_url': ''
         }
@@ -573,6 +592,42 @@ def update_email(user_id, new_email):
 def update_password(user_id, new_password):
     conn = get_db(); c = conn.cursor()
     c.execute("UPDATE users SET password_hash=? WHERE id=?", (generate_password_hash(new_password), user_id))
+    conn.commit(); conn.close()
+
+
+def create_password_reset_code(user_id, code_hash, expires_at):
+    conn = get_db(); c = conn.cursor()
+    try:
+        c.execute("UPDATE password_reset_codes SET consumed=1 WHERE user_id=? AND consumed=0", (user_id,))
+        c.execute("INSERT INTO password_reset_codes (user_id, code_hash, expires_at, attempts, consumed, created_at) VALUES (?,?,?,?,0,CURRENT_TIMESTAMP)",
+                  (user_id, code_hash, expires_at, 0))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def get_latest_password_reset_code(user_id):
+    conn = get_db(); c = conn.cursor()
+    c.execute("SELECT * FROM password_reset_codes WHERE user_id=? AND consumed=0 ORDER BY id DESC LIMIT 1", (user_id,))
+    row = c.fetchone(); conn.close()
+    return dict(row) if row else None
+
+
+def increment_password_reset_attempts(reset_id):
+    conn = get_db(); c = conn.cursor()
+    c.execute("UPDATE password_reset_codes SET attempts=attempts+1 WHERE id=?", (reset_id,))
+    conn.commit(); conn.close()
+
+
+def consume_password_reset_code(reset_id):
+    conn = get_db(); c = conn.cursor()
+    c.execute("UPDATE password_reset_codes SET consumed=1 WHERE id=?", (reset_id,))
+    conn.commit(); conn.close()
+
+
+def clear_password_reset_codes(user_id):
+    conn = get_db(); c = conn.cursor()
+    c.execute("UPDATE password_reset_codes SET consumed=1 WHERE user_id=? AND consumed=0", (user_id,))
     conn.commit(); conn.close()
 
 
@@ -802,7 +857,7 @@ def get_settings(user_id):
 def get_public_branding():
     # Public login branding must not depend on the first registered user's
     # personal settings. This prevents accidental cross-user branding leakage.
-    return {'app_name': 'Rizq رزق — Growth نمو'}
+    return {'app_name': 'YARIN يارين'}
 
 
 def save_user_asset(user_id, kind, mime_type, data):

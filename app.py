@@ -9,8 +9,9 @@ import mimetypes
 import threading
 import secrets
 import hmac
+import hashlib
 from collections import defaultdict, deque
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session, send_file, send_from_directory
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -266,6 +267,155 @@ def api_login():
         return jsonify({'success': True, 'redirect': url_for('splash')})
 
     return jsonify({'success': False, 'error': 'Incorrect username/email or password'}), 401
+
+
+def _password_reset_hash(user_id, code):
+    raw = f"{app.secret_key}:{int(user_id)}:{str(code)}".encode('utf-8')
+    return hashlib.sha256(raw).hexdigest()
+
+
+def _as_utc_datetime(value):
+    if isinstance(value, datetime):
+        dt = value
+    else:
+        text = str(value or '').strip().replace('Z', '+00:00')
+        dt = datetime.fromisoformat(text)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def _send_password_reset_email(email, code):
+    api_key = (os.environ.get('BREVO_API_KEY') or '').strip()
+    sender_email = (os.environ.get('BREVO_SENDER_EMAIL') or '').strip()
+    sender_name = (os.environ.get('BREVO_SENDER_NAME') or 'YARIN').strip() or 'YARIN'
+    if not api_key or not sender_email:
+        raise RuntimeError('email_service_not_configured')
+
+    payload = {
+        'sender': {'name': sender_name, 'email': sender_email},
+        'to': [{'email': email}],
+        'subject': 'YARIN password reset code',
+        'htmlContent': f'''<!doctype html><html><body style="margin:0;background:#06101f;font-family:Arial,sans-serif;color:#eaf4ff">
+        <div style="max-width:560px;margin:24px auto;padding:32px;border-radius:24px;background:#0b1b36;border:1px solid #1f6fbb">
+          <div style="font-size:13px;letter-spacing:4px;color:#5ad7e0">YARIN · يارين</div>
+          <h1 style="margin:14px 0 8px;font-size:26px">Reset your password</h1>
+          <p style="color:#b7c7dc;line-height:1.6">Use this one-time code to continue. It expires in 10 minutes.</p>
+          <div style="margin:26px 0;padding:18px;text-align:center;border-radius:16px;background:#07152b;border:1px solid #2e8cff;font-size:34px;font-weight:800;letter-spacing:10px;color:#ffffff">{code}</div>
+          <p style="color:#8fa5c1;font-size:13px;line-height:1.5">If you did not request this code, you can ignore this email. Never share this code with anyone.</p>
+          <div style="margin-top:20px;color:#5ad7e0;font-size:12px">Your Money. Your Future. · Tomorrow Starts Today.</div>
+        </div></body></html>'''
+    }
+    response = requests.post(
+        'https://api.brevo.com/v3/smtp/email',
+        headers={'accept': 'application/json', 'api-key': api_key, 'content-type': 'application/json'},
+        json=payload,
+        timeout=10,
+    )
+    if not 200 <= response.status_code < 300:
+        app.logger.error('Brevo password reset email failed with status %s', response.status_code)
+        raise RuntimeError('email_send_failed')
+
+
+@app.route('/api/password-reset/request', methods=['POST'])
+def password_reset_request():
+    retry_after = _rate_limit('password_reset_request', _client_ip(), 5, 900)
+    if retry_after:
+        return jsonify({'success': False, 'error': 'Too many reset requests. Please wait and try again.'}), 429, {'Retry-After': str(retry_after)}
+
+    if not (os.environ.get('BREVO_API_KEY') or '').strip() or not (os.environ.get('BREVO_SENDER_EMAIL') or '').strip():
+        return jsonify({'success': False, 'error': 'Password recovery email is not configured yet.'}), 503
+
+    data = request.get_json() or {}
+    email = str(data.get('email', '')).strip().lower()
+    if not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", email) or len(email) > 254:
+        return jsonify({'success': False, 'error': 'Enter a valid email address'}), 400
+
+    user = db.get_user_by_email(email)
+    generic = {'success': True, 'message': 'If that email is registered, a 6-digit code has been sent.'}
+    if not user:
+        return jsonify(generic)
+
+    code = f"{secrets.randbelow(1_000_000):06d}"
+    expires = datetime.now(timezone.utc) + timedelta(minutes=10)
+    db.create_password_reset_code(user['id'], _password_reset_hash(user['id'], code), expires.isoformat())
+    try:
+        _send_password_reset_email(email, code)
+    except RuntimeError as exc:
+        db.clear_password_reset_codes(user['id'])
+        if str(exc) == 'email_service_not_configured':
+            return jsonify({'success': False, 'error': 'Password recovery email is not configured yet.'}), 503
+        return jsonify({'success': False, 'error': 'Unable to send the reset email right now. Please try again.'}), 502
+    return jsonify(generic)
+
+
+@app.route('/api/password-reset/verify', methods=['POST'])
+def password_reset_verify():
+    retry_after = _rate_limit('password_reset_verify', _client_ip(), 12, 600)
+    if retry_after:
+        return jsonify({'success': False, 'error': 'Too many OTP attempts. Please wait and try again.'}), 429, {'Retry-After': str(retry_after)}
+
+    data = request.get_json() or {}
+    email = str(data.get('email', '')).strip().lower()
+    code = re.sub(r'\D', '', str(data.get('code', '')))
+    if len(code) != 6:
+        return jsonify({'success': False, 'error': 'Enter the 6-digit code'}), 400
+
+    session.pop('password_reset_user_id', None)
+    session.pop('password_reset_verified_at', None)
+    user = db.get_user_by_email(email)
+    if not user:
+        return jsonify({'success': False, 'error': 'Invalid or expired code'}), 400
+    reset = db.get_latest_password_reset_code(user['id'])
+    if not reset or int(reset.get('attempts') or 0) >= 5:
+        return jsonify({'success': False, 'error': 'Invalid or expired code'}), 400
+    try:
+        expired = _as_utc_datetime(reset.get('expires_at')) <= datetime.now(timezone.utc)
+    except Exception:
+        expired = True
+    if expired:
+        db.consume_password_reset_code(reset['id'])
+        return jsonify({'success': False, 'error': 'This code has expired. Request a new code.'}), 400
+
+    supplied_hash = _password_reset_hash(user['id'], code)
+    if not hmac.compare_digest(str(reset.get('code_hash') or ''), supplied_hash):
+        db.increment_password_reset_attempts(reset['id'])
+        return jsonify({'success': False, 'error': 'Invalid or expired code'}), 400
+
+    db.consume_password_reset_code(reset['id'])
+    session['password_reset_user_id'] = user['id']
+    session['password_reset_verified_at'] = int(time.time())
+    return jsonify({'success': True, 'message': 'Code verified. You can now choose a new password.'})
+
+
+@app.route('/api/password-reset/complete', methods=['POST'])
+def password_reset_complete():
+    retry_after = _rate_limit('password_reset_complete', _client_ip(), 8, 600)
+    if retry_after:
+        return jsonify({'success': False, 'error': 'Too many attempts. Please wait and try again.'}), 429, {'Retry-After': str(retry_after)}
+
+    user_id = session.get('password_reset_user_id')
+    verified_at = int(session.get('password_reset_verified_at') or 0)
+    if not user_id or not verified_at or time.time() - verified_at > 600:
+        session.pop('password_reset_user_id', None)
+        session.pop('password_reset_verified_at', None)
+        return jsonify({'success': False, 'error': 'Reset verification expired. Request a new code.'}), 403
+
+    data = request.get_json() or {}
+    password = str(data.get('password', ''))
+    confirm = str(data.get('confirm_password', ''))
+    if len(password) < 8:
+        return jsonify({'success': False, 'error': 'New password must be at least 8 characters'}), 400
+    if len(password) > 256:
+        return jsonify({'success': False, 'error': 'New password is too long'}), 400
+    if password != confirm:
+        return jsonify({'success': False, 'error': 'Passwords do not match'}), 400
+
+    db.update_password(user_id, password)
+    db.clear_password_reset_codes(user_id)
+    session.pop('password_reset_user_id', None)
+    session.pop('password_reset_verified_at', None)
+    return jsonify({'success': True, 'message': 'Password changed successfully. You can sign in now.'})
 
 
 @app.route('/api/logout', methods=['POST'])
@@ -827,11 +977,11 @@ def _build_ai_system_instruction(user_name, language_key, mode):
     )
 
     return (
-        f"You are Azret AI, the Gemini-powered assistant inside Rizq رزق for {user_name}. "
+        f"You are Azret AI, the Gemini-powered assistant inside YARIN يارين for {user_name}. "
         f"{language} {voice_rule} "
         "You are a GENERAL-PURPOSE conversational assistant, not only a finance bot. "
         "Answer questions about everyday knowledge, technology, travel, writing, calculations, ideas, and other normal topics using your model knowledge. "
-        "Use the supplied RIZQ financial context ONLY when the user's question is actually about their money, budget, savings, EMI, debt, shopping plan, or Rizq app records. "
+        "Use the supplied YARIN financial context ONLY when the user's question is actually about their money, budget, savings, EMI, debt, shopping plan, or YARIN app records. "
         "For unrelated questions, IGNORE the financial context completely. "
         "Use recent conversation history to understand follow-up questions and pronouns. "
         "Do not repeat a canned greeting or repeat the same financial summary unless it directly answers the new question. "
@@ -865,12 +1015,12 @@ def _is_finance_related(query, history=None):
 
 def _format_financial_context(context):
     if not context:
-        return "RIZQ FINANCIAL CONTEXT: not attached because this conversation is not about saved finance records."
+        return "YARIN FINANCIAL CONTEXT: not attached because this conversation is not about saved finance records."
     cur = context.get('display_currency', 'AED')
     rate = float(context.get('display_rate') or 1.0)
     cv = lambda x: float(x or 0) * rate
     return (
-        f"RIZQ PRIVATE FINANCIAL CONTEXT (display currency {cur}; use only when relevant):\n"
+        f"YARIN PRIVATE FINANCIAL CONTEXT (display currency {cur}; use only when relevant):\n"
         f"Total Income: {cv(context['total_income']):.2f} {cur}\n"
         f"Total Expenses: {cv(context['total_expenses']):.2f} {cur}\n"
         f"Total Savings: {cv(context['total_savings']):.2f} {cur}\n"
@@ -1199,7 +1349,7 @@ def _fx_cached(key, ttl, loader):
 
 def _fx_get_json(path, params=None, timeout=8):
     url = 'https://api.frankfurter.dev' + path
-    r = requests.get(url, params=params or {}, timeout=timeout, headers={'User-Agent': 'Rizq-Finance/1.0'})
+    r = requests.get(url, params=params or {}, timeout=timeout, headers={'User-Agent': 'YARIN-Finance/1.0'})
     r.raise_for_status()
     return r.json()
 
@@ -1340,8 +1490,8 @@ def get_branding():
     # are intentionally disabled. Login wallpapers remain online/random and
     # are independent from these removed dashboard settings.
     return jsonify({
-        'app_name': 'Rizq رزق',
-        'logo_url': '/static/icons/logo-mark.png',
+        'app_name': 'YARIN يارين',
+        'logo_url': '/static/icons/yarin-emblem.webp',
         'splash_video_url': '',
         'theme_image_url': '',
         'theme_video_url': ''
@@ -1366,42 +1516,42 @@ def serve_user_asset(kind):
 @app.route('/api/logo', methods=['POST'])
 @login_required
 def upload_logo():
-    return jsonify({'success': False, 'error': 'Branding customization is disabled in Rizq'}), 410
+    return jsonify({'success': False, 'error': 'Branding customization is disabled in YARIN'}), 410
 
 @app.route('/api/logo', methods=['DELETE'])
 @login_required
 def delete_logo():
-    return jsonify({'success': False, 'error': 'Branding customization is disabled in Rizq'}), 410
+    return jsonify({'success': False, 'error': 'Branding customization is disabled in YARIN'}), 410
 
 @app.route('/api/splash-video', methods=['POST'])
 @login_required
 def upload_splash_video():
-    return jsonify({'success': False, 'error': 'Branding customization is disabled in Rizq'}), 410
+    return jsonify({'success': False, 'error': 'Branding customization is disabled in YARIN'}), 410
 
 @app.route('/api/splash-video', methods=['DELETE'])
 @login_required
 def delete_splash_video():
-    return jsonify({'success': False, 'error': 'Branding customization is disabled in Rizq'}), 410
+    return jsonify({'success': False, 'error': 'Branding customization is disabled in YARIN'}), 410
 
 @app.route('/api/theme-image', methods=['POST'])
 @login_required
 def upload_theme_image():
-    return jsonify({'success': False, 'error': 'Branding customization is disabled in Rizq'}), 410
+    return jsonify({'success': False, 'error': 'Branding customization is disabled in YARIN'}), 410
 
 @app.route('/api/theme-image', methods=['DELETE'])
 @login_required
 def delete_theme_image():
-    return jsonify({'success': False, 'error': 'Branding customization is disabled in Rizq'}), 410
+    return jsonify({'success': False, 'error': 'Branding customization is disabled in YARIN'}), 410
 
 @app.route('/api/theme-video', methods=['POST'])
 @login_required
 def upload_theme_video():
-    return jsonify({'success': False, 'error': 'Branding customization is disabled in Rizq'}), 410
+    return jsonify({'success': False, 'error': 'Branding customization is disabled in YARIN'}), 410
 
 @app.route('/api/theme-video', methods=['DELETE'])
 @login_required
 def delete_theme_video():
-    return jsonify({'success': False, 'error': 'Branding customization is disabled in Rizq'}), 410
+    return jsonify({'success': False, 'error': 'Branding customization is disabled in YARIN'}), 410
 
 @app.route('/api/export', methods=['GET'])
 @login_required
@@ -1415,7 +1565,7 @@ def export_data():
         dump[table] = db.fetch_all(table, session['user_id'])
     dump['settings'] = db.get_settings(session['user_id'])
 
-    filename = f"rizq_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+    filename = f"yarin_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
     buf = io.BytesIO(json.dumps(dump, indent=2, default=str).encode('utf-8'))
     return send_file(buf, mimetype='application/json', as_attachment=True, download_name=filename)
 
@@ -1877,9 +2027,9 @@ def generate_report(kind):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font('Arial', 'B', 16)
-    pdf.cell(0, 10, 'RIZQ - A Smarter Financial Life', 0, 1, 'C')
+    pdf.cell(0, 10, 'YARIN - Tomorrow Starts Today.', 0, 1, 'C')
     pdf.set_font('Arial', '', 9)
-    pdf.cell(0, 6, 'Plan - Manage - Grow | A Smarter Financial Life', 0, 1, 'C')
+    pdf.cell(0, 6, 'Your Money. Your Future. | Tomorrow Starts Today.', 0, 1, 'C')
     pdf.set_font('Arial', '', 12)
     pdf.cell(0, 8, f"{kind.upper()} REPORT - {label}", 0, 1, 'C')
     pdf.ln(10)
@@ -1895,7 +2045,7 @@ def generate_report(kind):
     pdf.cell(0, 8, f"Outstanding Debt: {report_cur} {cv(debt_out):,.2f}", 0, 1)
     pdf.cell(0, 8, f"Net Balance: {report_cur} {cv(income - expenses - family - emi_paid):,.2f}", 0, 1)
 
-    filename = f"RIZQ_{kind}_report_{now.strftime('%Y%m%d')}.pdf"
+    filename = f"YARIN_{kind}_report_{now.strftime('%Y%m%d')}.pdf"
     output = io.BytesIO(pdf.output(dest='S').encode('latin1'))
 
     return send_file(output, mimetype='application/pdf', as_attachment=True, download_name=filename)

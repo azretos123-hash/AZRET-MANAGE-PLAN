@@ -1,5 +1,5 @@
 /* ==========================================================================
-   RIZQ رزق — Stylesheet
+   YARIN يارين — Stylesheet
    Design tokens: Premium Blue Glassmorphism — luxury banking finish
    ========================================================================== */
 @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Noto+Kufi+Arabic:wght@500;600;700&family=Playfair+Display:wght@600;700&display=swap');
@@ -1334,7 +1334,7 @@ table tbody tr:hover {
 
 
 
-/* ==========================================================================\n   Mobile-first / phone app experience (RIZQ public web)\n   ========================================================================== */
+/* ==========================================================================\n   Mobile-first / phone app experience (YARIN public web)\n   ========================================================================== */
 .mobile-bottom-nav{ display:none; }
 
 @media (max-width: 767px){
@@ -1422,7 +1422,7 @@ table tbody tr:hover {
   .topbar{ padding-top:max(10px, env(safe-area-inset-top)); }
 }
 
-/* ==========================================================================\n   V13 — Premium RIZQ startup splash\n   ========================================================================== */
+/* ==========================================================================\n   V13 — Premium YARIN startup splash\n   ========================================================================== */
 .premium-splash{
   overflow:hidden;
   isolation:isolate;
@@ -1580,7 +1580,7 @@ table tbody tr:hover {
   .premium-splash *, .premium-splash::before{ animation-duration:.001ms !important; animation-iteration-count:1 !important; }
 }
 
-/* ==========================================================================\n   V14 — Consistent premium bilingual RIZQ رزق brand system\n   ========================================================================== */
+/* ==========================================================================\n   V14 — Consistent premium bilingual YARIN يارين brand system\n   ========================================================================== */
 :root{
   --rizq-gold:#e7c36f;
   --rizq-gold-soft:#f2d995;
@@ -1679,7 +1679,7 @@ table tbody tr:hover {
 }
 
 /* ========================================================================
-   RIZQ V15 — Dynamic currency pair + premium exchange trend
+   YARIN V15 — Dynamic currency pair + premium exchange trend
    ======================================================================== */
 .currency-settings-block{width:100%}
 .currency-setting-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:12px}
@@ -1710,7 +1710,7 @@ table tbody tr:hover {
 @media(max-width:767px){.currency-select-grid{grid-template-columns:1fr}.currency-swap-btn{justify-self:center;transform:rotate(90deg)}.currency-swap-btn:hover{transform:rotate(270deg)}.fx-head{flex-direction:column}.fx-current{text-align:left;align-items:flex-start}.fx-canvas-wrap{height:220px}.fx-foot{flex-direction:column;gap:3px}}
 
 /* ========================================================================
-   RIZQ V16 — Luxury Fintech Visual System
+   YARIN V16 — Luxury Fintech Visual System
    ======================================================================== */
 
 :root{
@@ -1860,7 +1860,7 @@ body{background:var(--bg);}
 
 
 /* ========================================================================== 
-   V26 — Approved RIZQ luxury cinematic login (real HTML/CSS, no baked image)
+   V26 — Approved YARIN luxury cinematic login (real HTML/CSS, no baked image)
    ========================================================================== */
 .auth-v26{margin:0;min-height:100vh;overflow-x:hidden;background:#020813;color:#f7f2e8;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;}
 .auth-cinematic-bg{position:fixed;inset:0;overflow:hidden;z-index:0;background:
@@ -1912,8 +1912,8 @@ body{background:var(--bg);}
 @media(max-width:900px){.auth-shell-v26{grid-template-columns:1fr;width:min(680px,92vw);gap:12px;padding:26px 0 36px}.auth-hero-v26{padding:14px 6px 4px}.rizq-word-en{font-size:clamp(4.2rem,18vw,7rem)}.rizq-word-ar{font-size:clamp(4.7rem,20vw,7.8rem)}.hero-feature-row{margin-top:10px}.hero-public-copy{display:none}.auth-card-v26{padding:28px 22px;border-radius:24px}.desktop-only{display:none}}
 @media(max-width:520px){.auth-shell-v26{width:94vw}.hero-feature-row{gap:10px}.hero-feature-row>i{height:40px}.hero-feature{min-width:68px}.hero-feature-icon{font-size:23px}.hero-feature strong{font-size:.98rem}.hero-smart-line{font-size:1.1rem}.auth-options-row{align-items:flex-start}.forgot-password-link{font-size:.82rem}.auth-card-header h2{font-size:2rem}.auth-section-kicker{letter-spacing:.3em}.auth-card-v26{backdrop-filter:blur(16px)}}
 @media(prefers-reduced-motion:reduce){.auth-v26 *,.auth-v26 *:before,.auth-v26 *:after{animation-duration:.001ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important}}
-\n\n/* V27 — official RIZQ sidebar brand lockup */\n.sidebar-brand{\n  gap:12px; padding:2px 2px 20px; align-items:center; position:relative;\n}\n.brand-logo-wrap{\n  width:62px; height:62px; min-width:62px; border-radius:50%; overflow:hidden;\n  background:#07553f; border:1px solid rgba(211,164,51,.55);\n  box-shadow:0 8px 22px rgba(3,71,53,.14),0 0 0 3px rgba(211,164,51,.06);\n}\n.brand-logo-wrap img{\n  width:100%; height:100%; object-fit:cover; object-position:center; border-radius:50%;\n}\n.sidebar-brand-text{gap:3px; min-width:0; line-height:1; margin-right:auto;}\n.sidebar-brand-text .brand-name-bilingual{\n  display:flex; align-items:baseline; gap:6px; width:max-content; max-width:100%;\n  font-family:Georgia,"Times New Roman",serif; font-size:20px; font-weight:800;\n  letter-spacing:-.02em; color:#0c315d; position:relative; overflow:hidden;\n  background:linear-gradient(105deg,#0d3769 0%,#174f9b 35%,#d3a433 50%,#174f9b 65%,#0d3769 100%);\n  background-size:240% 100%; -webkit-background-clip:text; background-clip:text;\n  -webkit-text-fill-color:transparent; animation:rizqSidebarShimmer 7s ease-in-out infinite;\n}\n.sidebar-brand-text .brand-name-bilingual b{\n  font-family:"Noto Naskh Arabic","Noto Sans Arabic",Tahoma,Arial,sans-serif;\n  font-size:22px; font-weight:800; color:inherit; -webkit-text-fill-color:transparent;\n}\n.sidebar-brand-text .brand-motto-en{\n  font-size:8px; line-height:1.2; letter-spacing:.025em; color:var(--navy-700);\n  font-weight:700; white-space:nowrap; text-transform:none;\n}\n.sidebar-brand-text .brand-tagline-en{\n  font-size:7px; line-height:1.2; color:var(--text-muted); white-space:nowrap; font-style:italic;\n}\n.brand-theme-toggle{margin-left:auto; flex:0 0 auto;}\n[data-theme="dark"] .sidebar-brand-text .brand-name-bilingual{\n  background:linear-gradient(105deg,#f7fbff 0%,#78aef8 34%,#e1b852 50%,#78aef8 66%,#f7fbff 100%);\n  background-size:240% 100%; -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;\n}\n[data-theme="dark"] .sidebar-brand-text .brand-motto-en{color:#dbeafe;}\n@keyframes rizqSidebarShimmer{0%,68%,100%{background-position:0 0}82%{background-position:100% 0}}\n@media(max-width:1100px){.brand-logo-wrap{width:58px;height:58px;min-width:58px}.sidebar-brand-text .brand-name-bilingual{font-size:19px}.sidebar-brand-text .brand-name-bilingual b{font-size:21px}}\n@media(prefers-reduced-motion:reduce){.sidebar-brand-text .brand-name-bilingual{animation:none!important}}\n
-/* V28 — Dashboard Rizq AI live avatar dock. No screenshot/card image is used. */
+\n\n/* V27 — official YARIN sidebar brand lockup */\n.sidebar-brand{\n  gap:12px; padding:2px 2px 20px; align-items:center; position:relative;\n}\n.brand-logo-wrap{\n  width:62px; height:62px; min-width:62px; border-radius:50%; overflow:hidden;\n  background:#07553f; border:1px solid rgba(211,164,51,.55);\n  box-shadow:0 8px 22px rgba(3,71,53,.14),0 0 0 3px rgba(211,164,51,.06);\n}\n.brand-logo-wrap img{\n  width:100%; height:100%; object-fit:cover; object-position:center; border-radius:50%;\n}\n.sidebar-brand-text{gap:3px; min-width:0; line-height:1; margin-right:auto;}\n.sidebar-brand-text .brand-name-bilingual{\n  display:flex; align-items:baseline; gap:6px; width:max-content; max-width:100%;\n  font-family:Georgia,"Times New Roman",serif; font-size:20px; font-weight:800;\n  letter-spacing:-.02em; color:#0c315d; position:relative; overflow:hidden;\n  background:linear-gradient(105deg,#0d3769 0%,#174f9b 35%,#d3a433 50%,#174f9b 65%,#0d3769 100%);\n  background-size:240% 100%; -webkit-background-clip:text; background-clip:text;\n  -webkit-text-fill-color:transparent; animation:rizqSidebarShimmer 7s ease-in-out infinite;\n}\n.sidebar-brand-text .brand-name-bilingual b{\n  font-family:"Noto Naskh Arabic","Noto Sans Arabic",Tahoma,Arial,sans-serif;\n  font-size:22px; font-weight:800; color:inherit; -webkit-text-fill-color:transparent;\n}\n.sidebar-brand-text .brand-motto-en{\n  font-size:8px; line-height:1.2; letter-spacing:.025em; color:var(--navy-700);\n  font-weight:700; white-space:nowrap; text-transform:none;\n}\n.sidebar-brand-text .brand-tagline-en{\n  font-size:7px; line-height:1.2; color:var(--text-muted); white-space:nowrap; font-style:italic;\n}\n.brand-theme-toggle{margin-left:auto; flex:0 0 auto;}\n[data-theme="dark"] .sidebar-brand-text .brand-name-bilingual{\n  background:linear-gradient(105deg,#f7fbff 0%,#78aef8 34%,#e1b852 50%,#78aef8 66%,#f7fbff 100%);\n  background-size:240% 100%; -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;\n}\n[data-theme="dark"] .sidebar-brand-text .brand-motto-en{color:#dbeafe;}\n@keyframes rizqSidebarShimmer{0%,68%,100%{background-position:0 0}82%{background-position:100% 0}}\n@media(max-width:1100px){.brand-logo-wrap{width:58px;height:58px;min-width:58px}.sidebar-brand-text .brand-name-bilingual{font-size:19px}.sidebar-brand-text .brand-name-bilingual b{font-size:21px}}\n@media(prefers-reduced-motion:reduce){.sidebar-brand-text .brand-name-bilingual{animation:none!important}}\n
+/* V28 — Dashboard YARIN AI live avatar dock. No screenshot/card image is used. */
 #page-dashboard{position:relative;}
 .rizq-ai-dock{position:absolute;z-index:12;right:8px;top:-8px;width:245px;min-height:112px;border:1px solid rgba(76,141,255,.22);border-radius:28px;padding:12px 12px 12px 105px;background:linear-gradient(135deg,rgba(255,255,255,.80),rgba(244,248,255,.62));backdrop-filter:blur(18px) saturate(145%);box-shadow:0 18px 45px rgba(21,58,128,.14);cursor:pointer;text-align:left;color:var(--text);overflow:visible;isolation:isolate;transition:transform .25s ease,box-shadow .25s ease;}
 [data-theme="dark"] .rizq-ai-dock{background:linear-gradient(135deg,rgba(12,29,63,.88),rgba(7,20,47,.72));border-color:rgba(216,179,108,.20);}
@@ -2066,3 +2066,201 @@ body{background:var(--bg);}
 .gemini-assistant-modal.ai-minimized{z-index:10020!important}
 .gemini-assistant-modal.ai-minimized .ai-modal-head-left h3:after{content:' • Active';}
 @media(prefers-reduced-motion:reduce){.azret-live-avatar,.azret-avatar-frame:after{animation:none!important}}
+
+/* === V34 — Approved Azret AI redesign (code UI, not screenshot UI) === */
+.rizq-ai-avatar-wrap{overflow:hidden!important;background:#eaf2ff!important}
+.rizq-ai-avatar{width:100%!important;height:100%!important;object-fit:cover!important;object-position:50% 42%!important;transform:scale(1.06)!important;transform-origin:center!important}
+.rizq-ai-blink,.rizq-ai-smile,.rizq-ai-wave{display:none!important}
+
+.ai-modal-overlay{background:rgba(5,18,42,.58)!important;backdrop-filter:blur(12px)!important;-webkit-backdrop-filter:blur(12px)!important;align-items:center!important;justify-content:center!important;padding:24px!important}
+.v34-ai-modal{width:min(880px,95vw)!important;max-width:none!important;max-height:min(760px,92vh)!important;padding:0!important;border-radius:28px!important;overflow:hidden!important;background:linear-gradient(145deg,rgba(249,252,255,.985),rgba(235,244,255,.97))!important;border:1px solid rgba(86,144,255,.48)!important;box-shadow:0 30px 90px rgba(7,33,80,.32),0 0 0 1px rgba(255,255,255,.8) inset!important;color:#10234d!important}
+[data-theme="dark"] .v34-ai-modal{background:linear-gradient(145deg,rgba(10,28,63,.985),rgba(7,21,49,.985))!important;color:#edf4ff!important;border-color:rgba(93,149,255,.38)!important}
+.v34-ai-header{height:76px;display:flex;align-items:center;justify-content:space-between;padding:0 24px;border-bottom:1px solid rgba(84,124,196,.16);background:linear-gradient(90deg,rgba(255,255,255,.55),rgba(229,240,255,.7))}
+[data-theme="dark"] .v34-ai-header{background:linear-gradient(90deg,rgba(14,37,80,.95),rgba(8,25,58,.95));border-bottom-color:rgba(255,255,255,.08)}
+.v34-ai-title{display:flex;flex-direction:column;gap:1px}.v34-ai-title strong{font-size:27px;letter-spacing:.02em;color:#1954ca;font-weight:900}.v34-ai-title span{font-size:12px;color:#6d7c9b;font-weight:700}.v34-ai-header-actions{display:flex;align-items:center;gap:8px}.v34-online{display:flex;align-items:center;gap:7px;font-size:12px;color:#22a968;font-weight:800;margin-right:4px}.v34-online i{width:8px;height:8px;border-radius:50%;background:#2fca7b;box-shadow:0 0 0 5px rgba(47,202,123,.11)}
+.v34-icon-btn{width:34px;height:34px;border:0;border-radius:11px;background:transparent;color:inherit;font-size:22px;display:grid;place-items:center;cursor:pointer;transition:.2s}.v34-icon-btn:hover{background:rgba(73,126,221,.1);transform:translateY(-1px)}.v34-clear{font-size:18px!important}
+.v34-ai-body{display:grid;grid-template-columns:42% 58%;min-height:560px}
+.v34-ai-avatar-pane{position:relative;padding:24px 22px 20px;background:linear-gradient(180deg,rgba(240,247,255,.92),rgba(225,238,255,.84));border-right:1px solid rgba(78,123,201,.14);display:flex;flex-direction:column;align-items:center;overflow:hidden}
+[data-theme="dark"] .v34-ai-avatar-pane{background:linear-gradient(180deg,rgba(17,44,93,.82),rgba(9,28,63,.84));border-right-color:rgba(255,255,255,.07)}
+.v34-ai-avatar-pane:before{content:"";position:absolute;width:320px;height:320px;border-radius:50%;top:22px;background:radial-gradient(circle,rgba(47,124,255,.22),rgba(47,124,255,.05) 58%,transparent 72%);filter:blur(4px);animation:v34Aura 4.8s ease-in-out infinite}
+.v34-avatar-button{position:relative;width:250px;height:290px;border:0;padding:0;background:transparent;cursor:pointer;isolation:isolate;transition:transform .25s ease;z-index:2}.v34-avatar-button:hover{transform:translateY(-3px) scale(1.015)}
+.v34-avatar-halo{position:absolute;inset:20px 2px 12px;border-radius:46% 46% 42% 42%;background:conic-gradient(from 0deg,rgba(46,121,255,.15),#3f8bff,rgba(216,179,108,.9),#3f8bff,rgba(46,121,255,.15));filter:blur(.2px);animation:v34Halo 8s linear infinite;z-index:-2}.v34-avatar-halo:after{content:"";position:absolute;inset:4px;border-radius:inherit;background:linear-gradient(180deg,#ecf5ff,#dcecff)}
+[data-theme="dark"] .v34-avatar-halo:after{background:linear-gradient(180deg,#112c61,#081b40)}
+.v34-avatar-image{position:absolute;inset:8px 10px 0;width:calc(100% - 20px);height:calc(100% - 8px);object-fit:cover;object-position:center 40%;border-radius:42% 42% 38% 38%;z-index:1;box-shadow:0 16px 38px rgba(13,58,140,.24);animation:v34AvatarIdle 4.7s ease-in-out infinite}
+.v34-avatar-glow{position:absolute;left:50%;bottom:7px;width:65%;height:18px;transform:translateX(-50%);background:radial-gradient(ellipse,rgba(48,124,255,.38),transparent 70%);filter:blur(7px);z-index:-1;animation:v34Glow 2.5s ease-in-out infinite}
+.v34-avatar-copy{width:100%;z-index:2;margin-top:4px}.v34-avatar-copy h3{margin:0 0 5px;font-size:20px;color:#10234d}.v34-avatar-copy h3 span{display:inline-block;transform-origin:70% 80%;animation:v34Wave 3.8s ease-in-out infinite}.v34-avatar-copy p{margin:2px 0;font-size:12.5px;line-height:1.35;color:#5e6f8f}.v34-avatar-copy .v34-help-line{font-weight:800;color:#254f9c}
+[data-theme="dark"] .v34-avatar-copy h3{color:#f7fbff}[data-theme="dark"] .v34-avatar-copy p{color:#b6c8e8}[data-theme="dark"] .v34-avatar-copy .v34-help-line{color:#9dc2ff}
+.v34-quick-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%;margin-top:16px;z-index:2}.v34-quick-grid .suggest-chip{margin:0!important;min-height:38px;border-radius:12px!important;font-size:11px!important;padding:8px 9px!important;text-align:left!important;background:rgba(255,255,255,.72)!important;color:#203a71!important;border:1px solid rgba(73,126,221,.13)!important;box-shadow:0 7px 16px rgba(29,72,150,.07)!important}.v34-quick-grid .suggest-chip:hover{transform:translateY(-1px);border-color:rgba(52,120,242,.38)!important}
+[data-theme="dark"] .v34-quick-grid .suggest-chip{background:rgba(12,35,76,.84)!important;color:#dceaff!important;border-color:rgba(255,255,255,.08)!important}
+.v34-ai-conversation-pane{display:flex;flex-direction:column;min-width:0;background:rgba(255,255,255,.48)}[data-theme="dark"] .v34-ai-conversation-pane{background:rgba(5,18,43,.45)}
+.v34-mode-row{display:flex;gap:8px;padding:16px 18px 0}.v34-mode-row .gemini-mode-btn{min-width:92px;border-radius:12px!important;padding:10px 15px!important;background:rgba(44,96,190,.07)!important;color:#61708d!important;border:1px solid transparent!important}.v34-mode-row .gemini-mode-btn.active{background:rgba(49,116,239,.13)!important;color:#1761db!important;border-color:rgba(49,116,239,.18)!important;box-shadow:none!important}
+.v34-chat-view,.v34-live-view{flex:1;min-height:0;padding:12px 18px 18px!important;background:transparent!important}
+.v34-chat-view{display:flex;flex-direction:column}.v34-chat-view .gemini-chat-messages{flex:1;min-height:330px;max-height:390px;overflow:auto;padding:10px 2px 12px!important}.v34-chat-view .gemini-msg{margin-bottom:12px!important}.v34-chat-view .gemini-avatar{display:none!important}.v34-chat-view .gemini-bubble{max-width:88%!important;background:rgba(255,255,255,.88)!important;color:#20345f!important;border:1px solid rgba(65,119,215,.14)!important;border-radius:18px 18px 18px 6px!important;box-shadow:0 10px 25px rgba(29,72,150,.07)!important}.v34-chat-view .gemini-msg.user .gemini-bubble{margin-left:auto;background:linear-gradient(135deg,#2e7cff,#1a55cc)!important;color:#fff!important;border-radius:18px 18px 6px 18px!important}
+[data-theme="dark"] .v34-chat-view .gemini-bubble{background:rgba(15,41,86,.9)!important;color:#eaf2ff!important;border-color:rgba(255,255,255,.07)!important}
+.v34-input-row{display:grid!important;grid-template-columns:1fr 42px 42px!important;gap:8px!important;padding:8px!important;border-radius:16px!important;background:rgba(255,255,255,.9)!important;border:1px solid rgba(75,126,215,.15)!important;box-shadow:0 10px 28px rgba(18,63,140,.09)!important}.v34-input-row input{height:44px!important;border:0!important;background:transparent!important;color:#20345f!important;padding:0 10px!important;box-shadow:none!important}.v34-input-row input:focus{box-shadow:none!important;background:transparent!important}.v34-mic-btn,.v34-send-btn{width:42px;height:42px;border:0;border-radius:13px;display:grid;place-items:center;cursor:pointer}.v34-mic-btn{background:#edf3ff;color:#2e69d3}.v34-send-btn{background:linear-gradient(135deg,#3a83ff,#2459d2);color:#fff;font-size:20px;box-shadow:0 8px 18px rgba(42,101,215,.26)}
+[data-theme="dark"] .v34-input-row{background:rgba(8,29,67,.92)!important;border-color:rgba(255,255,255,.08)!important}.v34-input-row input::placeholder{color:#8798b7!important}[data-theme="dark"] .v34-input-row input{color:#f4f8ff!important}[data-theme="dark"] .v34-mic-btn{background:#153b7f;color:#a9cbff}
+.v34-live-view{display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center}.v34-live-status-head{width:100%;display:flex;justify-content:space-between;align-items:flex-start;text-align:left;margin:4px 0 10px}.v34-live-kicker{font-size:10px;letter-spacing:.12em;font-weight:900;color:#3376df}.v34-live-status-head h3{margin:4px 0 0;font-size:24px}.v34-live-wave{height:130px;width:100%;display:flex!important;align-items:center;justify-content:center;gap:7px;cursor:pointer}.v34-live-wave span{width:7px;border-radius:999px;background:linear-gradient(180deg,#5fb0ff,#1767ed);height:25px;animation:v34Bars 1.1s ease-in-out infinite;box-shadow:0 0 18px rgba(55,133,255,.25)}.v34-live-wave span:nth-child(2){animation-delay:.08s;height:44px}.v34-live-wave span:nth-child(3){animation-delay:.16s;height:66px}.v34-live-wave span:nth-child(4){animation-delay:.24s;height:42px}.v34-live-wave span:nth-child(5){animation-delay:.32s;height:88px}.v34-live-wave span:nth-child(6){animation-delay:.4s;height:55px}.v34-live-wave span:nth-child(7){animation-delay:.48s;height:74px}.v34-live-wave span:nth-child(8){animation-delay:.56s;height:38px}.v34-live-wave span:nth-child(9){animation-delay:.64s;height:58px}.v34-live-wave[data-ai-state="idle"] span{animation-play-state:paused;opacity:.45;transform:scaleY(.45)}.v34-transcript{width:100%;min-height:82px!important;margin:10px 0!important;border-radius:17px!important;background:rgba(255,255,255,.78)!important;color:#435574!important;border:1px solid rgba(69,124,222,.12)!important}.v34-live-controls{margin-top:12px!important}.v34-main-call{min-width:150px!important;border-radius:999px!important;background:linear-gradient(135deg,#2f7cff,#175fd7)!important;color:#fff!important;box-shadow:0 10px 28px rgba(42,101,215,.24)!important}
+[data-theme="dark"] .v34-transcript{background:rgba(12,36,79,.82)!important;color:#d9e7ff!important;border-color:rgba(255,255,255,.07)!important}
+.gemini-assistant-modal.ai-minimized.v34-ai-modal{width:min(360px,92vw)!important;right:20px!important;bottom:20px!important;left:auto!important;top:auto!important;border-radius:22px!important;max-height:none!important}.gemini-assistant-modal.ai-minimized.v34-ai-modal .v34-ai-body{display:none!important}.gemini-assistant-modal.ai-minimized.v34-ai-modal .v34-ai-header{height:64px!important;border:0!important}.gemini-assistant-modal.ai-minimized.v34-ai-modal .v34-ai-title strong{font-size:20px!important}
+@keyframes v34Aura{0%,100%{transform:scale(.96);opacity:.55}50%{transform:scale(1.05);opacity:1}}@keyframes v34Halo{to{transform:rotate(360deg)}}@keyframes v34AvatarIdle{0%,100%{transform:translateY(0) scale(1)}48%{transform:translateY(-3px) scale(1.01)}52%{transform:translateY(-3px) scale(1.01)}80%{transform:translateY(0) scale(1)}}@keyframes v34Glow{0%,100%{opacity:.45;transform:translateX(-50%) scaleX(.92)}50%{opacity:.85;transform:translateX(-50%) scaleX(1.08)}}@keyframes v34Wave{0%,70%,100%{transform:rotate(0)}75%{transform:rotate(18deg)}80%{transform:rotate(-8deg)}85%{transform:rotate(16deg)}90%{transform:rotate(0)}}@keyframes v34Bars{0%,100%{transform:scaleY(.45);opacity:.45}50%{transform:scaleY(1.15);opacity:1}}
+@media(max-width:760px){.ai-modal-overlay{padding:8px!important}.v34-ai-modal{width:calc(100vw - 16px)!important;max-height:94vh!important;border-radius:22px!important}.v34-ai-header{height:66px;padding:0 16px}.v34-ai-title strong{font-size:21px}.v34-ai-body{display:block;overflow:auto;max-height:calc(94vh - 66px)}.v34-ai-avatar-pane{padding:14px 14px 12px;border-right:0;border-bottom:1px solid rgba(78,123,201,.12)}.v34-avatar-button{width:175px;height:205px}.v34-avatar-copy{text-align:center}.v34-quick-grid{grid-template-columns:1fr 1fr}.v34-ai-conversation-pane{min-height:390px}.v34-chat-view .gemini-chat-messages{min-height:220px;max-height:280px}.v34-online{display:none}.v34-clear{display:none}.v34-input-row{grid-template-columns:1fr 40px 40px!important}}
+@media(prefers-reduced-motion:reduce){.v34-avatar-image,.v34-avatar-halo,.v34-avatar-glow,.v34-avatar-copy h3 span,.v34-ai-avatar-pane:before,.v34-live-wave span{animation:none!important}}
+
+/* === V35 — Dashboard AI dock clipping/overlap hotfix ===
+   Keep the assistant fully below the sticky topbar on desktop/ChromeOS.
+   The dock stays inside the dashboard content flow and never hides behind
+   the topbar or currency controls. */
+@media (min-width:1100px){
+  #page-dashboard{position:relative;overflow:visible;}
+  #page-dashboard > .rizq-ai-dock{
+    top:18px !important;
+    right:10px !important;
+    z-index:24 !important;
+    transform:none;
+  }
+  #page-dashboard > .dashboard-hero-head{
+    min-height:152px !important;
+    padding-right:286px !important;
+  }
+  #page-dashboard > .rizq-ai-dock:hover{
+    transform:translateY(-2px) !important;
+  }
+}
+
+/* Mid-size desktop/tablet: keep the assistant as a normal block so it can
+   never collide with greeting/time/currency controls. */
+@media (min-width:768px) and (max-width:1099px){
+  #page-dashboard > .rizq-ai-dock{
+    position:relative !important;
+    top:auto !important;
+    right:auto !important;
+    margin:0 0 16px auto !important;
+    z-index:2 !important;
+  }
+}
+
+/* Prevent wide greeting/clock text from forcing horizontal overflow on
+   narrower ChromeOS windows. */
+@media (min-width:861px) and (max-width:1220px){
+  .topbar{gap:10px;padding-left:18px;padding-right:18px;}
+  .topbar-search{max-width:330px;}
+  .topbar-greetclock{gap:10px;padding-left:8px;padding-right:8px;min-width:0;}
+  .greet-line{font-size:18px;}
+  .live-clock .clock-time{font-size:21px;}
+  .topbar-actions{flex:0 0 auto;}
+}
+
+/* ========================================================================== 
+   V37 — YARIN login refinement: official emblem + Dubai night vector scene
+   ========================================================================== */
+.auth-v26{background:#020713;}
+.auth-cinematic-bg{background:
+  linear-gradient(90deg,rgba(1,6,17,.28),rgba(1,7,20,.08) 46%,rgba(1,7,19,.32)),
+  url('/static/images/dubai-night.svg') center center/cover no-repeat,
+  linear-gradient(125deg,#020713,#071b3a 58%,#020611)!important;}
+.auth-cinematic-bg:before{opacity:.22;mix-blend-mode:screen;}
+.auth-cinematic-bg:after{opacity:.32;}
+.auth-aurora-blue{opacity:.20}.auth-aurora-gold{opacity:.17}
+.auth-light-ribbon{opacity:.42}
+
+.auth-shell-v26{grid-template-columns:minmax(0,1.08fr) minmax(430px,.92fr);gap:clamp(34px,5vw,86px);}
+.auth-hero-v26{padding:26px 18px 34px;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+.yarin-emblem-shell{width:clamp(92px,9vw,142px);aspect-ratio:1;border-radius:34px;display:grid;place-items:center;margin:0 auto 18px;position:relative;background:radial-gradient(circle at 35% 28%,rgba(48,214,230,.18),rgba(5,21,51,.36) 48%,rgba(2,8,20,.78));border:1px solid rgba(88,186,255,.26);box-shadow:0 18px 45px rgba(0,0,0,.34),0 0 34px rgba(38,163,255,.16),inset 0 0 30px rgba(29,191,210,.08);backdrop-filter:blur(16px);animation:v37EmblemFloat 5.5s ease-in-out infinite;}
+.yarin-emblem-shell:before{content:"";position:absolute;inset:-6px;border-radius:39px;background:conic-gradient(from 0deg,transparent,rgba(40,181,255,.7),transparent 26%,rgba(52,218,203,.55),transparent 58%,rgba(84,120,255,.7),transparent 84%);filter:blur(8px);opacity:.58;z-index:-1;animation:v37EmblemSpin 10s linear infinite;}
+.yarin-emblem-shell img{width:78%;height:78%;object-fit:contain;filter:drop-shadow(0 10px 18px rgba(0,0,0,.34)) drop-shadow(0 0 16px rgba(39,203,221,.22));}
+@keyframes v37EmblemFloat{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-5px) scale(1.025)}}
+@keyframes v37EmblemSpin{to{transform:rotate(360deg)}}
+
+.rizq-title-lockup{gap:0;}
+.rizq-word-en{font-family:"Bodoni MT",Didot,"Times New Roman",Georgia,serif!important;font-size:clamp(4.7rem,8.2vw,8.6rem)!important;font-weight:700;letter-spacing:.045em!important;line-height:.88!important;text-transform:uppercase;}
+.rizq-word-ar{font-family:"Noto Naskh Arabic","Amiri","Traditional Arabic",Tahoma,serif!important;font-size:clamp(4.8rem,8.4vw,8.8rem)!important;font-weight:700;line-height:.92!important;margin-top:8px!important;}
+.rizq-word-en,.rizq-word-ar{background:linear-gradient(105deg,#2e61c8 0%,#54d7df 20%,#edfaff 36%,#25b8d7 52%,#3a70d7 72%,#b9f7ff 86%,#2761c5 100%)!important;background-size:240% 100%!important;text-shadow:0 0 18px rgba(47,158,255,.22),0 0 46px rgba(32,204,215,.12)!important;animation:v26GoldReveal 1s cubic-bezier(.16,1,.3,1) both,v37YarinShimmer 6.8s 1.3s ease-in-out infinite!important;}
+@keyframes v37YarinShimmer{0%,68%,100%{background-position:0 0}82%{background-position:100% 0}}
+.rizq-divider{margin:13px auto 6px;color:#55d6df}.rizq-divider span{background:linear-gradient(90deg,transparent,#45a8f3,#4fd4dc,transparent)!important}.rizq-divider b{color:#7be9ed;text-shadow:0 0 15px rgba(49,204,220,.65)}
+.hero-money-line{font-family:"Bodoni MT",Didot,Georgia,serif;font-size:clamp(1.22rem,2.1vw,1.72rem);font-weight:650;letter-spacing:.025em;color:#e9f6ff;margin:14px 0 0;text-shadow:0 3px 22px rgba(0,0,0,.45);}
+.hero-smart-line{font-family:Inter,ui-sans-serif,system-ui,sans-serif!important;font-size:clamp(1rem,1.6vw,1.28rem)!important;font-weight:750;letter-spacing:.09em!important;text-transform:uppercase;color:#66e0e5!important;margin:10px 0 0!important;text-shadow:0 0 22px rgba(50,200,215,.22)}
+.hero-public-copy{max-width:560px;color:rgba(233,244,255,.78)!important;font-size:.95rem!important;line-height:1.65!important;text-shadow:0 2px 14px rgba(0,0,0,.42)}
+.hero-mini-divider span{background:linear-gradient(90deg,transparent,#4679dc,#49d1d8,transparent)!important}.hero-mini-divider b{color:#62dfe4}
+
+.auth-card-v26{background:linear-gradient(150deg,rgba(5,18,42,.80),rgba(3,10,25,.92))!important;border-color:rgba(71,163,235,.34)!important;box-shadow:0 30px 90px rgba(0,0,0,.44),inset 0 0 0 1px rgba(62,214,222,.06),0 0 48px rgba(27,112,222,.11)!important;}
+.auth-card-v26:before{background:conic-gradient(from var(--auth-angle,0deg),transparent 0 36%,rgba(54,137,255,.92) 43%,transparent 49% 67%,rgba(61,221,217,.88) 73%,transparent 80%)!important;}
+.auth-section-kicker{color:#56dce0!important}.auth-section-kicker span{background:linear-gradient(90deg,transparent,#4cced6)!important}.auth-card-header h2{font-family:"Bodoni MT",Didot,Georgia,serif!important;font-weight:650!important;letter-spacing:.01em;color:#f5fbff!important}
+.auth-title-ornament{color:#50d5dd!important}.auth-title-ornament span{background:linear-gradient(90deg,transparent,#3f83dd,#4bd4da,transparent)!important}
+.auth-form-v26 label{color:#d7e9ff!important}.auth-input-wrap{background:linear-gradient(100deg,rgba(82,136,220,.48),rgba(53,210,213,.34),rgba(68,116,204,.48))!important}.auth-input-wrap:before{background:linear-gradient(90deg,transparent,rgba(82,216,223,.86),rgba(76,138,255,.88),transparent)!important}.auth-input-icon{color:#51d5da!important}.remember-row input{accent-color:#36b9cf!important}.forgot-password-link{color:#56b7ff!important}
+.auth-primary-v26{border-color:rgba(74,205,214,.64)!important;background:linear-gradient(105deg,#173f9b 0%,#1767d0 45%,#12a9bb 100%)!important;box-shadow:0 14px 30px rgba(17,95,193,.22),0 0 26px rgba(38,190,203,.10)!important}
+.auth-secondary-v26{border-color:rgba(76,148,230,.38)!important;color:#e9f7ff!important;background:rgba(7,24,52,.64)!important}
+.secure-login-v26 strong{color:#5ad7de!important}
+
+@media(max-width:900px){.yarin-emblem-shell{width:92px;border-radius:28px}.rizq-word-en{font-size:clamp(3.2rem,13vw,5.2rem)!important}.rizq-word-ar{font-size:clamp(3.25rem,13vw,5.3rem)!important}.hero-money-line{font-size:1.18rem}.hero-smart-line{font-size:.92rem!important;letter-spacing:.065em!important}}
+@media(prefers-reduced-motion:reduce){.yarin-emblem-shell,.yarin-emblem-shell:before,.rizq-word-en,.rizq-word-ar{animation:none!important}}
+
+/* ========================================================================== 
+   V38 — YARIN cinematic brand + Dubai night motion pass
+   ========================================================================== */
+.auth-cinematic-bg{
+  background-size:110% 110%,110% 110%,cover!important;
+  animation:v38DubaiPan 22s ease-in-out infinite alternate;
+  will-change:background-position,filter;
+}
+@keyframes v38DubaiPan{
+  0%{background-position:50% 50%,50% 50%,center;filter:brightness(.96) saturate(1.02)}
+  50%{background-position:47% 49%,47% 49%,center;filter:brightness(1.015) saturate(1.08)}
+  100%{background-position:53% 51%,53% 51%,center;filter:brightness(.985) saturate(1.05)}
+}
+.auth-cinematic-bg:before{animation:v26StarDrift 28s linear infinite,v38CityTwinkle 4.8s ease-in-out infinite alternate!important;}
+@keyframes v38CityTwinkle{0%{opacity:.17}55%{opacity:.30}100%{opacity:.22}}
+.auth-water-glow{
+  overflow:hidden;
+  background:linear-gradient(to top,rgba(0,91,214,.19),rgba(40,184,211,.05) 48%,transparent)!important;
+  animation:v38WaterBreathe 6.5s ease-in-out infinite alternate;
+}
+.auth-water-glow:after{
+  content:"";position:absolute;left:-30%;bottom:3%;width:160%;height:55%;
+  background:linear-gradient(100deg,transparent 30%,rgba(74,191,255,.10) 44%,rgba(82,231,219,.18) 50%,rgba(255,202,86,.07) 56%,transparent 70%);
+  filter:blur(14px);transform:translateX(-18%) skewX(-10deg);
+  animation:v38WaterSweep 9s ease-in-out infinite;
+}
+@keyframes v38WaterBreathe{to{opacity:.82;filter:blur(20px) brightness(1.14)}}
+@keyframes v38WaterSweep{0%,18%{transform:translateX(-24%) skewX(-10deg);opacity:.25}55%{opacity:.9}82%,100%{transform:translateX(24%) skewX(-10deg);opacity:.25}}
+
+.yarin-emblem-shell{
+  animation:v38EmblemLife 5.8s cubic-bezier(.4,0,.2,1) infinite!important;
+  transform-style:preserve-3d;
+}
+.yarin-emblem-shell:before{animation:v37EmblemSpin 12s linear infinite,v38HaloPulse 3.6s ease-in-out infinite!important;}
+.yarin-emblem-shell:after{
+  content:"";position:absolute;inset:8%;border-radius:26px;pointer-events:none;
+  background:linear-gradient(120deg,transparent 20%,rgba(255,255,255,.34) 42%,rgba(81,227,235,.22) 50%,transparent 68%);
+  transform:translateX(-150%) rotate(8deg);mix-blend-mode:screen;filter:blur(.4px);
+  animation:v38LogoGloss 6.2s ease-in-out infinite;
+}
+.yarin-emblem-shell img{animation:v38LogoInnerGlow 4.6s ease-in-out infinite alternate;}
+@keyframes v38EmblemLife{0%,100%{transform:translateY(0) rotateX(0) rotateY(0) scale(1)}50%{transform:translateY(-7px) rotateX(1.4deg) rotateY(-1.6deg) scale(1.028)}}
+@keyframes v38HaloPulse{0%,100%{opacity:.44;filter:blur(8px)}50%{opacity:.76;filter:blur(10px)}}
+@keyframes v38LogoGloss{0%,62%,100%{transform:translateX(-150%) rotate(8deg);opacity:0}72%{opacity:.8}84%{transform:translateX(150%) rotate(8deg);opacity:0}}
+@keyframes v38LogoInnerGlow{from{filter:drop-shadow(0 10px 18px rgba(0,0,0,.34)) drop-shadow(0 0 12px rgba(39,203,221,.18))}to{filter:drop-shadow(0 12px 20px rgba(0,0,0,.36)) drop-shadow(0 0 24px rgba(45,216,229,.42))}}
+
+.rizq-title-lockup{animation:v38TitleFloat 7s ease-in-out infinite;}
+.rizq-word-en,.rizq-word-ar{
+  animation:v26GoldReveal 1s cubic-bezier(.16,1,.3,1) both,v38YarinLuxuryShimmer 7.4s 1.25s ease-in-out infinite!important;
+  will-change:background-position,text-shadow,transform;
+}
+.rizq-word-ar{animation-delay:.12s,1.45s!important;}
+@keyframes v38TitleFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+@keyframes v38YarinLuxuryShimmer{
+  0%,64%,100%{background-position:0 0;text-shadow:0 0 18px rgba(47,158,255,.20),0 0 42px rgba(32,204,215,.10)}
+  78%{background-position:100% 0;text-shadow:0 0 22px rgba(87,193,255,.42),0 0 58px rgba(49,222,223,.22)}
+  88%{background-position:62% 0;text-shadow:0 0 17px rgba(47,158,255,.24),0 0 44px rgba(32,204,215,.12)}
+}
+.rizq-divider b,.hero-mini-divider b{animation:v38StarPulse 2.7s ease-in-out infinite;}
+@keyframes v38StarPulse{0%,100%{transform:scale(.92);opacity:.65}50%{transform:scale(1.16);opacity:1;text-shadow:0 0 18px rgba(92,231,235,.8)}}
+
+@media(prefers-reduced-motion:reduce){
+  .auth-cinematic-bg,.auth-cinematic-bg:before,.auth-water-glow,.auth-water-glow:after,
+  .yarin-emblem-shell,.yarin-emblem-shell:before,.yarin-emblem-shell:after,.yarin-emblem-shell img,
+  .rizq-title-lockup,.rizq-word-en,.rizq-word-ar,.rizq-divider b,.hero-mini-divider b{animation:none!important;}
+}
+
+
+/* V39 — secure email OTP password recovery */
+.reset-card-v39{width:min(470px,94vw);text-align:left;overflow:hidden}.reset-card-v39:before{content:"";position:absolute;inset:-2px;pointer-events:none;background:linear-gradient(110deg,transparent 25%,rgba(62,205,223,.14),transparent 58%);transform:translateX(-100%);animation:v39ResetSweep 7s ease-in-out infinite}.reset-badge-v39{display:inline-flex;padding:6px 10px;border-radius:999px;border:1px solid rgba(74,207,222,.25);background:rgba(8,39,70,.55);color:#61d8df;font-weight:800;font-size:.7rem;letter-spacing:.16em;margin-bottom:12px}.reset-card-v39 h3{text-align:left}.reset-card-v39>p{margin:0 0 18px}.reset-step-v39{display:grid;gap:11px;position:relative;z-index:1}.reset-step-v39 label{color:#d7e9ff;font-weight:700;font-size:.9rem}.reset-step-v39 .auth-primary-v26{margin-top:4px}.reset-note-v39{margin:0;color:#91a9c6!important;font-size:.79rem!important;line-height:1.45!important}.reset-otp-wrap-v39 input{font-size:1.35rem!important;letter-spacing:.42em;text-align:center;padding-left:48px!important}.reset-text-btn-v39{border:0;background:transparent;color:#56b7ff;cursor:pointer;font-weight:700;padding:7px 4px}.reset-text-btn-v39:disabled{opacity:.55;cursor:wait}.reset-success-v39{text-align:center;position:relative;z-index:1}.reset-success-v39 strong{display:block;color:#f3f8ff;font-size:1.2rem;margin:8px 0}.reset-success-v39 p{color:#9fb3cc}.reset-success-icon-v39{width:68px;height:68px;border-radius:50%;display:grid;place-items:center;margin:4px auto 12px;background:radial-gradient(circle at 35% 30%,#64e7dc,#1675db 60%,#0b2f70);color:#fff;font-size:2rem;box-shadow:0 0 0 8px rgba(62,205,223,.08),0 0 34px rgba(57,156,255,.3);animation:v39ResetSuccess 2.4s ease-in-out infinite}.reset-success-v39 .auth-primary-v26{width:100%;margin-top:15px}@keyframes v39ResetSweep{0%,68%,100%{transform:translateX(-110%)}82%{transform:translateX(110%)}}@keyframes v39ResetSuccess{50%{transform:scale(1.045);box-shadow:0 0 0 12px rgba(62,205,223,.05),0 0 42px rgba(57,156,255,.4)}}

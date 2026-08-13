@@ -1,36 +1,32 @@
-# Rizq رزق — Growth نمو
+# YARIN يارين
 
-**Plan • Manage • Grow · خطّط • أدر • نمُ**  
-**A Smarter Financial Life · لحياة مالية أذكى**
+**Your Money. Your Future.**  
+**Tomorrow Starts Today.**
 
-Rizq is a public, multi-user personal finance web application built with Flask,
-vanilla JavaScript and persistent PostgreSQL/Neon storage for production.
-Each account has isolated finance records and its own salary date, theme and
+YARIN is a public, multi-user personal finance web application built with Flask,
+vanilla JavaScript and persistent PostgreSQL/Neon storage for production. Each
+account has isolated finance records and its own salary date, theme and
 primary/secondary display currencies.
 
 ## Current experience
 
 - Premium responsive finance dashboard for desktop/ChromeOS and mobile.
 - Public registration/login with private user-isolated data.
+- Email OTP password reset through Brevo transactional email.
 - Income, Expenses, Savings, Family Transfer, EMI, Debt, Shopping, Notes,
   Salary Planner, Calculators, Search, Reports/PDF, Backup/Import and Settings.
-- Selectable **Primary + Secondary Currency** pair; the top switch, forms,
-  dashboard values, calculators and reference exchange chart follow the pair.
-- Dashboard **exchange-rate trend** with 7D / 1M / 3M / 1Y views.
-- Per-user **Salary Credit Date** and salary countdown.
-- **Azret AI** chat + voice assistant with English/Malayalam, conversation
-  history, finance-aware context and a responsive animated avatar experience.
-- Premium bilingual Rizq branding, splash animation, dark/light mode and PWA.
-- Hourly online dashboard wallpaper with a safe gradient fallback.
+- Selectable primary + secondary currency pair with dashboard and form updates.
+- Exchange-rate trend views and salary countdown.
+- Azret AI chat + voice assistant with finance-aware context.
+- Official YARIN emblem, animated login/splash, dark/light mode and PWA.
 
 ## Production architecture
 
 `GitHub → Render → Flask/Gunicorn → Neon PostgreSQL`
 
-Render production requires `DATABASE_URL` (Neon) and `GEMINI_API_KEY`. A
-`SECRET_KEY` can be supplied explicitly; if omitted in production, the app can
-persist a generated secret in the PostgreSQL system config. Never commit real
-secrets to the repository.
+Production requires `DATABASE_URL`. Gemini requires `GEMINI_API_KEY`. Password
+reset email requires `BREVO_API_KEY`, `BREVO_SENDER_EMAIL`, and
+`BREVO_SENDER_NAME`. Never commit real secrets to the repository.
 
 ## Run locally
 

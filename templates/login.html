@@ -4,11 +4,11 @@
   <meta name="csrf-token" content="{{ csrf_token }}">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>Rizq رزق — Sign In</title>
+  <title>YARIN يارين — Sign In</title>
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#06101f">
   <link rel="icon" id="faviconLink" href="{{ url_for('static', filename='icons/icon-192.png') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=26">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=42">
 </head>
 <body class="auth-body auth-v26">
   <div class="auth-cinematic-bg" aria-hidden="true">
@@ -21,24 +21,18 @@
   </div>
 
   <main class="auth-shell-v26">
-    <section class="auth-hero-v26" aria-label="Rizq brand introduction">
+    <section class="auth-hero-v26" aria-label="YARIN brand introduction">
+      <div class="yarin-emblem-shell" aria-hidden="true"><img src="{{ url_for('static', filename='icons/yarin-emblem.webp') }}" alt=""></div>
       <div class="rizq-title-lockup">
-        <h1 class="rizq-word-en">Rizq</h1>
+        <h1 class="rizq-word-en">YARIN</h1>
         <div class="rizq-divider" aria-hidden="true"><span></span><b>✦</b><span></span></div>
-        <div class="rizq-word-ar" lang="ar" dir="rtl">رزق</div>
+        <div class="rizq-word-ar" lang="ar" dir="rtl">يارين</div>
       </div>
 
-      <div class="hero-feature-row" aria-label="Plan Manage Grow">
-        <div class="hero-feature"><span class="hero-feature-icon" aria-hidden="true">◎</span><strong>Plan</strong></div>
-        <i></i>
-        <div class="hero-feature"><span class="hero-feature-icon" aria-hidden="true">▣</span><strong>Manage</strong></div>
-        <i></i>
-        <div class="hero-feature"><span class="hero-feature-icon" aria-hidden="true">↗</span><strong>Grow</strong></div>
-      </div>
-
-      <p class="hero-smart-line">A Smarter Financial Life</p>
+      <p class="hero-money-line">Your Money. Your Future.</p>
+      <p class="hero-smart-line">Tomorrow Starts Today.</p>
       <div class="hero-mini-divider" aria-hidden="true"><span></span><b>✦</b><span></span></div>
-      <p class="hero-public-copy">Your public finance platform — create an account<br class="desktop-only"> and manage your finances online.</p>
+      <p class="hero-public-copy">Plan with clarity. Manage with confidence.<br class="desktop-only"> Build the future you want.</p>
     </section>
 
     <section class="auth-card-v26" aria-label="Account access">
@@ -102,11 +96,44 @@
       </section>
 
       <div class="forgot-dialog" id="forgotDialog" hidden>
-        <div class="forgot-dialog-card" role="dialog" aria-modal="true" aria-labelledby="forgotTitle">
+        <div class="forgot-dialog-card reset-card-v39" role="dialog" aria-modal="true" aria-labelledby="forgotTitle">
           <button type="button" class="forgot-close" id="forgotClose" aria-label="Close">×</button>
-          <h3 id="forgotTitle">Forgot Password?</h3>
-          <p>For account security, password reset needs a verified recovery method. This public site does not expose an insecure reset shortcut.</p>
-          <button type="button" class="auth-secondary-v26" id="forgotOkay">Back to Sign In</button>
+          <div class="reset-badge-v39">YARIN · يارين</div>
+          <h3 id="forgotTitle">Reset Password</h3>
+          <p id="resetIntro">Enter the email address linked to your account.</p>
+
+          <form id="resetEmailForm" class="reset-step-v39">
+            <label for="resetEmail">Email address</label>
+            <div class="auth-input-wrap"><span class="auth-input-icon" aria-hidden="true">✉</span><input type="email" id="resetEmail" placeholder="you@example.com" required autocomplete="email"></div>
+            <p class="reset-note-v39">We’ll send a 6-digit one-time code. The code expires in 10 minutes.</p>
+            <p id="resetEmailError" class="form-error auth-error-v26" style="display:none"></p>
+            <button type="submit" class="auth-primary-v26"><span>Send OTP</span><b aria-hidden="true">›</b></button>
+          </form>
+
+          <form id="resetOtpForm" class="reset-step-v39" hidden>
+            <label for="resetOtp">6-digit OTP</label>
+            <div class="auth-input-wrap reset-otp-wrap-v39"><span class="auth-input-icon" aria-hidden="true">#</span><input type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" id="resetOtp" placeholder="000000" required autocomplete="one-time-code"></div>
+            <p class="reset-note-v39">Check your inbox and spam folder. Never share this code.</p>
+            <p id="resetOtpError" class="form-error auth-error-v26" style="display:none"></p>
+            <button type="submit" class="auth-primary-v26"><span>Verify OTP</span><b aria-hidden="true">›</b></button>
+            <button type="button" class="reset-text-btn-v39" id="resetResendBtn">Send code again</button>
+          </form>
+
+          <form id="resetPasswordForm" class="reset-step-v39" hidden>
+            <label for="resetNewPassword">New password</label>
+            <div class="auth-input-wrap password-field-v26"><span class="auth-input-icon" aria-hidden="true">▣</span><input type="password" id="resetNewPassword" minlength="8" maxlength="256" placeholder="Minimum 8 characters" required autocomplete="new-password"><button type="button" class="password-toggle-v26" data-target="resetNewPassword" aria-label="Show password">◉</button></div>
+            <label for="resetConfirmPassword">Confirm new password</label>
+            <div class="auth-input-wrap password-field-v26"><span class="auth-input-icon" aria-hidden="true">▣</span><input type="password" id="resetConfirmPassword" minlength="8" maxlength="256" placeholder="Re-enter new password" required autocomplete="new-password"><button type="button" class="password-toggle-v26" data-target="resetConfirmPassword" aria-label="Show password">◉</button></div>
+            <p id="resetPasswordError" class="form-error auth-error-v26" style="display:none"></p>
+            <button type="submit" class="auth-primary-v26"><span>Change Password</span><b aria-hidden="true">›</b></button>
+          </form>
+
+          <div id="resetSuccess" class="reset-success-v39" hidden>
+            <div class="reset-success-icon-v39">✓</div>
+            <strong>Password changed</strong>
+            <p>Your new password is ready. You can sign in now.</p>
+            <button type="button" class="auth-primary-v26" id="resetBackToLogin"><span>Back to Sign In</span><b aria-hidden="true">›</b></button>
+          </div>
         </div>
       </div>
     </section>
@@ -122,7 +149,7 @@ function setAuthPanel(which){
   loginPanel.hidden=!login;
   registerPanel.hidden=login;
   document.querySelector('.auth-section-kicker strong').textContent=login?'SIGN IN':'CREATE ACCOUNT';
-  document.querySelector('.auth-card-header h2').textContent=login?'Welcome Back!':'Join Rizq';
+  document.querySelector('.auth-card-header h2').textContent=login?'Welcome Back!':'Join YARIN';
 }
 showRegisterBtn.addEventListener('click',()=>setAuthPanel('register'));
 backToLoginBtn.addEventListener('click',()=>setAuthPanel('login'));
@@ -134,12 +161,75 @@ document.querySelectorAll('.password-toggle-v26').forEach(btn=>btn.addEventListe
 }));
 
 const forgotDialog=document.getElementById('forgotDialog');
-const openForgot=()=>{forgotDialog.hidden=false; requestAnimationFrame(()=>forgotDialog.classList.add('open'));};
-const closeForgot=()=>{forgotDialog.classList.remove('open'); setTimeout(()=>forgotDialog.hidden=true,180);};
+const resetEmailForm=document.getElementById('resetEmailForm');
+const resetOtpForm=document.getElementById('resetOtpForm');
+const resetPasswordForm=document.getElementById('resetPasswordForm');
+const resetSuccess=document.getElementById('resetSuccess');
+let resetEmailValue='';
+
+function setResetStep(step){
+  resetEmailForm.hidden=step!=='email';
+  resetOtpForm.hidden=step!=='otp';
+  resetPasswordForm.hidden=step!=='password';
+  resetSuccess.hidden=step!=='success';
+  const title=document.getElementById('forgotTitle'), intro=document.getElementById('resetIntro');
+  if(step==='email'){title.textContent='Reset Password';intro.textContent='Enter the email address linked to your account.';intro.hidden=false;setTimeout(()=>document.getElementById('resetEmail').focus(),50);}
+  if(step==='otp'){title.textContent='Check Your Email';intro.textContent='Enter the 6-digit code sent to your email.';intro.hidden=false;setTimeout(()=>document.getElementById('resetOtp').focus(),50);}
+  if(step==='password'){title.textContent='Create New Password';intro.textContent='Choose a strong new password for your account.';intro.hidden=false;setTimeout(()=>document.getElementById('resetNewPassword').focus(),50);}
+  if(step==='success'){title.textContent='All Set';intro.hidden=true;}
+}
+const openForgot=()=>{
+  const current=document.getElementById('username').value.trim();
+  if(current.includes('@'))document.getElementById('resetEmail').value=current;
+  setResetStep('email');forgotDialog.hidden=false;requestAnimationFrame(()=>forgotDialog.classList.add('open'));
+};
+const closeForgot=()=>{forgotDialog.classList.remove('open');setTimeout(()=>forgotDialog.hidden=true,180);};
 document.getElementById('forgotPasswordBtn').addEventListener('click',openForgot);
 document.getElementById('forgotClose').addEventListener('click',closeForgot);
-document.getElementById('forgotOkay').addEventListener('click',closeForgot);
+document.getElementById('resetBackToLogin').addEventListener('click',closeForgot);
 forgotDialog.addEventListener('click',e=>{if(e.target===forgotDialog)closeForgot();});
+
+async function resetPost(url,payload,errorEl,button){
+  errorEl.style.display='none';button.classList.add('loading');button.disabled=true;
+  try{
+    const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':(document.querySelector('meta[name="csrf-token"]')?.content||'')},body:JSON.stringify(payload)});
+    let data={};try{data=await res.json();}catch(_e){}
+    if(!res.ok){errorEl.textContent=data.error||'Something went wrong';errorEl.style.display='block';return null;}
+    return data;
+  }catch(_e){errorEl.textContent='Unable to reach server.';errorEl.style.display='block';return null;}
+  finally{button.classList.remove('loading');button.disabled=false;}
+}
+
+async function sendResetOtp(button){
+  const err=document.getElementById('resetEmailError');
+  resetEmailValue=document.getElementById('resetEmail').value.trim().toLowerCase();
+  const data=await resetPost('/api/password-reset/request',{email:resetEmailValue},err,button);
+  if(data){setResetStep('otp');}
+}
+resetEmailForm.addEventListener('submit',async e=>{e.preventDefault();await sendResetOtp(e.currentTarget.querySelector('button[type=submit]'));});
+document.getElementById('resetResendBtn').addEventListener('click',async e=>{
+  const err=document.getElementById('resetOtpError');err.style.display='none';
+  const btn=e.currentTarget;btn.disabled=true;btn.textContent='Sending…';
+  const ghost=document.createElement('button');ghost.className='loading';
+  try{
+    const res=await fetch('/api/password-reset/request',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':(document.querySelector('meta[name="csrf-token"]')?.content||'')},body:JSON.stringify({email:resetEmailValue})});
+    const data=await res.json();if(!res.ok){err.textContent=data.error||'Unable to resend code';err.style.display='block';}else{btn.textContent='Code sent ✓';setTimeout(()=>btn.textContent='Send code again',1800);}
+  }catch(_e){err.textContent='Unable to reach server.';err.style.display='block';}
+  finally{btn.disabled=false;if(btn.textContent==='Sending…')btn.textContent='Send code again';}
+});
+resetOtpForm.addEventListener('submit',async e=>{
+  e.preventDefault();const err=document.getElementById('resetOtpError');const btn=e.currentTarget.querySelector('button[type=submit]');
+  const code=document.getElementById('resetOtp').value.replace(/\D/g,'');
+  const data=await resetPost('/api/password-reset/verify',{email:resetEmailValue,code},err,btn);
+  if(data)setResetStep('password');
+});
+resetPasswordForm.addEventListener('submit',async e=>{
+  e.preventDefault();const err=document.getElementById('resetPasswordError');const btn=e.currentTarget.querySelector('button[type=submit]');
+  const password=document.getElementById('resetNewPassword').value,confirm_password=document.getElementById('resetConfirmPassword').value;
+  if(password!==confirm_password){err.textContent='Passwords do not match';err.style.display='block';return;}
+  const data=await resetPost('/api/password-reset/complete',{password,confirm_password},err,btn);
+  if(data){document.getElementById('password').value='';setResetStep('success');}
+});
 
 async function submitJson(url,payload,errorEl,button){
   errorEl.style.display='none'; button.classList.add('loading'); button.disabled=true;
