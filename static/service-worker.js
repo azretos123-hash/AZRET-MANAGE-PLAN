@@ -7,7 +7,7 @@
    from being replayed after logout on the same device.
 */
 
-const CACHE_NAME = 'yarin-cache-v53';
+const CACHE_NAME = 'yarin-cache-v64';
 const STATIC_ASSETS = [
   '/manifest.json',
   '/static/css/style.css',
@@ -55,7 +55,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Do not interfere with third-party online wallpaper/exchange-rate requests.
+  // Do not interfere with any explicitly requested third-party resources.
   if (url.origin !== self.location.origin) return;
 
   // Cache only our static assets. Network-first keeps deployments fresh.
@@ -69,7 +69,7 @@ self.addEventListener('fetch', (event) => {
           }
           return response;
         })
-        .catch(() => caches.match(request))
+        .catch(() => caches.match(request, { ignoreSearch: true }))
     );
   }
 });

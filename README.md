@@ -25,8 +25,9 @@ primary/secondary display currencies.
 `GitHub → Render → Flask/Gunicorn → Neon PostgreSQL`
 
 Production requires `DATABASE_URL`. Gemini requires `GEMINI_API_KEY`. Password
-reset email requires `BREVO_API_KEY`, `BREVO_SENDER_EMAIL`, and
-`BREVO_SENDER_NAME`. Never commit real secrets to the repository.
+reset email requires `BREVO_SENDER_EMAIL` plus either `BREVO_API_KEY` (preferred)
+or the optional Brevo SMTP fallback pair `BREVO_SMTP_LOGIN` + `BREVO_SMTP_KEY`.
+`BREVO_SENDER_NAME` is optional. Never commit real secrets to the repository.
 
 ## Run locally
 

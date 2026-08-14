@@ -388,10 +388,11 @@ def _ensure_settings_schema(c, owner_id):
             id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL,
             key TEXT NOT NULL, value TEXT, UNIQUE(user_id,key))''')
 
-    # If there is no account yet, keep legacy settings under temporary owner 0.
-    # The first registered account will claim them. This prevents data loss when
-    # upgrading an old single-user production database before registration.
-    legacy_owner = owner_id if owner_id is not None else 0
+    # SECURITY: never assign legacy single-user settings to whichever account
+    # happens to have the lowest id. Keep them quarantined under owner 0. The
+    # explicit LEGACY_OWNER_EMAIL / LEGACY_OWNER_USERNAME migration below (or in
+    # create_user) may claim them only after the configured identity matches.
+    legacy_owner = 0
     c.execute("SELECT key, value FROM settings_legacy")
     for row in c.fetchall():
         c.execute("INSERT INTO settings (user_id,key,value) VALUES (?,?,?) ON CONFLICT(user_id,key) DO NOTHING",
@@ -448,7 +449,7 @@ def init_db():
                     c.execute("UPDATE settings SET user_id=? WHERE user_id=0", (owner_id,))
 
         defaults = {
-            'theme': 'light', 'default_currency': 'AED', 'primary_currency': 'AED', 'secondary_currency': 'INR', 'exchange_rate': '22.60',
+            'theme': 'light', 'default_currency': 'AED', 'primary_currency': 'AED', 'secondary_currency': 'INR',
             'app_name': 'YARIN يارين', 'shopping_budget': '0',
             'splash_video_url': '',
             'theme_image_url': '', 'theme_video_url': '', 'logo_url': ''
@@ -527,16 +528,21 @@ def create_user(username, email, password):
             # deployment's configured legacy owner identity.
             legacy_email = (os.environ.get("LEGACY_OWNER_EMAIL") or "").strip().lower()
             legacy_username = (os.environ.get("LEGACY_OWNER_USERNAME") or "").strip().lower()
-            owner_match = bool(legacy_email and email.lower() == legacy_email)
-            if owner_match and legacy_username:
+            if legacy_email:
+                owner_match = email.lower() == legacy_email
+                if owner_match and legacy_username:
+                    owner_match = username.lower() == legacy_username
+            elif legacy_username:
                 owner_match = username.lower() == legacy_username
+            else:
+                owner_match = False
             if owner_match:
                 for table in DATA_TABLES + PAYMENT_TABLES:
                     c.execute(f"UPDATE {table} SET user_id=? WHERE user_id IS NULL", (user_id,))
                 c.execute("UPDATE settings SET user_id=? WHERE user_id=0", (user_id,))
 
         defaults = {
-            'theme': 'light', 'default_currency': 'AED', 'primary_currency': 'AED', 'secondary_currency': 'INR', 'exchange_rate': '22.60',
+            'theme': 'light', 'default_currency': 'AED', 'primary_currency': 'AED', 'secondary_currency': 'INR',
             'app_name': 'YARIN يارين', 'shopping_budget': '0',
             'splash_video_url': '',
             'theme_image_url': '', 'theme_video_url': '', 'logo_url': ''
@@ -591,8 +597,15 @@ def update_email(user_id, new_email):
 
 def update_password(user_id, new_password):
     conn = get_db(); c = conn.cursor()
-    c.execute("UPDATE users SET password_hash=? WHERE id=?", (generate_password_hash(new_password), user_id))
-    conn.commit(); conn.close()
+    try:
+        c.execute("UPDATE users SET password_hash=? WHERE id=?", (generate_password_hash(new_password), user_id))
+        conn.commit()
+        return c.rowcount > 0
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 def create_password_reset_code(user_id, code_hash, expires_at):
@@ -601,7 +614,15 @@ def create_password_reset_code(user_id, code_hash, expires_at):
         c.execute("UPDATE password_reset_codes SET consumed=1 WHERE user_id=? AND consumed=0", (user_id,))
         c.execute("INSERT INTO password_reset_codes (user_id, code_hash, expires_at, attempts, consumed, created_at) VALUES (?,?,?,?,0,CURRENT_TIMESTAMP)",
                   (user_id, code_hash, expires_at, 0))
+        # A public account may request password recovery many times over its
+        # lifetime. Keep only a bounded history so this auxiliary table cannot
+        # grow forever. This SQL works on both SQLite and PostgreSQL.
+        c.execute("DELETE FROM password_reset_codes WHERE user_id=? AND id NOT IN (SELECT id FROM password_reset_codes WHERE user_id=? ORDER BY id DESC LIMIT 20)",
+                  (user_id, user_id))
         conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         conn.close()
 
@@ -666,20 +687,40 @@ def fetch_one(table, record_id, user_id):
     row = c.fetchone(); conn.close(); return dict(row) if row else None
 
 
-def insert_record(table, data, user_id):
-    if table not in ALLOWED_TABLES: raise ValueError('unknown table')
+def insert_record(table, data, user_id, conn=None):
+    """Insert one user-scoped record.
+
+    An optional existing connection lets higher-level operations (notably backup
+    import) commit several related rows atomically. Normal CRUD callers keep the
+    previous one-call/one-commit behaviour.
+    """
+    if table not in ALLOWED_TABLES:
+        raise ValueError('unknown table')
     payload = dict(data); payload['user_id'] = user_id
-    conn = get_db(); c = conn.cursor()
-    keys = list(payload); values = [payload[k] for k in keys]
-    placeholders = ', '.join(['?'] * len(keys))
-    if IS_POSTGRES:
-        c.execute(f"INSERT INTO {table} ({', '.join(keys)}) VALUES ({placeholders}) RETURNING id", values)
-        new_id = c.fetchone()[0]
-    else:
-        c.execute(f"INSERT INTO {table} ({', '.join(keys)}) VALUES ({placeholders})", values)
-        c.execute("SELECT last_insert_rowid()")
-        new_id = c.fetchone()[0]
-    conn.commit(); conn.close(); return new_id
+    own_conn = conn is None
+    if own_conn:
+        conn = get_db()
+    c = conn.cursor()
+    try:
+        keys = list(payload); values = [payload[k] for k in keys]
+        placeholders = ', '.join(['?'] * len(keys))
+        if IS_POSTGRES:
+            c.execute(f"INSERT INTO {table} ({', '.join(keys)}) VALUES ({placeholders}) RETURNING id", values)
+            new_id = c.fetchone()[0]
+        else:
+            c.execute(f"INSERT INTO {table} ({', '.join(keys)}) VALUES ({placeholders})", values)
+            c.execute("SELECT last_insert_rowid()")
+            new_id = c.fetchone()[0]
+        if own_conn:
+            conn.commit()
+        return new_id
+    except Exception:
+        if own_conn:
+            conn.rollback()
+        raise
+    finally:
+        if own_conn:
+            conn.close()
 
 
 def update_record(table, record_id, data, user_id):
@@ -788,7 +829,7 @@ def get_dashboard_data(user_id, reference_date=None):
     total_income=scalar("SELECT COALESCE(SUM(amount),0) FROM income WHERE user_id=?",uid)
     total_expenses=scalar("SELECT COALESCE(SUM(amount),0) FROM expenses WHERE user_id=?",uid)
     total_savings=scalar("SELECT COALESCE(SUM(amount),0) FROM savings WHERE user_id=?",uid)
-    savings_goal=scalar("SELECT COALESCE(SUM(goal),0) FROM savings WHERE user_id=?",uid)
+    savings_goal=scalar("SELECT COALESCE(MAX(goal),0) FROM savings WHERE user_id=?",uid)
     total_family=scalar("SELECT COALESCE(SUM(amount),0) FROM family_transfers WHERE user_id=?",uid)
     total_emi=scalar("SELECT COALESCE(SUM(amount),0) FROM emi WHERE user_id=?",uid)
     emi_paid=scalar("SELECT COALESCE(SUM(paid),0) FROM emi WHERE user_id=?",uid)
@@ -810,7 +851,12 @@ def get_dashboard_data(user_id, reference_date=None):
     monthly_income=scalar("SELECT COALESCE(SUM(amount),0) FROM income WHERE user_id=? AND date LIKE ?",(user_id,f"{this_month}%"))
     monthly_expense=scalar("SELECT COALESCE(SUM(amount),0) FROM expenses WHERE user_id=? AND date LIKE ?",(user_id,f"{this_month}%"))
     monthly_savings=scalar("SELECT COALESCE(SUM(amount),0) FROM savings WHERE user_id=? AND date LIKE ?",(user_id,f"{this_month}%"))
-    monthly_available=monthly_income-monthly_expense
+    monthly_family=scalar("SELECT COALESCE(SUM(amount),0) FROM family_transfers WHERE user_id=? AND date LIKE ?",(user_id,f"{this_month}%"))
+    # EMI/debt parent rows store lifetime paid totals. Monthly cash flow must use
+    # the payment ledgers, otherwise old repayments get charged to every month.
+    monthly_emi_payments=scalar("SELECT COALESCE(SUM(amount),0) FROM emi_payments WHERE user_id=? AND date LIKE ?",(user_id,f"{this_month}%"))
+    monthly_debt_payments=scalar("SELECT COALESCE(SUM(amount),0) FROM debt_payments WHERE user_id=? AND date LIKE ?",(user_id,f"{this_month}%"))
+    monthly_available=monthly_income-monthly_expense-monthly_family-monthly_emi_payments-monthly_debt_payments
 
     months=[]; income_series=[]; expense_series=[]
     for i in range(5,-1,-1):
@@ -821,7 +867,11 @@ def get_dashboard_data(user_id, reference_date=None):
         expense_series.append(scalar("SELECT COALESCE(SUM(amount),0) FROM expenses WHERE user_id=? AND date LIKE ?",(user_id,f"{m}%")))
     c.execute("SELECT category,COALESCE(SUM(amount),0) cat_total FROM expenses WHERE user_id=? GROUP BY category ORDER BY cat_total DESC",(user_id,))
     cat_rows=c.fetchall(); categories=[r['category'] for r in cat_rows]; category_totals=[r['cat_total'] for r in cat_rows]
-    running=0; savings_series=[]
+    # Savings Growth should remain a cumulative balance even when the chart only
+    # displays the latest six months. Include savings created before the window
+    # as the opening balance instead of incorrectly restarting at zero.
+    first_month = months[0] if months else this_month
+    running=scalar("SELECT COALESCE(SUM(amount),0) FROM savings WHERE user_id=? AND date < ?", (user_id, f"{first_month}-01")); savings_series=[]
     for m in months:
         running += scalar("SELECT COALESCE(SUM(amount),0) FROM savings WHERE user_id=? AND date LIKE ?",(user_id,f"{m}%")); savings_series.append(running)
     conn.close()
@@ -831,7 +881,8 @@ def get_dashboard_data(user_id, reference_date=None):
         'total_debt':total_debt,'debt_paid':debt_paid,'outstanding_debt':outstanding_debt,
         'total_shopping':total_shopping,'net_balance':net_balance,
         'monthly_income':monthly_income,'monthly_expense':monthly_expense,'monthly_savings':monthly_savings,
-        'monthly_available':monthly_available,
+        'monthly_family_transfer':monthly_family,'monthly_emi_payments':monthly_emi_payments,
+        'monthly_debt_payments':monthly_debt_payments,'monthly_available':monthly_available,
         'chart_months':months,'chart_income':income_series,'chart_expense':expense_series,
         'chart_savings_growth':savings_series,'chart_categories':categories,'chart_category_totals':category_totals}
 
@@ -906,11 +957,24 @@ def delete_user_asset(user_id, kind):
     return deleted
 
 
-def save_settings(data, user_id):
-    conn=get_db(); c=conn.cursor()
-    for k,v in data.items():
-        c.execute("INSERT INTO settings (user_id,key,value) VALUES (?,?,?) ON CONFLICT(user_id,key) DO UPDATE SET value=excluded.value",(user_id,k,str(v)))
-    conn.commit(); conn.close()
+def save_settings(data, user_id, conn=None):
+    """Upsert settings, optionally participating in a caller transaction."""
+    own_conn = conn is None
+    if own_conn:
+        conn = get_db()
+    c = conn.cursor()
+    try:
+        for k,v in data.items():
+            c.execute("INSERT INTO settings (user_id,key,value) VALUES (?,?,?) ON CONFLICT(user_id,key) DO UPDATE SET value=excluded.value",(user_id,k,str(v)))
+        if own_conn:
+            conn.commit()
+    except Exception:
+        if own_conn:
+            conn.rollback()
+        raise
+    finally:
+        if own_conn:
+            conn.close()
 
 
 def clear_all_data(user_id):

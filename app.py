@@ -6,6 +6,8 @@ import io
 import time
 import math
 import mimetypes
+import smtplib
+from email.message import EmailMessage
 import threading
 import secrets
 import hmac
@@ -95,6 +97,19 @@ def _rate_limit(bucket, key, limit, window_seconds):
     now = time.time()
     token = (bucket, str(key or 'unknown'))
     with _rate_lock:
+        # Public traffic can introduce an unbounded number of one-off IP keys.
+        # Periodically prune stale buckets and cap the in-process map so abuse
+        # protection itself cannot become a memory leak on a long-lived worker.
+        if len(_rate_buckets) > 4096:
+            stale_before = now - 3600
+            for old_key, old_q in list(_rate_buckets.items()):
+                if not old_q or old_q[-1] <= stale_before:
+                    _rate_buckets.pop(old_key, None)
+            if len(_rate_buckets) > 8192:
+                excess = len(_rate_buckets) - 8192
+                oldest = sorted(_rate_buckets, key=lambda k: _rate_buckets[k][-1] if _rate_buckets[k] else 0)[:excess]
+                for old_key in oldest:
+                    _rate_buckets.pop(old_key, None)
         q = _rate_buckets[token]
         cutoff = now - window_seconds
         while q and q[0] <= cutoff:
@@ -241,7 +256,9 @@ def api_register():
         return jsonify({'success': False, 'error': 'Unable to create account'}), 400
 
     session.clear()
-    session.permanent = True
+    # Registration does not expose a 'Remember me' choice. Use a browser-session
+    # login by default; users can opt into the 30-day session on normal sign-in.
+    session.permanent = False
     session['user_id'] = user_id
     session['username'] = username
     return jsonify({'success': True, 'redirect': url_for('splash')})
@@ -260,8 +277,9 @@ def api_login():
 
     user = db.get_user_by_login(login_value)
     if user and check_password_hash(user['password_hash'], password):
+        remember = data.get('remember') is True or str(data.get('remember', '')).strip().lower() in {'1', 'true', 'yes', 'on'}
         session.clear()
-        session.permanent = True
+        session.permanent = remember
         session['user_id'] = user['id']
         session['username'] = user['username']
         return jsonify({'success': True, 'redirect': url_for('splash')})
@@ -285,37 +303,104 @@ def _as_utc_datetime(value):
     return dt.astimezone(timezone.utc)
 
 
+def _clean_env_value(name, default=''):
+    """Read a Render/env value safely, tolerating accidental wrapping quotes."""
+    value = str(os.environ.get(name, default) or '').strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+        value = value[1:-1].strip()
+    return value
+
+
+def _password_reset_email_html(code):
+    return f'''<!doctype html><html><body style="margin:0;background:#06101f;font-family:Arial,sans-serif;color:#eaf4ff">
+    <div style="max-width:560px;margin:24px auto;padding:32px;border-radius:24px;background:#0b1b36;border:1px solid #1f6fbb">
+      <div style="font-size:13px;letter-spacing:4px;color:#5ad7e0">YARIN · يارين</div>
+      <h1 style="margin:14px 0 8px;font-size:26px">Reset your password</h1>
+      <p style="color:#b7c7dc;line-height:1.6">Use this one-time code to continue. It expires in 10 minutes.</p>
+      <div style="margin:26px 0;padding:18px;text-align:center;border-radius:16px;background:#07152b;border:1px solid #2e8cff;font-size:34px;font-weight:800;letter-spacing:10px;color:#ffffff">{code}</div>
+      <p style="color:#8fa5c1;font-size:13px;line-height:1.5">If you did not request this code, you can ignore this email. Never share this code with anyone.</p>
+      <div style="margin-top:20px;color:#5ad7e0;font-size:12px">Your Money. Your Future. · Tomorrow Starts Today.</div>
+    </div></body></html>'''
+
+
+def _send_password_reset_via_brevo_smtp(email, code, sender_email, sender_name):
+    """Optional fallback when the Brevo REST API key is unavailable/rejected."""
+    smtp_login = _clean_env_value('BREVO_SMTP_LOGIN')
+    smtp_key = _clean_env_value('BREVO_SMTP_KEY')
+    if not smtp_login or not smtp_key:
+        return False
+
+    msg = EmailMessage()
+    msg['Subject'] = 'YARIN password reset code'
+    msg['From'] = f'{sender_name} <{sender_email}>'
+    msg['To'] = email
+    msg.set_content(f'Your YARIN password reset code is {code}. It expires in 10 minutes.')
+    msg.add_alternative(_password_reset_email_html(code), subtype='html')
+    try:
+        with smtplib.SMTP('smtp-relay.brevo.com', 587, timeout=12) as smtp:
+            smtp.ehlo()
+            smtp.starttls()
+            smtp.ehlo()
+            smtp.login(smtp_login, smtp_key)
+            smtp.send_message(msg)
+        return True
+    except Exception as exc:
+        app.logger.error('Brevo SMTP password reset fallback failed: %s', str(exc)[:300])
+        return False
+
+
+def _password_email_configured():
+    sender_email = _clean_env_value('BREVO_SENDER_EMAIL')
+    return bool(sender_email and (
+        _clean_env_value('BREVO_API_KEY') or
+        (_clean_env_value('BREVO_SMTP_LOGIN') and _clean_env_value('BREVO_SMTP_KEY'))
+    ))
+
+
 def _send_password_reset_email(email, code):
-    api_key = (os.environ.get('BREVO_API_KEY') or '').strip()
-    sender_email = (os.environ.get('BREVO_SENDER_EMAIL') or '').strip()
-    sender_name = (os.environ.get('BREVO_SENDER_NAME') or 'YARIN').strip() or 'YARIN'
-    if not api_key or not sender_email:
+    api_key = _clean_env_value('BREVO_API_KEY')
+    sender_email = _clean_env_value('BREVO_SENDER_EMAIL')
+    sender_name = _clean_env_value('BREVO_SENDER_NAME', 'YARIN') or 'YARIN'
+    smtp_configured = bool(_clean_env_value('BREVO_SMTP_LOGIN') and _clean_env_value('BREVO_SMTP_KEY'))
+    if not sender_email or not (api_key or smtp_configured):
         raise RuntimeError('email_service_not_configured')
 
-    payload = {
-        'sender': {'name': sender_name, 'email': sender_email},
-        'to': [{'email': email}],
-        'subject': 'YARIN password reset code',
-        'htmlContent': f'''<!doctype html><html><body style="margin:0;background:#06101f;font-family:Arial,sans-serif;color:#eaf4ff">
-        <div style="max-width:560px;margin:24px auto;padding:32px;border-radius:24px;background:#0b1b36;border:1px solid #1f6fbb">
-          <div style="font-size:13px;letter-spacing:4px;color:#5ad7e0">YARIN · يارين</div>
-          <h1 style="margin:14px 0 8px;font-size:26px">Reset your password</h1>
-          <p style="color:#b7c7dc;line-height:1.6">Use this one-time code to continue. It expires in 10 minutes.</p>
-          <div style="margin:26px 0;padding:18px;text-align:center;border-radius:16px;background:#07152b;border:1px solid #2e8cff;font-size:34px;font-weight:800;letter-spacing:10px;color:#ffffff">{code}</div>
-          <p style="color:#8fa5c1;font-size:13px;line-height:1.5">If you did not request this code, you can ignore this email. Never share this code with anyone.</p>
-          <div style="margin-top:20px;color:#5ad7e0;font-size:12px">Your Money. Your Future. · Tomorrow Starts Today.</div>
-        </div></body></html>'''
-    }
-    response = requests.post(
-        'https://api.brevo.com/v3/smtp/email',
-        headers={'accept': 'application/json', 'api-key': api_key, 'content-type': 'application/json'},
-        json=payload,
-        timeout=10,
-    )
-    if not 200 <= response.status_code < 300:
-        app.logger.error('Brevo password reset email failed: status=%s body=%s', response.status_code, (response.text or '')[:500])
+    # Prefer Brevo REST. If REST fails and SMTP credentials are present, use
+    # Brevo SMTP relay as a transparent fallback.
+    if api_key:
+        payload = {
+            'sender': {'name': sender_name, 'email': sender_email},
+            'to': [{'email': email}],
+            'subject': 'YARIN password reset code',
+            'htmlContent': _password_reset_email_html(code),
+        }
+        try:
+            response = requests.post(
+                'https://api.brevo.com/v3/smtp/email',
+                headers={'accept': 'application/json', 'api-key': api_key, 'content-type': 'application/json'},
+                json=payload,
+                timeout=10,
+            )
+        except requests.RequestException as exc:
+            app.logger.error('Brevo password reset API network failure: %s', str(exc)[:300])
+            if _send_password_reset_via_brevo_smtp(email, code, sender_email, sender_name):
+                return
+            raise RuntimeError('email_send_failed:network') from exc
+
+        if 200 <= response.status_code < 300:
+            return
+        app.logger.error(
+            'Brevo password reset email failed: status=%s body=%s',
+            response.status_code,
+            (response.text or '')[:500],
+        )
+        if _send_password_reset_via_brevo_smtp(email, code, sender_email, sender_name):
+            return
         raise RuntimeError(f'email_send_failed:{response.status_code}')
 
+    if _send_password_reset_via_brevo_smtp(email, code, sender_email, sender_name):
+        return
+    raise RuntimeError('email_send_failed:smtp')
 
 @app.route('/api/password-reset/request', methods=['POST'])
 def password_reset_request():
@@ -323,7 +408,7 @@ def password_reset_request():
     if retry_after:
         return jsonify({'success': False, 'error': 'Too many reset requests. Please wait and try again.'}), 429, {'Retry-After': str(retry_after)}
 
-    if not (os.environ.get('BREVO_API_KEY') or '').strip() or not (os.environ.get('BREVO_SENDER_EMAIL') or '').strip():
+    if not _password_email_configured():
         return jsonify({'success': False, 'error': 'Password recovery email is not configured yet.'}), 503
 
     data = request.get_json() or {}
@@ -349,7 +434,7 @@ def password_reset_request():
         code = str(exc).split(':', 1)[1] if ':' in str(exc) else ''
         hint = 'Check Brevo sender verification, API key, and account sending activation.'
         if code in ('401','403'):
-            hint = 'Brevo rejected the credentials or account sending permission. Check the API key and complete any Brevo phone/account verification.'
+            hint = 'Brevo rejected the API credentials. Replace BREVO_API_KEY in Render with an active Brevo API v3 key, and make sure BREVO_SENDER_EMAIL is verified.'
         elif code == '429':
             hint = 'Brevo rate limit was reached. Wait briefly and try again.'
         return jsonify({'success': False, 'error': 'Unable to send the reset email right now.', 'provider': 'Brevo', 'provider_status': code, 'hint': hint}), 502
@@ -418,7 +503,10 @@ def password_reset_complete():
     if password != confirm:
         return jsonify({'success': False, 'error': 'Passwords do not match'}), 400
 
-    db.update_password(user_id, password)
+    if not db.update_password(user_id, password):
+        session.pop('password_reset_user_id', None)
+        session.pop('password_reset_verified_at', None)
+        return jsonify({'success': False, 'error': 'Account is no longer available. Request a new reset if needed.'}), 404
     db.clear_password_reset_codes(user_id)
     session.pop('password_reset_user_id', None)
     session.pop('password_reset_verified_at', None)
@@ -988,34 +1076,55 @@ def _gemini_models_to_try():
 
 
 
+_GEMINI_MODEL_CACHE_LOCK = threading.Lock()
+_GEMINI_MODEL_CACHE = {'key_hash': '', 'models': None, 'expires_at': 0.0}
+
 def _gemini_runtime_models(api_key):
-    """Return generateContent models this API key can actually access.
-    Falls back to the static preference list if model discovery is unavailable.
+    """Return a short, cached list of generateContent models this key can use.
+
+    V63 rediscovered models on every chat request and could then try as many as
+    eight models twice (SDK + REST). Under provider trouble that made one user
+    request approach/exceed the web-server timeout. Cache discovery for an hour
+    and cap fallbacks to three low-latency candidates.
     """
     preferred = _gemini_models_to_try()
+    key_hash = hashlib.sha256(str(api_key).encode('utf-8')).hexdigest()[:16]
+    now = time.time()
+    with _GEMINI_MODEL_CACHE_LOCK:
+        if (
+            _GEMINI_MODEL_CACHE.get('key_hash') == key_hash and
+            _GEMINI_MODEL_CACHE.get('models') and
+            float(_GEMINI_MODEL_CACHE.get('expires_at') or 0) > now
+        ):
+            return list(_GEMINI_MODEL_CACHE['models'])
+
+    result = preferred[:3]
+    ttl = 300
     try:
         res = requests.get(
             'https://generativelanguage.googleapis.com/v1beta/models',
-            params={'pageSize': 100}, headers={'x-goog-api-key': api_key}, timeout=8
+            params={'pageSize': 100}, headers={'x-goog-api-key': api_key}, timeout=5
         )
         if not (200 <= res.status_code < 300):
             app.logger.warning('Gemini model discovery failed status=%s body=%s', res.status_code, (res.text or '')[:400])
-            return preferred
-        accessible = []
-        for item in (res.json().get('models') or []):
-            name = str(item.get('name') or '').removeprefix('models/')
-            methods = item.get('supportedGenerationMethods') or []
-            if name and 'generateContent' in methods:
-                accessible.append(name)
-        if not accessible:
-            return preferred
-        ordered = [m for m in preferred if m in accessible]
-        # If the account exposes a newer/different Flash model, use it after preferred stable choices.
-        ordered.extend(m for m in accessible if 'flash' in m.lower() and m not in ordered)
-        return ordered[:8] or preferred
+        else:
+            accessible = []
+            for item in (res.json().get('models') or []):
+                name = str(item.get('name') or '').removeprefix('models/')
+                methods = item.get('supportedGenerationMethods') or []
+                if name and 'generateContent' in methods:
+                    accessible.append(name)
+            if accessible:
+                ordered = [m for m in preferred if m in accessible]
+                ordered.extend(m for m in accessible if 'flash' in m.lower() and m not in ordered)
+                result = (ordered or preferred)[:3]
+                ttl = 3600
     except Exception as exc:
         app.logger.warning('Gemini model discovery exception: %s', str(exc)[:300])
-        return preferred
+
+    with _GEMINI_MODEL_CACHE_LOCK:
+        _GEMINI_MODEL_CACHE.update({'key_hash': key_hash, 'models': list(result), 'expires_at': now + ttl})
+    return list(result)
 
 def _build_ai_system_instruction(user_name, language_key, mode):
     if language_key.startswith('ml'):
@@ -1044,7 +1153,10 @@ def _build_ai_system_instruction(user_name, language_key, mode):
         "Do not repeat a canned greeting or repeat the same financial summary unless it directly answers the new question. "
         "Personality: warm, friendly, lightly playful and encouraging. Small tasteful jokes or affectionate phrases are welcome in casual conversation, but never overdo them and never let humor reduce financial accuracy. "
         "For serious finance questions, give the direct accurate answer first, then optional friendly encouragement. Avoid possessive or manipulative language. "
-        "Never claim that saved app data is current real-world information. If current/live external information is requested and no live search tool is available, say that limitation clearly."
+        "Never claim that saved app data is current real-world information. "
+        "When a YARIN LIVE EXCHANGE REFERENCE is supplied in the current message, it was fetched server-side immediately for this turn: use that value as the source of truth for current/daily FX questions and never replace it with a memorized exchange rate. "
+        "When a YARIN LIVE GOLD REFERENCE is supplied in the current message, use that server-fetched value as the source of truth for current/daily gold-price questions and never replace it with a memorized gold price. "
+        "If current/live external information is requested and no YARIN live reference or other live tool is supplied, say that limitation clearly."
     )
 
 
@@ -1057,7 +1169,10 @@ def _is_finance_related(query, history=None):
     keywords = [
         'money', 'finance', 'financial', 'budget', 'income', 'salary', 'expense', 'saving', 'savings',
         'emi', 'debt', 'loan', 'balance', 'cash', 'aed', 'inr', 'rupee', 'dirham', 'shopping', 'spend', 'payment',
-        'വരുമാനം', 'ശമ്പളം', 'ചിലവ്', 'ചെലവ്', 'സേവിംഗ്', 'സമ്പാദ്യം', 'കടം', 'ഇഎംഐ', 'ഇ.എം.ഐ', 'ബാലൻസ്', 'പണം', 'ബജറ്റ്'
+        'exchange', 'exchange rate', 'forex', 'currency rate', 'convert currency', 'conversion rate',
+        'gold', 'gold rate', 'gold price', 'xau', '24k', '22k', '21k', '18k', 'സ്വർണം', 'സ്വര്‍ണം', 'ഗോൾഡ്', 'ഗോള്‍ഡ്',
+        'വരുമാനം', 'ശമ്പളം', 'ചിലവ്', 'ചെലവ്', 'സേവിംഗ്', 'സമ്പാദ്യം', 'കടം', 'ഇഎംഐ', 'ഇ.എം.ഐ', 'ബാലൻസ്', 'പണം', 'ബജറ്റ്',
+        'എക്സ്ചേഞ്ച്', 'റേറ്റ്', 'വിനിമയ നിരക്ക്', 'ദിർഹം', 'ദിര്‍ഹം', 'രൂപ'
     ]
     if any(k in current for k in keywords):
         return True
@@ -1068,6 +1183,292 @@ def _is_finance_related(query, history=None):
         if prev_users and any(k in prev_users[-1] for k in keywords):
             return True
     return False
+
+
+_FX_QUERY_TERMS = (
+    'exchange', 'exchange rate', 'forex', 'currency rate', 'conversion rate', 'convert currency',
+    'today rate', "today's rate", 'current rate', 'live rate',
+    'എക്സ്ചേഞ്ച്', 'വിനിമയ നിരക്ക്', 'ഇന്നത്തെ റേറ്റ്', 'ഇന്നത്തെ നിരക്ക്', 'റേറ്റ് എത്ര'
+)
+
+_FX_ALIASES = {
+    'dirham': 'AED', 'dirhams': 'AED', 'uae dirham': 'AED', 'ദിർഹം': 'AED', 'ദിര്‍ഹം': 'AED',
+    'rupee': 'INR', 'rupees': 'INR', 'indian rupee': 'INR', 'രൂപ': 'INR',
+    'dollar': 'USD', 'dollars': 'USD', 'us dollar': 'USD', 'ഡോളർ': 'USD',
+    'euro': 'EUR', 'euros': 'EUR', 'യൂറോ': 'EUR',
+    'pound': 'GBP', 'pounds': 'GBP', 'british pound': 'GBP',
+    'riyal': 'SAR', 'saudi riyal': 'SAR', 'റിയാൽ': 'SAR',
+    'qatar riyal': 'QAR', 'qatari riyal': 'QAR',
+    'dinar': 'KWD', 'kuwaiti dinar': 'KWD',
+    'omani rial': 'OMR', 'rial': 'OMR',
+}
+
+
+def _is_exchange_rate_query(query):
+    text = str(query or '').strip().lower()
+    if any(term in text for term in _FX_QUERY_TERMS):
+        return True
+    codes = re.findall(r'(?<![A-Za-z])([A-Za-z]{3})(?![A-Za-z])', str(query or ''))
+    valid = [c.upper() for c in codes if c.upper() in FINANCE_SUITE_CURRENCIES]
+    return len(set(valid)) >= 2
+
+
+def _is_simple_fx_quote_query(query):
+    if not _is_exchange_rate_query(query):
+        return False
+    text = str(query or '').strip().lower()
+    # Questions asking for analysis/calculation still go through Gemini, but with
+    # the verified live reference attached. Simple "what is today's rate?"
+    # requests are answered deterministically so the model cannot hallucinate.
+    analysis_terms = (
+        'why', 'trend', 'forecast', 'predict', 'tomorrow', 'history', 'compare', 'explain',
+        'convert ', 'how much', 'send ', 'remit', 'bank rate', 'exchange house',
+        'എന്തുകൊണ്ട്', 'ട്രെൻഡ്', 'നാളെ', 'കണക്കാക്ക', 'എത്ര കിട്ടും'
+    )
+    if any(term in text for term in analysis_terms):
+        return False
+    numbers = re.findall(r'(?<![A-Za-z])\d+(?:\.\d+)?', text)
+    if any(float(n) > 1 for n in numbers):
+        return False
+    return len(text) <= 180
+
+
+def _extract_fx_pair_for_ai(query, user_id):
+    text = str(query or '')
+    lower = text.lower()
+    found = []
+    # Preserve mention order for explicit ISO codes.
+    for match in re.finditer(r'(?<![A-Za-z])([A-Za-z]{3})(?![A-Za-z])', text):
+        code = match.group(1).upper()
+        if code in FINANCE_SUITE_CURRENCIES:
+            found.append((match.start(), code))
+    # Add common natural-language currency names, including Malayalam aliases.
+    for alias, code in _FX_ALIASES.items():
+        start = 0
+        while True:
+            idx = lower.find(alias, start)
+            if idx < 0:
+                break
+            found.append((idx, code))
+            start = idx + max(1, len(alias))
+    found.sort(key=lambda x: x[0])
+    ordered = []
+    for _, code in found:
+        if code not in ordered:
+            ordered.append(code)
+    settings = _normalize_currency_settings(db.get_settings(user_id))
+    primary, secondary = settings['primary_currency'], settings['secondary_currency']
+    if len(ordered) >= 2:
+        return ordered[0], ordered[1]
+    if len(ordered) == 1:
+        code = ordered[0]
+        other = secondary if code != secondary else primary
+        if other == code:
+            other = 'INR' if code != 'INR' else 'AED'
+        return code, other
+    return primary, secondary
+
+
+def _live_fx_reference_for_ai(user_id, query):
+    """Fetch the latest server-side daily reference rate for an AI exchange query.
+
+    The model must never invent a current exchange rate from training memory.
+    This reference is fetched by YARIN immediately before the Gemini request.
+    """
+    if not _is_exchange_rate_query(query):
+        return None
+    try:
+        base, quote = _extract_fx_pair_for_ai(query, user_id)
+        if base == quote:
+            return {'base': base, 'quote': quote, 'rate': 1.0,
+                    'date': datetime.now(timezone.utc).date().isoformat(), 'provider': 'YARIN'}
+        data = _fx_cached(
+            f'ai-rate:{base}:{quote}', 120,
+            lambda: _fx_get_json(f'/v2/rate/{base}/{quote}', timeout=5)
+        )
+        rate = float(data.get('rate') or 0)
+        if not math.isfinite(rate) or rate <= 0:
+            raise ValueError('Invalid live FX rate')
+        rate_date = str(data.get('date') or '').strip()
+        # Persist AED-based verified rates so the UI and AI share one source of truth.
+        if base == 'AED':
+            db.save_settings({f'fx_rate_{quote}': rate, f'fx_rate_date_{quote}': rate_date}, user_id)
+            if quote == 'INR':
+                db.save_settings({'exchange_rate': rate}, user_id)
+        return {'base': base, 'quote': quote, 'rate': rate, 'date': rate_date, 'provider': 'Frankfurter'}
+    except Exception as exc:
+        app.logger.warning('AI live FX lookup failed: %s', str(exc)[:240])
+        return None
+
+
+def _format_live_fx_context(live_fx):
+    if not live_fx:
+        return ''
+    date_text = live_fx.get('date') or 'latest available business day'
+    return (
+        "YARIN LIVE EXCHANGE REFERENCE (server-fetched for this turn; SOURCE OF TRUTH):\n"
+        f"1 {live_fx['base']} = {float(live_fx['rate']):.6f} {live_fx['quote']}\n"
+        f"Reference date: {date_text}\n"
+        f"Provider: {live_fx.get('provider') or 'reference provider'}\n"
+        "Use this supplied rate for any current/today/daily exchange-rate answer. "
+        "Do NOT substitute a remembered/model-training rate. Explain that this is a reference rate and that bank, card, remittance, or exchange-house customer rates can differ."
+    )
+
+
+def _direct_fx_fallback_reply(live_fx, language_key):
+    if not live_fx:
+        return None
+    base, quote, rate = live_fx['base'], live_fx['quote'], float(live_fx['rate'])
+    date_text = live_fx.get('date') or 'latest available business day'
+    if str(language_key or '').startswith('ml'):
+        return (f"ഏറ്റവും പുതിയ reference rate: 1 {base} = {rate:.4f} {quote}. "
+                f"Reference date: {date_text}. Bank/remittance/exchange-house rate അല്പം വ്യത്യാസപ്പെടാം.")
+    return (f"Latest reference rate: 1 {base} = {rate:.4f} {quote}. "
+            f"Reference date: {date_text}. Bank, remittance, card, or exchange-house rates may differ slightly.")
+
+
+_GOLD_QUERY_TERMS = (
+    'gold', 'gold rate', 'gold price', 'xau', '24k', '22k', '21k', '18k',
+    'സ്വർണം', 'സ്വര്‍ണം', 'സ്വർണ്ണം', 'സ്വര്‍ണ്ണം', 'ഗോൾഡ്', 'ഗോള്‍ഡ്'
+)
+_GOLD_SUPPORTED_CURRENCIES = {'AED', 'INR', 'SAR', 'QAR', 'GBP', 'USD'}
+
+
+def _is_gold_rate_query(query):
+    text = str(query or '').strip().lower()
+    return any(term in text for term in _GOLD_QUERY_TERMS)
+
+
+def _extract_gold_karat(query):
+    text = str(query or '').lower()
+    match = re.search(r'(?<!\d)(24|22|21|18)\s*(?:k|kt|karat)?\b', text)
+    if match:
+        return int(match.group(1))
+    return 24
+
+
+def _extract_gold_currency_for_ai(query, user_id):
+    text = str(query or '')
+    lower = text.lower()
+    found = []
+    for match in re.finditer(r'(?<![A-Za-z])([A-Za-z]{3})(?![A-Za-z])', text):
+        code = match.group(1).upper()
+        if code in _GOLD_SUPPORTED_CURRENCIES:
+            found.append((match.start(), code))
+    for alias, code in _FX_ALIASES.items():
+        if code not in _GOLD_SUPPORTED_CURRENCIES:
+            continue
+        idx = lower.find(alias)
+        if idx >= 0:
+            found.append((idx, code))
+    if found:
+        found.sort(key=lambda x: x[0])
+        return found[0][1]
+    settings = _normalize_currency_settings(db.get_settings(user_id))
+    primary = str(settings.get('primary_currency') or 'AED').upper()
+    return primary if primary in _GOLD_SUPPORTED_CURRENCIES else 'AED'
+
+
+def _fetch_gold_reference(currency='AED', karat=24):
+    currency = str(currency or 'AED').upper().strip()
+    if currency not in _GOLD_SUPPORTED_CURRENCIES:
+        raise ValueError('Unsupported gold market currency')
+    karat = int(karat or 24)
+    if karat not in (24, 22, 21, 18):
+        raise ValueError('Unsupported gold karat')
+
+    def load_gold_usd_oz():
+        response = requests.get('https://api.gold-api.com/price/XAU', timeout=6)
+        response.raise_for_status()
+        payload = response.json()
+        price = float(payload.get('price'))
+        if not math.isfinite(price) or price <= 0:
+            raise ValueError('Invalid gold price')
+        return price
+
+    usd_oz = float(_fx_cached('gold:xau:usd_oz', 120, load_gold_usd_oz))
+    fx_rate_value = 1.0
+    fx_date = datetime.now(timezone.utc).date().isoformat()
+    if currency != 'USD':
+        fx_payload = _fx_cached(f'rate:USD:{currency}', 600, lambda: _fx_get_json(f'/v2/rate/USD/{currency}'))
+        fx_rate_value = float(fx_payload.get('rate'))
+        fx_date = str(fx_payload.get('date') or fx_date)
+        if not math.isfinite(fx_rate_value) or fx_rate_value <= 0:
+            raise ValueError('Invalid FX rate')
+    pure_per_gram = (usd_oz / 31.1034768) * fx_rate_value
+    per_gram = pure_per_gram * (karat / 24.0)
+    return {
+        'currency': currency,
+        'karat': karat,
+        'usd_per_oz': usd_oz,
+        'fx_rate': fx_rate_value,
+        'per_gram': round(per_gram, 6),
+        'pure_24k_per_gram': round(pure_per_gram, 6),
+        'date': fx_date,
+        'fetched_at': datetime.now(timezone.utc).isoformat(timespec='seconds'),
+        'provider': 'Gold API + Frankfurter',
+    }
+
+
+def _live_gold_reference_for_ai(user_id, query):
+    if not _is_gold_rate_query(query):
+        return None
+    try:
+        currency = _extract_gold_currency_for_ai(query, user_id)
+        karat = _extract_gold_karat(query)
+        return _fetch_gold_reference(currency, karat)
+    except Exception as exc:
+        app.logger.warning('AI live gold lookup failed: %s', str(exc)[:240])
+        return None
+
+
+def _is_simple_gold_quote_query(query):
+    if not _is_gold_rate_query(query):
+        return False
+    text = str(query or '').strip().lower()
+    analysis_terms = (
+        'why', 'trend', 'forecast', 'predict', 'tomorrow', 'history', 'compare', 'explain',
+        'buy', 'sell', 'making charge', 'jewellery', 'jewelry', 'investment', 'should i',
+        'എന്തുകൊണ്ട്', 'ട്രെൻഡ്', 'നാളെ', 'ചരിത്രം', 'വാങ്ങ', 'വിൽക്ക', 'നിക്ഷേപ'
+    )
+    if any(term in text for term in analysis_terms):
+        return False
+    # Quantity/calculation questions should go through Gemini with the live reference attached.
+    nums = [float(n) for n in re.findall(r'(?<![A-Za-z])\d+(?:\.\d+)?', text)]
+    allowed_karat_numbers = {18.0, 21.0, 22.0, 24.0}
+    if any(n not in allowed_karat_numbers and n > 1 for n in nums):
+        return False
+    return len(text) <= 180
+
+
+def _format_live_gold_context(live_gold):
+    if not live_gold:
+        return ''
+    return (
+        "YARIN LIVE GOLD REFERENCE (server-fetched for this turn; SOURCE OF TRUTH):\n"
+        f"{live_gold['karat']}K gold reference = {float(live_gold['per_gram']):.4f} {live_gold['currency']} per gram\n"
+        f"24K spot reference = {float(live_gold['pure_24k_per_gram']):.4f} {live_gold['currency']} per gram\n"
+        f"XAU spot = {float(live_gold['usd_per_oz']):.2f} USD per troy ounce\n"
+        f"FX reference date: {live_gold.get('date') or 'latest available'}\n"
+        f"Fetched at: {live_gold.get('fetched_at') or 'now'}\n"
+        f"Provider: {live_gold.get('provider') or 'reference provider'}\n"
+        "Use this supplied gold value for current/today/live gold-price answers. Do NOT substitute a remembered/model-training gold price. "
+        "Explain that jewellery/shop buy/sell prices can differ because of purity, spread, making charges, tax, and local market pricing."
+    )
+
+
+def _direct_gold_reply(live_gold, language_key):
+    if not live_gold:
+        return None
+    karat = int(live_gold['karat'])
+    cur = live_gold['currency']
+    rate = float(live_gold['per_gram'])
+    fetched = live_gold.get('fetched_at') or 'now'
+    if str(language_key or '').startswith('ml'):
+        return (f"Live reference: {karat}K gold ≈ {rate:.2f} {cur}/gram. "
+                f"Server-fetched: {fetched}. Jewellery/shop buy-sell rate purity, spread, making charge, tax എന്നിവ കാരണം വ്യത്യാസപ്പെടാം.")
+    return (f"Live reference: {karat}K gold ≈ {rate:.2f} {cur}/gram. "
+            f"Server-fetched: {fetched}. Jewellery/shop buy-sell rates can differ due to purity, spread, making charges, tax, and local pricing.")
 
 
 def _format_financial_context(context):
@@ -1147,18 +1548,46 @@ def ai_assistant():
 
     user_name = session.get('username', 'User')
     history = db.get_ai_chat_history(session['user_id'], 8)
-    finance_related = _is_finance_related(query, history)
+    exchange_query = _is_exchange_rate_query(query)
+    gold_query = _is_gold_rate_query(query)
+    finance_related = _is_finance_related(query, history) or exchange_query or gold_query
     context = gather_financial_context() if finance_related else None
+    live_fx = _live_fx_reference_for_ai(session['user_id'], query) if exchange_query else None
+    live_gold = _live_gold_reference_for_ai(session['user_id'], query) if gold_query else None
+
+    if live_gold and _is_simple_gold_quote_query(query):
+        direct = _direct_gold_reply(live_gold, language_key)
+        db.add_ai_chat_message(session['user_id'], 'user', query, mode)
+        db.add_ai_chat_message(session['user_id'], 'assistant', direct, mode)
+        return jsonify({
+            'response': direct, 'reply': direct, 'language': language_key, 'mode': mode,
+            'provider': 'YARIN Live Gold', 'model': 'server-live-gold', 'live_gold': live_gold
+        }), 200
+
+    # A simple current-rate question should never depend on model memory. Return
+    # the verified server-fetched quote directly through the Azret AI endpoint.
+    if live_fx and _is_simple_fx_quote_query(query):
+        direct = _direct_fx_fallback_reply(live_fx, language_key)
+        db.add_ai_chat_message(session['user_id'], 'user', query, mode)
+        db.add_ai_chat_message(session['user_id'], 'assistant', direct, mode)
+        return jsonify({
+            'response': direct, 'reply': direct, 'language': language_key, 'mode': mode,
+            'provider': 'YARIN Live FX', 'model': 'server-live-fx', 'live_fx': live_fx, 'live_gold': live_gold
+        }), 200
+
     gemini_key = _gemini_api_key()
 
     if not gemini_key:
-        fallback = None
-        if context and os.environ.get('AI_LOCAL_FALLBACK', '0') == '1':
+        fallback = _direct_gold_reply(live_gold, language_key) if gold_query and live_gold else None
+        if not fallback:
+            fallback = _direct_fx_fallback_reply(live_fx, language_key) if exchange_query else None
+        if not fallback and context and os.environ.get('AI_LOCAL_FALLBACK', '0') == '1':
             fallback = local_ai_response(query, context, language_key, user_name)
         if fallback:
             db.add_ai_chat_message(session['user_id'], 'user', query, mode)
             db.add_ai_chat_message(session['user_id'], 'assistant', fallback, mode)
-            return jsonify({'response': fallback, 'reply': fallback, 'language': language_key, 'mode': mode, 'provider': 'local-finance-fallback'}), 200
+            fallback_provider = 'YARIN Live Gold' if gold_query and live_gold else ('YARIN Live FX' if exchange_query and live_fx else 'local-finance-fallback')
+            return jsonify({'response': fallback, 'reply': fallback, 'language': language_key, 'mode': mode, 'provider': fallback_provider, 'live_fx': live_fx, 'live_gold': live_gold}), 200
         return jsonify({
             'error': 'Gemini API is not configured on the server.',
             'code': 'GEMINI_NOT_CONFIGURED',
@@ -1181,10 +1610,21 @@ def ai_assistant():
         if safe_alerts:
             coach_lines.append('upcoming_alerts: ' + ' | '.join(safe_alerts))
     extra_coach = ('\nYARIN COACH SUMMARY:\n' + '\n'.join(coach_lines)) if coach_lines else ''
+    live_fx_context = _format_live_fx_context(live_fx)
+    live_gold_context = _format_live_gold_context(live_gold)
+    context_parts = []
     if context:
-        current_message = f"{_format_financial_context(context)}{extra_coach}\n\nUSER MESSAGE:\n{query}"
+        context_parts.append(_format_financial_context(context))
+    if live_fx_context:
+        context_parts.append(live_fx_context)
+    if live_gold_context:
+        context_parts.append(live_gold_context)
+    if extra_coach:
+        context_parts.append(extra_coach.strip())
+    if context_parts:
+        current_message = "\n\n".join(context_parts) + f"\n\nUSER MESSAGE:\n{query}"
     else:
-        current_message = f"{extra_coach}\n\nUSER MESSAGE:\n{query}" if extra_coach else query
+        current_message = query
 
     response_text = None
     used_model = None
@@ -1291,7 +1731,7 @@ def ai_assistant():
                 rest_res = requests.post(
                     f'https://generativelanguage.googleapis.com/v1beta/models/{mname}:generateContent',
                     headers={'x-goog-api-key': gemini_key, 'Content-Type': 'application/json'},
-                    json=rest_payload, timeout=25
+                    json=rest_payload, timeout=10
                 )
                 if 200 <= rest_res.status_code < 300:
                     payload = rest_res.json()
@@ -1307,12 +1747,23 @@ def ai_assistant():
                 app.logger.warning('Gemini REST fallback failed for %s: %s', mname, str(rest_exc)[:400])
 
     if not response_text:
-        fallback = None
-        if context and os.environ.get('AI_LOCAL_FALLBACK', '0') == '1':
+        # If Gemini itself is temporarily unavailable, never throw away live
+        # market data that YARIN already fetched successfully. Gold was missing
+        # from this final fallback path in V63, so complex gold questions could
+        # incorrectly return a 502 during a transient Gemini outage.
+        fallback = _direct_gold_reply(live_gold, language_key) if gold_query and live_gold else None
+        if not fallback:
+            fallback = _direct_fx_fallback_reply(live_fx, language_key) if exchange_query and live_fx else None
+        if not fallback and context and os.environ.get('AI_LOCAL_FALLBACK', '0') == '1':
             fallback = local_ai_response(query, context, language_key, user_name)
         if fallback:
             response_text = fallback
-            used_model = 'local-finance-fallback'
+            if gold_query and live_gold:
+                used_model = 'live-gold-fallback'
+            elif exchange_query and live_fx:
+                used_model = 'live-fx-fallback'
+            else:
+                used_model = 'local-finance-fallback'
         else:
             # Do not silently pretend that canned financial data came from Gemini.
             # This was the main source of the old repetitive/wrong behaviour.
@@ -1340,8 +1791,9 @@ def ai_assistant():
         'reply': response_text,
         'language': language_key,
         'mode': mode,
-        'provider': 'Google Gemini' if used_model != 'local-finance-fallback' else used_model,
-        'model': used_model
+        'provider': 'Google Gemini' if used_model not in ('local-finance-fallback', 'live-fx-fallback', 'live-gold-fallback') else used_model,
+        'model': used_model,
+        'live_fx': live_fx, 'live_gold': live_gold
     })
 
 
@@ -1394,13 +1846,44 @@ def global_search_api():
     results = db.search_global(q, session['user_id'])
     return jsonify(results)
 
+def _normalize_currency_settings(settings):
+    """Return a valid, deterministic currency pair for legacy/corrupt settings."""
+    normalized = dict(settings or {})
+    primary = str(normalized.get('primary_currency') or 'AED').strip().upper()
+    if primary not in FINANCE_SUITE_CURRENCIES:
+        primary = 'AED'
+
+    secondary = str(normalized.get('secondary_currency') or 'INR').strip().upper()
+    if secondary not in FINANCE_SUITE_CURRENCIES or secondary == primary:
+        secondary = 'INR' if primary != 'INR' else 'AED'
+
+    default = str(normalized.get('default_currency') or primary).strip().upper()
+    if default not in {primary, secondary}:
+        default = primary
+
+    normalized['primary_currency'] = primary
+    normalized['secondary_currency'] = secondary
+    normalized['default_currency'] = default
+    return normalized
+
+
 @app.route('/api/settings', methods=['GET'])
 @login_required
 def get_settings_api():
     settings = db.get_settings(session['user_id'])
     settings.pop('finance_suite_json', None)
     settings.pop('finance_suite_updated_at', None)
-    return jsonify(settings)
+    normalized = _normalize_currency_settings(settings)
+    if normalized.get('theme') not in {'light', 'dark'}:
+        normalized['theme'] = 'light'
+    corrections = {
+        key: normalized[key]
+        for key in ('primary_currency', 'secondary_currency', 'default_currency', 'theme')
+        if str(settings.get(key) or '') != normalized[key]
+    }
+    if corrections:
+        db.save_settings(corrections, session['user_id'])
+    return jsonify(normalized)
 
 @app.route('/api/settings', methods=['POST'])
 @login_required
@@ -1417,20 +1900,21 @@ def save_settings_api():
     for cur_key in ('default_currency', 'primary_currency', 'secondary_currency'):
         if cur_key in safe:
             code = str(safe[cur_key] or '').upper().strip()
-            if not re.fullmatch(r'[A-Z]{3}', code):
-                return jsonify({'success': False, 'error': f'Invalid {cur_key}'}), 400
+            if code not in FINANCE_SUITE_CURRENCIES:
+                return jsonify({'success': False, 'error': f'Unsupported {cur_key}'}), 400
             safe[cur_key] = code
-    # Validate the resulting pair, not only fields present in this one request.
-    # This closes a bug where changing only primary (or only secondary) could
-    # make both saved currencies identical. The active/default currency must
-    # also always belong to the saved pair.
-    existing = db.get_settings(session['user_id'])
-    resulting_primary = safe.get('primary_currency', str(existing.get('primary_currency') or 'AED').upper())
-    resulting_secondary = safe.get('secondary_currency', str(existing.get('secondary_currency') or 'INR').upper())
+    # Validate the complete resulting pair, including legacy values that were
+    # already stored before this request.
+    existing = _normalize_currency_settings(db.get_settings(session['user_id']))
+    resulting_primary = safe.get('primary_currency', existing['primary_currency'])
+    resulting_secondary = safe.get('secondary_currency', existing['secondary_currency'])
     if resulting_primary == resulting_secondary:
         return jsonify({'success': False, 'error': 'Primary and secondary currencies must be different'}), 400
-    if 'default_currency' in safe and safe['default_currency'] not in {resulting_primary, resulting_secondary}:
-        return jsonify({'success': False, 'error': 'Default currency must be one of the selected currency pair'}), 400
+    resulting_default = safe.get('default_currency', existing['default_currency'])
+    if resulting_default not in {resulting_primary, resulting_secondary}:
+        if 'default_currency' in safe:
+            return jsonify({'success': False, 'error': 'Default currency must be one of the selected currency pair'}), 400
+        safe['default_currency'] = resulting_primary
     if 'salary_credit_day' in safe:
         try:
             day = int(safe['salary_credit_day'])
@@ -1470,6 +1954,11 @@ def _fx_cached(key, ttl, loader):
     value = loader()
     with _FX_CACHE_LOCK:
         _FX_CACHE[key] = (now, value)
+        # Currency-pair/range keys are user-selectable. Bound this process-local
+        # cache so a public deployment cannot accumulate pair combinations forever.
+        if len(_FX_CACHE) > 2048:
+            for old_key, _ in sorted(_FX_CACHE.items(), key=lambda kv: kv[1][0])[:1024]:
+                _FX_CACHE.pop(old_key, None)
     return value
 
 def _fx_get_json(path, params=None, timeout=8):
@@ -1505,12 +1994,12 @@ def fx_currencies():
 def fx_rate():
     base = str(request.args.get('base') or 'AED').upper().strip()
     quote = str(request.args.get('quote') or 'INR').upper().strip()
-    if not re.fullmatch(r'[A-Z]{3}', base) or not re.fullmatch(r'[A-Z]{3}', quote):
-        return jsonify({'error':'Invalid currency code'}), 400
+    if base not in FINANCE_SUITE_CURRENCIES or quote not in FINANCE_SUITE_CURRENCIES:
+        return jsonify({'error':'Unsupported currency code'}), 400
     if base == quote:
         return jsonify({'base':base,'quote':quote,'rate':1.0,'date':datetime.utcnow().strftime('%Y-%m-%d')})
     try:
-        data = _fx_cached(f'rate:{base}:{quote}', 600, lambda: _fx_get_json(f'/v2/rate/{base}/{quote}'))
+        data = _fx_cached(f'rate:{base}:{quote}', 300, lambda: _fx_get_json(f'/v2/rate/{base}/{quote}'))
         rate = float(data.get('rate'))
         rate_date = data.get('date')
         if not math.isfinite(rate) or rate <= 0:
@@ -1529,46 +2018,24 @@ def fx_rate():
 @app.route('/api/gold/rate', methods=['GET'])
 @login_required
 def gold_rate():
-    """Return XAU spot converted to a supported user currency, per gram.
+    """Return a live XAU reference converted to the requested currency, per gram.
 
-    Keeping this server-side avoids browser CORS failures and prevents the client
-    from silently using stale hard-coded FX values. This is a reference rate only.
+    Default is 24K/pure-gold spot-equivalent. Supported karats: 24, 22, 21, 18.
+    Jewellery/shop customer prices can differ from this reference.
     """
     currency = str(request.args.get('currency') or 'AED').upper().strip()
-    supported = {'AED', 'INR', 'SAR', 'QAR', 'GBP', 'USD'}
-    if currency not in supported:
-        return jsonify({'error': 'Unsupported gold market currency'}), 400
     try:
-        def load_gold_usd_oz():
-            response = requests.get('https://api.gold-api.com/price/XAU', timeout=6)
-            response.raise_for_status()
-            payload = response.json()
-            price = float(payload.get('price'))
-            if not math.isfinite(price) or price <= 0:
-                raise ValueError('Invalid gold price')
-            return price
-
-        usd_oz = float(_fx_cached('gold:xau:usd_oz', 120, load_gold_usd_oz))
-        fx_rate_value = 1.0
-        fx_date = datetime.utcnow().strftime('%Y-%m-%d')
-        if currency != 'USD':
-            fx_payload = _fx_cached(f'rate:USD:{currency}', 600, lambda: _fx_get_json(f'/v2/rate/USD/{currency}'))
-            fx_rate_value = float(fx_payload.get('rate'))
-            fx_date = fx_payload.get('date') or fx_date
-            if not math.isfinite(fx_rate_value) or fx_rate_value <= 0:
-                raise ValueError('Invalid FX rate')
-        per_gram = (usd_oz / 31.1034768) * fx_rate_value
-        return jsonify({
-            'currency': currency,
-            'usd_per_oz': usd_oz,
-            'fx_rate': fx_rate_value,
-            'per_gram': round(per_gram, 6),
-            'date': fx_date,
-            'provider': 'Gold API + Frankfurter',
-            'reference_only': True,
-        })
+        karat = int(request.args.get('karat') or 24)
+    except (TypeError, ValueError):
+        karat = 24
+    if currency not in _GOLD_SUPPORTED_CURRENCIES:
+        return jsonify({'error': 'Unsupported gold market currency'}), 400
+    if karat not in (24, 22, 21, 18):
+        return jsonify({'error': 'Unsupported gold karat'}), 400
+    try:
+        return jsonify(_fetch_gold_reference(currency, karat))
     except Exception:
-        return jsonify({'error': 'Gold reference rate temporarily unavailable'}), 503
+        return jsonify({'error': 'Live gold rate temporarily unavailable'}), 503
 
 
 @app.route('/api/fx/series', methods=['GET'])
@@ -1578,8 +2045,8 @@ def fx_series():
     base = str(request.args.get('base') or 'AED').upper().strip()
     quote = str(request.args.get('quote') or 'INR').upper().strip()
     range_key = str(request.args.get('range') or '1M').upper()
-    if not re.fullmatch(r'[A-Z]{3}', base) or not re.fullmatch(r'[A-Z]{3}', quote):
-        return jsonify({'error':'Invalid currency code'}), 400
+    if base not in FINANCE_SUITE_CURRENCIES or quote not in FINANCE_SUITE_CURRENCIES:
+        return jsonify({'error':'Unsupported currency code'}), 400
     days = {'7D':10,'1M':35,'3M':100,'1Y':370}.get(range_key,35)
     end = datetime.utcnow().date(); start = end - timedelta(days=days)
     params={'base':base,'quotes':quote,'from':start.isoformat(),'to':end.isoformat()}
@@ -1612,14 +2079,12 @@ def fx_series():
         return jsonify({'error':'Exchange history temporarily unavailable','points':[]}), 503
 
 def _user_display_currency(user_id):
-    settings = db.get_settings(user_id)
-    code = str(settings.get('default_currency') or settings.get('primary_currency') or 'AED').upper()
-    if not re.fullmatch(r'[A-Z]{3}', code):
-        code = 'AED'
+    settings = _normalize_currency_settings(db.get_settings(user_id))
+    code = settings['default_currency']
     rate = 1.0
     if code != 'AED':
         try:
-            data = _fx_cached(f'rate:AED:{code}', 600, lambda: _fx_get_json(f'/v2/rate/AED/{code}', timeout=2.5))
+            data = _fx_cached(f'rate:AED:{code}', 300, lambda: _fx_get_json(f'/v2/rate/AED/{code}', timeout=2.5))
             rate = float(data.get('rate') or 0)
             if not math.isfinite(rate) or rate <= 0:
                 raise ValueError('Invalid live FX rate')
@@ -1637,16 +2102,11 @@ def _user_display_currency(user_id):
                 persisted_rate = 0.0
             if math.isfinite(persisted_rate) and persisted_rate > 0:
                 rate = persisted_rate
-            elif code == 'INR':
-                try:
-                    legacy_rate = float(settings.get('exchange_rate') or 0)
-                except (TypeError, ValueError):
-                    legacy_rate = 0.0
-                if math.isfinite(legacy_rate) and legacy_rate > 0:
-                    rate = legacy_rate
-                else:
-                    code, rate = 'AED', 1.0
             else:
+                # Do not fall back to the legacy `exchange_rate` setting here.
+                # Older builds created every account with a hard-coded INR rate,
+                # so that value cannot be trusted as a real last-known quote.
+                # V60+ persists verified rates under fx_rate_<CODE>.
                 code, rate = 'AED', 1.0
     return code, rate
 
@@ -1754,8 +2214,11 @@ def _suite_text(value, limit=200):
 
 
 def _suite_currency(value, fallback='AED'):
-    cur = str(value or fallback).strip().upper()
-    return cur if cur in FINANCE_SUITE_CURRENCIES else fallback
+    cur = str(value or '').strip().upper()
+    fallback_code = str(fallback or '').strip().upper()
+    if fallback_code and fallback_code not in FINANCE_SUITE_CURRENCIES:
+        fallback_code = 'AED'
+    return cur if cur in FINANCE_SUITE_CURRENCIES else fallback_code
 
 
 def _suite_number(value, *, minimum=0.0, maximum=MAX_FINANCE_VALUE, positive=False):
@@ -1783,7 +2246,7 @@ def _sanitize_finance_suite(raw):
             continue
         title = _suite_text(item.get('title'), 200)
         date = _suite_text(item.get('date'), 10)
-        if not title or not _valid_date(date):
+        if not title or not date or not _valid_date(date):
             continue
         calendar.append({'title': title, 'date': date, 'type': _suite_text(item.get('type'), 60) or 'Reminder'})
         if len(calendar) >= FINANCE_SUITE_LIST_LIMITS['calendar']:
@@ -1853,6 +2316,11 @@ def _sanitize_finance_suite(raw):
         if local_date and not _valid_date(local_date):
             local_date = ''
         date = _suite_text(item.get('date'), 40)
+        if date:
+            try:
+                datetime.fromisoformat(date.replace('Z', '+00:00'))
+            except (TypeError, ValueError):
+                date = ''
         if amount is None or grams is None or rate is None:
             continue
         gold_savings.append({'amount': amount, 'grams': grams, 'rate': rate, 'cc': cc, 'cur': cur, 'date': date, 'localDate': local_date})
@@ -1919,13 +2387,13 @@ def _get_finance_suite(user_id):
     return suite, max(0, updated_at)
 
 
-def _save_finance_suite(user_id, suite):
+def _save_finance_suite(user_id, suite, conn=None):
     safe = _sanitize_finance_suite(suite)
     updated_at = int(time.time() * 1000)
     db.save_settings({
         'finance_suite_json': json.dumps(safe, ensure_ascii=False, separators=(',', ':'), allow_nan=False),
         'finance_suite_updated_at': str(updated_at),
-    }, user_id)
+    }, user_id, conn=conn)
     return safe, updated_at
 
 
@@ -1975,14 +2443,29 @@ def import_data():
         return jsonify({'success': False, 'error': 'No file provided'}), 400
 
     file = request.files['file']
+    import_conn = None
     try:
         content = json.loads(file.read().decode('utf-8'))
         if not isinstance(content, dict):
             raise ValueError('Backup root must be an object')
 
+        # Validate finance-suite content before inserting any table rows. In older
+        # builds, a malformed suite could fail at the very end after records had
+        # already been imported, leaving a confusing partial restore.
+        prepared_suite = None
+        if 'finance_suite' in content:
+            existing_suite, _ = _get_finance_suite(session['user_id'])
+            prepared_suite = _merge_finance_suite(existing_suite, content.get('finance_suite') or {})
+
+        # All related table rows/settings are now written through one DB
+        # transaction. If an unexpected DB/provider error happens midway, the
+        # entire restore rolls back instead of leaving a partial backup import.
+        import_conn = db.get_db()
+
         # Map old backup IDs to newly inserted IDs. This is required so imported
         # EMI/debt payment history points at the correct newly-created parent row.
         id_maps = {'emi': {}, 'debts': {}}
+        parent_paid_totals = {'emi': {}, 'debts': {}}
         for table in TABLE_CONFIGS:
             rows = content.get(table, [])
             if not isinstance(rows, list):
@@ -2008,14 +2491,30 @@ def import_data():
                     rec_copy[field] = num
                 if malformed:
                     continue
+                # Older backups can omit the display-only time field even though
+                # current database schemas require it.
+                if 'time' in allowed_fields and not str(rec_copy.get('time') or '').strip():
+                    rec_copy['time'] = get_now_date_time()[1]
+                missing_required = any(
+                    rec_copy.get(req) is None or str(rec_copy.get(req)).strip() == ''
+                    for req in TABLE_CONFIGS[table]['required']
+                )
+                if missing_required:
+                    continue
                 if _validate_text_dates(rec_copy):
                     continue
                 integrity_error = _validate_record_integrity(table, rec_copy)
                 if integrity_error:
                     continue
-                new_id = db.insert_record(table, rec_copy, session['user_id'])
-                if table in id_maps and old_id is not None:
-                    id_maps[table][str(old_id)] = new_id
+                new_id = db.insert_record(table, rec_copy, session['user_id'], conn=import_conn)
+                if table in id_maps:
+                    if old_id is not None:
+                        id_maps[table][str(old_id)] = new_id
+                    paid_field = 'paid' if table == 'emi' else 'paid_amount'
+                    try:
+                        parent_paid_totals[table][new_id] = max(0.0, float(rec_copy.get(paid_field) or 0))
+                    except (TypeError, ValueError):
+                        parent_paid_totals[table][new_id] = 0.0
 
         payment_specs = {
             'emi_payments': ('emi_id', 'emi', 'paid'),
@@ -2040,13 +2539,10 @@ def import_data():
                     continue
                 if not math.isfinite(amount) or amount <= 0 or amount > MAX_FINANCE_VALUE:
                     continue
-                parent = db.fetch_one(parent_table, mapped_parent, session['user_id'])
-                if not parent:
-                    continue
-                try:
-                    parent_paid = float(parent.get(paid_field) or 0)
-                except (TypeError, ValueError):
-                    parent_paid = 0.0
+                # Parent rows were inserted in this same uncommitted restore
+                # transaction, so use the validated parent totals retained above
+                # instead of opening a second connection that cannot see them yet.
+                parent_paid = parent_paid_totals[parent_table].get(mapped_parent, 0.0)
                 total_key = (table, mapped_parent)
                 next_ledger_total = imported_payment_totals.get(total_key, 0.0) + amount
                 # The parent paid total is authoritative in the exported record.
@@ -2063,13 +2559,13 @@ def import_data():
                 }
                 if _validate_text_dates(payload):
                     continue
-                db.insert_record(table, payload, session['user_id'])
+                db.insert_record(table, payload, session['user_id'], conn=import_conn)
                 imported_payment_totals[total_key] = next_ledger_total
 
         settings = content.get('settings')
         if isinstance(settings, dict):
-            # Backups are untrusted input. Only import settings that this build
-            # understands, and validate the currency pair before saving it.
+            # Backups are untrusted input. Only import settings this build
+            # understands, and normalize them against the supported FX list.
             allowed_import_settings = {
                 'theme', 'default_currency', 'primary_currency', 'secondary_currency',
                 'exchange_rate', 'shopping_budget', 'salary_credit_day',
@@ -2081,24 +2577,48 @@ def import_data():
             safe_settings = {}
             for k, v in settings.items():
                 key = str(k)[:80]
-                if key not in allowed_import_settings:
+                fx_match = re.fullmatch(r'fx_rate_([A-Z]{3})', key)
+                fx_date_match = re.fullmatch(r'fx_rate_date_([A-Z]{3})', key)
+                if key not in allowed_import_settings and not fx_match and not fx_date_match:
                     continue
                 value = str(v)
-                if len(value) <= 12000:
-                    safe_settings[key] = value
+                if len(value) > 12000:
+                    continue
+                if fx_match:
+                    code = fx_match.group(1)
+                    if code not in FINANCE_SUITE_CURRENCIES:
+                        continue
+                    try:
+                        rate = float(value)
+                        if not math.isfinite(rate) or rate <= 0 or rate > MAX_FINANCE_VALUE:
+                            continue
+                        value = str(rate)
+                    except (TypeError, ValueError):
+                        continue
+                elif fx_date_match:
+                    code = fx_date_match.group(1)
+                    if code not in FINANCE_SUITE_CURRENCIES or (value and not _valid_date(value)):
+                        continue
+                safe_settings[key] = value
 
-            pcur = str(safe_settings.get('primary_currency') or '').upper()
-            scur = str(safe_settings.get('secondary_currency') or '').upper()
-            dcur = str(safe_settings.get('default_currency') or '').upper()
-            if pcur and not re.fullmatch(r'[A-Z]{3}', pcur):
-                safe_settings.pop('primary_currency', None); pcur = ''
-            if scur and not re.fullmatch(r'[A-Z]{3}', scur):
-                safe_settings.pop('secondary_currency', None); scur = ''
-            if pcur and scur and pcur == scur:
-                safe_settings.pop('secondary_currency', None); scur = ''
-            if dcur and not re.fullmatch(r'[A-Z]{3}', dcur):
-                safe_settings.pop('default_currency', None)
-            elif dcur and pcur and scur and dcur not in {pcur, scur}:
+            if safe_settings.get('theme') not in (None, 'light', 'dark'):
+                safe_settings.pop('theme', None)
+
+            existing_settings = _normalize_currency_settings(db.get_settings(session['user_id']))
+            pcur = str(safe_settings.get('primary_currency') or existing_settings['primary_currency']).strip().upper()
+            scur = str(safe_settings.get('secondary_currency') or existing_settings['secondary_currency']).strip().upper()
+            dcur = str(safe_settings.get('default_currency') or existing_settings['default_currency']).strip().upper()
+
+            if pcur not in FINANCE_SUITE_CURRENCIES:
+                safe_settings.pop('primary_currency', None)
+                pcur = existing_settings['primary_currency']
+            if scur not in FINANCE_SUITE_CURRENCIES or scur == pcur:
+                safe_settings.pop('secondary_currency', None)
+                scur = existing_settings['secondary_currency']
+                if scur == pcur:
+                    scur = 'INR' if pcur != 'INR' else 'AED'
+                    safe_settings['secondary_currency'] = scur
+            if dcur not in {pcur, scur}:
                 safe_settings['default_currency'] = pcur
 
             if 'salary_credit_day' in safe_settings:
@@ -2118,24 +2638,42 @@ def import_data():
                         num = float(safe_settings[numeric_setting])
                         if not math.isfinite(num) or num < 0 or num > MAX_FINANCE_VALUE:
                             raise ValueError
+                        if numeric_setting == 'exchange_rate' and num <= 0:
+                            raise ValueError
                         safe_settings[numeric_setting] = str(num)
                     except Exception:
                         safe_settings.pop(numeric_setting, None)
 
+            if 'income_profile_saved' in safe_settings:
+                raw_saved = str(safe_settings['income_profile_saved']).strip().lower()
+                if raw_saved in {'1', 'true', 'yes', 'on'}:
+                    safe_settings['income_profile_saved'] = '1'
+                elif raw_saved in {'0', 'false', 'no', 'off', ''}:
+                    safe_settings['income_profile_saved'] = '0'
+                else:
+                    safe_settings.pop('income_profile_saved', None)
+
             if safe_settings:
-                db.save_settings(safe_settings, session['user_id'])
+                db.save_settings(safe_settings, session['user_id'], conn=import_conn)
 
-        if 'finance_suite' in content:
-            try:
-                existing_suite, _ = _get_finance_suite(session['user_id'])
-                merged_suite = _merge_finance_suite(existing_suite, content.get('finance_suite') or {})
-                _save_finance_suite(session['user_id'], merged_suite)
-            except ValueError:
-                raise ValueError('Invalid finance suite in backup')
+        if prepared_suite is not None:
+            _save_finance_suite(session['user_id'], prepared_suite, conn=import_conn)
 
+        import_conn.commit()
         return jsonify({'success': True})
     except Exception:
+        if import_conn is not None:
+            try:
+                import_conn.rollback()
+            except Exception:
+                pass
         return jsonify({'success': False, 'error': 'Invalid or incompatible JSON backup'}), 400
+    finally:
+        if import_conn is not None:
+            try:
+                import_conn.close()
+            except Exception:
+                pass
 
 @app.route('/api/clear-all-data', methods=['POST'])
 @login_required

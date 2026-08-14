@@ -29,7 +29,9 @@ window.fetch = function(input, init = {}) {
 const state = {
   currency: localStorage.getItem('azret_currency') || 'AED',
   theme: localStorage.getItem('azret_theme') || 'light',
-  exchangeRate: parseFloat(localStorage.getItem('azret_rate') || '22.60'), // 1 AED -> INR
+  // Never trust a browser-stored FX quote. A verified live or server-persisted
+  // rate is loaded during boot; until then foreign conversion fails closed.
+  exchangeRate: NaN, // 1 AED -> INR, populated only from a verified server response
   tables: {},          // cache of last-fetched records per table
   dashboard: null,     // cache of last dashboard payload
   editing: {},          // { tableName: id } currently being edited
@@ -46,8 +48,10 @@ const state = {
   userId: null,             // authenticated account id; used to namespace device-local preferences
   primaryCurrency: localStorage.getItem('rizq_primary_currency') || 'AED',
   secondaryCurrency: localStorage.getItem('rizq_secondary_currency') || 'INR',
-  aedRates: { AED: 1, INR: parseFloat(localStorage.getItem('azret_rate') || '22.60') },
+  aedRates: { AED: 1 },
+  fxRateDates: {},
   fxRange: '1M',
+  fxLastRefreshAt: 0,
 };
 
 /** Same palette as AzretCharts, kept in sync so the allocation list
@@ -62,6 +66,59 @@ function localDateISO(date = new Date()) {
 const SALARY_PALETTE = ['#4C8DFF', '#1E4DB7', '#1FAA59', '#F5A524', '#E5484D', '#7C8AA5', '#0F2A5E', '#6EDB9A'];
 
 const CURRENCY_SYMBOL = { AED:'AED', INR:'₹', USD:'$', EUR:'€', GBP:'£', JPY:'¥', CNY:'¥', KRW:'₩', RUB:'₽', TRY:'₺', SAR:'SAR', QAR:'QAR', KWD:'KWD', BHD:'BHD', OMR:'OMR', CAD:'C$', AUD:'A$', CHF:'CHF', SGD:'S$', NZD:'NZ$' };
+
+// Primary flag for each currency. Multi-country/supranational currencies use
+// the best-recognised regional flag; unsupported/metal/archive codes fall back
+// to a subtle currency-code watermark instead of showing the wrong country.
+const CURRENCY_FLAG_COUNTRY = {
+  AED:'AE',AFN:'AF',ALL:'AL',AMD:'AM',ANG:'CW',AOA:'AO',ARS:'AR',AUD:'AU',AWG:'AW',AZN:'AZ',
+  BAM:'BA',BBD:'BB',BDT:'BD',BGN:'BG',BHD:'BH',BIF:'BI',BMD:'BM',BND:'BN',BOB:'BO',BRL:'BR',BSD:'BS',BTN:'BT',BWP:'BW',BYN:'BY',BZD:'BZ',
+  CAD:'CA',CDF:'CD',CHF:'CH',CLP:'CL',CNY:'CN',CNH:'CN',COP:'CO',CRC:'CR',CUP:'CU',CVE:'CV',CZK:'CZ',
+  DJF:'DJ',DKK:'DK',DOP:'DO',DZD:'DZ',EGP:'EG',ERN:'ER',ETB:'ET',EUR:'EU',FJD:'FJ',FKP:'FK',
+  GBP:'GB',GEL:'GE',GGP:'GG',GHS:'GH',GIP:'GI',GMD:'GM',GNF:'GN',GTQ:'GT',GYD:'GY',
+  HKD:'HK',HNL:'HN',HTG:'HT',HUF:'HU',IDR:'ID',ILS:'IL',IMP:'IM',INR:'IN',IQD:'IQ',IRR:'IR',ISK:'IS',JEP:'JE',JMD:'JM',JOD:'JO',JPY:'JP',
+  KES:'KE',KGS:'KG',KHR:'KH',KMF:'KM',KPW:'KP',KRW:'KR',KWD:'KW',KYD:'KY',KZT:'KZ',
+  LAK:'LA',LBP:'LB',LKR:'LK',LRD:'LR',LSL:'LS',LYD:'LY',MAD:'MA',MDL:'MD',MGA:'MG',MKD:'MK',MMK:'MM',MNT:'MN',MOP:'MO',MRU:'MR',MUR:'MU',MVR:'MV',MWK:'MW',MXN:'MX',MYR:'MY',MZN:'MZ',
+  NAD:'NA',NGN:'NG',NIO:'NI',NOK:'NO',NPR:'NP',NZD:'NZ',OMR:'OM',PAB:'PA',PEN:'PE',PGK:'PG',PHP:'PH',PKR:'PK',PLN:'PL',PYG:'PY',QAR:'QA',RON:'RO',RSD:'RS',RUB:'RU',RWF:'RW',
+  SAR:'SA',SBD:'SB',SCR:'SC',SDG:'SD',SEK:'SE',SGD:'SG',SHP:'SH',SLE:'SL',SOS:'SO',SRD:'SR',SSP:'SS',STN:'ST',SYP:'SY',SZL:'SZ',
+  THB:'TH',TJS:'TJ',TMT:'TM',TND:'TN',TOP:'TO',TRY:'TR',TTD:'TT',TWD:'TW',TZS:'TZ',UAH:'UA',UGX:'UG',USD:'US',UYU:'UY',UZS:'UZ',VES:'VE',VND:'VN',VUV:'VU',WST:'WS',YER:'YE',ZAR:'ZA',ZMW:'ZM',ZWG:'ZW'
+};
+function countryFlagEmoji(countryCode){
+  const cc=String(countryCode||'').toUpperCase();
+  if(!/^[A-Z]{2}$/.test(cc))return '';
+  return [...cc].map(ch=>String.fromCodePoint(127397+ch.charCodeAt(0))).join('');
+}
+function updateSalaryCurrencyFlag(currency=state.currency){
+  const card=document.getElementById('salaryCountdownCard');
+  const glyph=document.getElementById('salaryCurrencyFlagGlyph');
+  if(!card||!glyph)return;
+  const code=String(currency||state.primaryCurrency||'AED').toUpperCase();
+  const flag=countryFlagEmoji(CURRENCY_FLAG_COUNTRY[code]);
+  const next=flag||code;
+  // Rapid AED⇄INR taps could previously leave an older 160ms timer pending.
+  // Example: AED→INR→AED before the first fade completed would later paint INR
+  // even though AED was active. Always cancel the stale transition first.
+  if(updateSalaryCurrencyFlag._timer){
+    clearTimeout(updateSalaryCurrencyFlag._timer);
+    updateSalaryCurrencyFlag._timer=null;
+  }
+  updateSalaryCurrencyFlag._pendingCode=code;
+  if(glyph.textContent===next){
+    glyph.classList.toggle('currency-code-watermark',!flag);
+    card.dataset.currencyFlag=code;
+    card.classList.remove('flag-changing');
+    return;
+  }
+  card.classList.add('flag-changing');
+  updateSalaryCurrencyFlag._timer=window.setTimeout(()=>{
+    if(updateSalaryCurrencyFlag._pendingCode!==code)return;
+    glyph.textContent=next;
+    glyph.classList.toggle('currency-code-watermark',!flag);
+    card.dataset.currencyFlag=code;
+    updateSalaryCurrencyFlag._timer=null;
+    requestAnimationFrame(()=>card.classList.remove('flag-changing'));
+  },160);
+}
 
 /** Which fields on each form hold a monetary amount stored in AED in the
  *  database. Used to convert values entered/displayed in the currently
@@ -144,6 +201,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   checkSalaryNotification();
   await loadBranding();
   await refreshExchangeRate(true);
+  setupFxAutoRefresh();
 
   if (window.START_SPLASH) {
     await playSplashIntro();
@@ -232,13 +290,15 @@ function setupSidebar() {
   document.getElementById('menuToggle').addEventListener('click', () => {
     sidebar.classList.add('open');
     overlay.classList.add('show');
+    document.body.classList.add('sidebar-mobile-open');
   });
-  document.getElementById('sidebarClose').addEventListener('click', closeSidebar);
+  document.getElementById('sidebarClose')?.addEventListener('click', closeSidebar);
   overlay.addEventListener('click', closeSidebar);
 
   function closeSidebar() {
     sidebar.classList.remove('open');
     overlay.classList.remove('show');
+    document.body.classList.remove('sidebar-mobile-open');
   }
 
   document.querySelectorAll('.nav-item[data-page]').forEach(btn => {
@@ -264,6 +324,7 @@ function setupSidebar() {
   if (mobileMoreBtn) mobileMoreBtn.addEventListener('click', () => {
     sidebar.classList.add('open');
     overlay.classList.add('show');
+    document.body.classList.add('sidebar-mobile-open');
   });
 
   const performLogout = async () => {
@@ -272,10 +333,8 @@ function setupSidebar() {
   };
   const logoutBtn = document.getElementById('logoutBtn');
   const mobileSidebarLogout = document.getElementById('mobileSidebarLogout');
-  const mobileTopLogout = document.getElementById('mobileTopLogout');
   if (logoutBtn) logoutBtn.addEventListener('click', performLogout);
   if (mobileSidebarLogout) mobileSidebarLogout.addEventListener('click', performLogout);
-  if (mobileTopLogout) mobileTopLogout.addEventListener('click', performLogout);
 
   document.getElementById('themeToggle').addEventListener('click', () => {
     setTheme(state.theme === 'light' ? 'dark' : 'light');
@@ -580,73 +639,9 @@ function legacy_convertVisibleAmountInputs(table) {
 
 function round2(n) { return Math.round((Number(n) || 0) * 100) / 100; }
 
-function legacy_rerenderAllVisible() {
-  if (state.dashboard) renderDashboard(state.dashboard);
-  Object.keys(state.tables).forEach(table => renderTable(table, state.tables[table]));
-  if (state.salaryPlan) renderSalaryPlan(state.salaryPlan);
-  const salInput = document.getElementById('salaryplan-amount');
-  if (salInput && state.lastSalaryAED) {
-    salInput.value = state.currency === 'INR'
-      ? round2(state.lastSalaryAED * state.exchangeRate)
-      : round2(state.lastSalaryAED);
-  }
-}
-
-/** Convert an AED amount into the active display currency and format it. */
-function legacy_fmt(amountAED) {
-  const val = Number(amountAED) || 0;
-  if (state.currency === 'INR') {
-    return `₹${(val * state.exchangeRate).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
-  }
-  return `AED ${val.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
-}
-
-/* ---------------------------------------------------------------------- */
-/* Exchange rate                                                          */
-/* ---------------------------------------------------------------------- */
-async function legacy_loadServerSettings() {
-  try {
-    const res = await fetch('/api/settings');
-    const s = await res.json();
-    if (s.theme) { state.theme = s.theme; applyTheme(s.theme, false); }
-    if (s.default_currency) { state.currency = s.default_currency; applyCurrency(s.default_currency, false); }
-    if (s.exchange_rate) { state.exchangeRate = parseFloat(s.exchange_rate); }
-    if (s.shopping_budget) { state.shoppingBudget = parseFloat(s.shopping_budget) || 0; }
-    if (s.last_salary_amount) { state.lastSalaryAED = parseFloat(s.last_salary_amount) || 0; }
-    if (s.salary_credit_day) {
-      const day = parseInt(s.salary_credit_day, 10);
-      if (Number.isInteger(day) && day >= 1 && day <= 31) state.salaryCreditDay = day;
-    }
-    const salaryDayInput = document.getElementById('salaryCreditDay');
-    if (salaryDayInput) salaryDayInput.value = String(state.salaryCreditDay);
-    renderSalaryCountdown();
-    updateShoppingBudgetUI((state.tables.shopping || []).reduce((a, r) => a + (Number(r.total) || 0), 0));
-  } catch (e) { /* offline: keep local defaults */ }
-}
-
-async function legacy_refreshExchangeRate(silent) {
-  const rateEl = document.getElementById('rateValue');
-  const btn = document.getElementById('refreshRate');
-  btn.classList.add('loading');
-  try {
-    const res = await fetch('https://open.er-api.com/v6/latest/AED', { cache: 'no-store' });
-    const data = await res.json();
-    if (data && data.rates && data.rates.INR) {
-      state.exchangeRate = data.rates.INR;
-      localStorage.setItem('azret_rate', state.exchangeRate);
-      fetch('/api/settings', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ exchange_rate: state.exchangeRate })
-      }).catch(() => {});
-      if (!silent) toast('Exchange rate updated', 'success');
-    }
-  } catch (e) {
-    if (!silent) toast('Could not fetch live rate — using last known value', 'error');
-  }
-  rateEl.textContent = `1 AED = ₹${state.exchangeRate.toFixed(2)}`;
-  btn.classList.remove('loading');
-  rerenderAllVisible();
-}
+/* Legacy single-pair currency helpers removed in V64.
+   The active implementation below uses YARIN's server-verified multi-currency
+   endpoints only, avoiding stale browser/provider fallbacks. */
 
 /* ==========================================================================
    Animated Salary Countdown Widget (Phase 2)
@@ -1933,8 +1928,9 @@ function updateShoppingBudgetUI(totalAED) {
 
   const budgetAED = state.shoppingBudget || 0;
   input.value = budgetAED > 0
-    ? round2(fromAED(budgetAED, state.currency))
+    ? safeConvertedInputValue(budgetAED, state.currency)
     : '';
+  if (budgetAED > 0 && !input.value) input.placeholder = 'Exchange rate unavailable';
 
   if (budgetAED <= 0) {
     fill.style.width = '0%';
@@ -2222,12 +2218,14 @@ function editRecord(table, id, rows) {
         // This keeps EMI/Debt edit forms consistent even when AED is not
         // one of the user's two configured currencies.
         el.dataset.entryCur = state.currency;
-        el.value = round2(fromAED(aedVal, state.currency));
+        el.value = safeConvertedInputValue(aedVal, state.currency);
+        if (!el.value && aedVal !== 0) el.placeholder = 'Exchange rate unavailable';
         setEntryCurrency(`${table}-${f}`, state.currency);
       } else {
         // Amount fields are stored in AED; show them converted into
         // whichever currency is currently selected for display.
-        el.value = round2(fromAED(aedVal, state.currency));
+        el.value = safeConvertedInputValue(aedVal, state.currency);
+        if (!el.value && aedVal !== 0) el.placeholder = 'Exchange rate unavailable';
       }
     } else if (f === 'notes') {
       el.value = stripAutoNote(row[f]);
@@ -2377,7 +2375,8 @@ function renderIncomeProfile(profile) {
     const salInput = document.getElementById('salaryplan-amount');
     const hint = document.getElementById('salaryPlanVerifiedHint');
     if (salInput && !salInput.value) {
-      salInput.value = round2(fromAED(profile.total_verified_income, state.currency));
+      salInput.value = safeConvertedInputValue(profile.total_verified_income, state.currency);
+      if (!salInput.value && Number(profile.total_verified_income)) salInput.placeholder = 'Exchange rate unavailable';
       updateAmountHint('salaryplan', 'amount');
     }
     if (hint) hint.textContent = `Defaults to your verified income (${fmt(profile.total_verified_income)}). Change it to try a what-if amount.`;
@@ -2562,7 +2561,9 @@ function setupCalculators() {
     let result;
     if (convFrom.value === convTo.value) result = amt;
     else result = fromAED(toAED(amt, convFrom.value), convTo.value);
-    convResult.textContent = `${currencySymbol(convFrom.value)} ${amt.toLocaleString(undefined,{maximumFractionDigits:2})} = ${currencySymbol(convTo.value)} ${result.toLocaleString(undefined,{maximumFractionDigits:2})}`;
+    convResult.textContent = Number.isFinite(result)
+      ? `${currencySymbol(convFrom.value)} ${amt.toLocaleString(undefined,{maximumFractionDigits:2})} = ${currencySymbol(convTo.value)} ${result.toLocaleString(undefined,{maximumFractionDigits:2})}`
+      : 'Exchange rate unavailable';
   }
   [convAmount, convFrom, convTo].forEach(el => el.addEventListener('input', runConv));
   runConv();
@@ -3201,6 +3202,7 @@ function otherCurrency(code = state.currency) {
 
 function syncCurrencyPairUI() {
   const pair = [state.primaryCurrency, state.secondaryCurrency];
+  updateSalaryCurrencyFlag(state.currency);
   const switchEl = document.getElementById('currencySwitch');
   if (switchEl) {
     const buttons = [...switchEl.querySelectorAll('.cur-opt')];
@@ -3270,16 +3272,25 @@ function applyCurrency(cur, rerender) {
   }
 }
 
+function safeConvertedInputValue(amountAED, currency) {
+  const converted=fromAED(Number(amountAED)||0,currency);
+  return Number.isFinite(converted) ? String(round2(converted)) : '';
+}
 function convertVisibleAmountInputs(table) {
   const id=state.editing[table]; if(!id) return;
   const row=(state.tables[table]||[]).find(r=>String(r.id)===String(id)); if(!row) return;
-  (AMOUNT_FIELDS[table]||[]).forEach(f=>{ const el=document.getElementById(`${table}-${f}`); if(el) el.value=round2(fromAED(Number(row[f])||0,state.currency)); });
+  (AMOUNT_FIELDS[table]||[]).forEach(f=>{
+    const el=document.getElementById(`${table}-${f}`); if(!el)return;
+    const value=safeConvertedInputValue(row[f],state.currency);
+    el.value=value;
+    if(!value && (Number(row[f])||0)!==0) el.placeholder='Exchange rate unavailable';
+  });
 }
 function rerenderAllVisible() {
   if(state.dashboard) renderDashboard(state.dashboard);
   Object.keys(state.tables).forEach(t=>renderTable(t,state.tables[t]));
   if(state.salaryPlan) renderSalaryPlan(state.salaryPlan);
-  const sal=document.getElementById('salaryplan-amount'); if(sal&&state.lastSalaryAED) sal.value=round2(fromAED(state.lastSalaryAED,state.currency));
+  const sal=document.getElementById('salaryplan-amount'); if(sal&&state.lastSalaryAED){sal.value=safeConvertedInputValue(state.lastSalaryAED,state.currency);if(!sal.value)sal.placeholder='Exchange rate unavailable';}
 }
 function fmt(amountAED) {
   const v=fromAED(amountAED,state.currency);
@@ -3293,13 +3304,14 @@ async function fetchAEDRate(code) {
   code=String(code||'AED').toUpperCase(); if(code==='AED') return 1;
   const res=await fetch(`/api/fx/rate?base=AED&quote=${encodeURIComponent(code)}`,{cache:'no-store'});
   if(!res.ok) throw new Error('rate unavailable');
-  const data=await res.json(); const r=Number(data.rate); if(!Number.isFinite(r)||r<=0) throw new Error('invalid rate'); return r;
+  const data=await res.json(); const r=Number(data.rate); if(!Number.isFinite(r)||r<=0) throw new Error('invalid rate');
+  if(data.date) state.fxRateDates[code]=String(data.date);
+  return r;
 }
 async function refreshCurrencyRates() {
   const codes=[...new Set([state.primaryCurrency,state.secondaryCurrency,'INR'])];
   const results=await Promise.allSettled(codes.map(async c=>[c,await fetchAEDRate(c)]));
-  results.forEach(x=>{ if(x.status==='fulfilled'){ const [c,r]=x.value; state.aedRates[c]=r; if(c==='INR'){state.exchangeRate=r; localStorage.setItem('azret_rate',String(r));} } });
-  localStorage.setItem('rizq_aed_rates',JSON.stringify(state.aedRates));
+  results.forEach(x=>{ if(x.status==='fulfilled'){ const [c,r]=x.value; state.aedRates[c]=r; if(c==='INR'){state.exchangeRate=r;} } });
   const required=[state.primaryCurrency,state.secondaryCurrency].filter(c=>c!=='AED');
   const missing=required.filter(c=>!(Number.isFinite(Number(state.aedRates[c]))&&Number(state.aedRates[c])>0));
   if(missing.length) throw new Error(`Missing exchange rate for ${missing.join(', ')}`);
@@ -3314,14 +3326,13 @@ async function loadServerSettings() {
     if(state.primaryCurrency===state.secondaryCurrency) state.secondaryCurrency=state.primaryCurrency==='INR'?'AED':'INR';
     state.currency=[state.primaryCurrency,state.secondaryCurrency].includes(String(cfg.default_currency||'').toUpperCase())?String(cfg.default_currency).toUpperCase():state.primaryCurrency;
     localStorage.setItem('rizq_primary_currency',state.primaryCurrency); localStorage.setItem('rizq_secondary_currency',state.secondaryCurrency); localStorage.setItem('azret_currency',state.currency);
-    try{Object.assign(state.aedRates,JSON.parse(localStorage.getItem('rizq_aed_rates')||'{}'));}catch(_){ }
+    // Browser localStorage is intentionally not a source of truth for rates.
     // Server-persisted last-known FX rates make conversions safe on a new
     // device even if the external reference service is temporarily offline.
     Object.entries(cfg).forEach(([k,v])=>{
       const m=/^fx_rate_([A-Z]{3})$/.exec(k);
       if(m){const n=Number(v);if(Number.isFinite(n)&&n>0)state.aedRates[m[1]]=n;}
     });
-    if(cfg.exchange_rate){state.exchangeRate=Number(cfg.exchange_rate)||state.exchangeRate;state.aedRates.INR=state.exchangeRate;}
     if(cfg.shopping_budget) state.shoppingBudget=Number(cfg.shopping_budget)||0;
     if(cfg.last_salary_amount) state.lastSalaryAED=Number(cfg.last_salary_amount)||0;
     if(cfg.salary_credit_day){const d=parseInt(cfg.salary_credit_day,10);if(d>=1&&d<=31)state.salaryCreditDay=d;}
@@ -3349,6 +3360,7 @@ async function refreshExchangeRate(silent=false) {
   const btn=document.getElementById('refreshRate'); if(btn) btn.classList.add('loading');
   try {
     await refreshCurrencyRates();
+    state.fxLastRefreshAt=Date.now();
     const rate=currencyPairRate();
     const rateEl=document.getElementById('rateValue');
     if(rateEl) rateEl.textContent=Number.isFinite(rate)?`1 ${state.primaryCurrency} = ${currencySymbol(state.secondaryCurrency)} ${rate.toLocaleString(undefined,{maximumFractionDigits:4})}`:'Exchange rate unavailable';
@@ -3367,7 +3379,8 @@ function updateAmountHint(table,field) {
 }
 function buildAutoNote(amountAED,dateVal,timeVal) {
   const other=otherCurrency(state.currency), otherVal=fromAED(amountAED,other),d=dateVal||localDateISO(),t=timeVal||new Date().toTimeString().slice(0,5);
-  return `[Base: AED ${round2(amountAED).toFixed(2)} | ${other}: ${round2(otherVal).toFixed(2)} | ${d} ${t}]`;
+  const otherText=Number.isFinite(otherVal)?round2(otherVal).toFixed(2):'unavailable';
+  return `[Base: AED ${round2(amountAED).toFixed(2)} | ${other}: ${otherText} | ${d} ${t}]`;
 }
 
 function updateDualHint(inputId) {
@@ -3407,8 +3420,7 @@ function setupCurrencyPairSettings() {
       // Otherwise an outage could make a non-AED amount be treated as AED.
       const needed=[...new Set([a,b].filter(c=>c!=='AED'))];
       const fetched=await Promise.all(needed.map(async c=>[c,await fetchAEDRate(c)]));
-      fetched.forEach(([c,r])=>{state.aedRates[c]=r;if(c==='INR'){state.exchangeRate=r;localStorage.setItem('azret_rate',String(r));}});
-      localStorage.setItem('rizq_aed_rates',JSON.stringify(state.aedRates));
+      fetched.forEach(([c,r])=>{state.aedRates[c]=r;if(c==='INR'){state.exchangeRate=r;}});
       const r=await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({primary_currency:a,secondary_currency:b,default_currency:a})});const d=await r.json();if(!r.ok||!d.success)throw new Error(d.error||'Save failed');state.primaryCurrency=a;state.secondaryCurrency=b;state.currency=a;localStorage.setItem('rizq_primary_currency',a);localStorage.setItem('rizq_secondary_currency',b);localStorage.setItem('azret_currency',a);syncCurrencyPairUI();await refreshExchangeRate(true);applyCurrency(a,true);if(msg)msg.style.display='none';toast(`Currency pair saved: ${a} ⇄ ${b}`,'success');
     }catch(err){if(msg){msg.textContent=(err.message==='rate unavailable'?'Exchange rate is temporarily unavailable. Please try again.':(err.message||'Could not save currencies'));msg.style.display='block';}}});
 }
@@ -3429,15 +3441,51 @@ function drawFxChart(points) {
 }
 async function refreshFxChart(range='1M') {
   state.fxRange=range;document.querySelectorAll('#fxRange button').forEach(b=>b.classList.toggle('active',b.dataset.range===range));const status=document.getElementById('fxStatus');if(status)status.textContent='Updating reference market data…';
-  try{const r=await fetch(`/api/fx/series?base=${state.primaryCurrency}&quote=${state.secondaryCurrency}&range=${range}`,{cache:'no-store'});const d=await r.json();if(!r.ok)throw new Error(d.error||'Exchange history unavailable');const pts=Array.isArray(d.points)?d.points:[];if(!pts.length)throw new Error('No exchange history available');drawFxChart(pts);const pair=currencyPairRate();const current=document.getElementById('fxCurrentRate');if(current)current.textContent=Number.isFinite(pair)?`${currencySymbol(state.secondaryCurrency)} ${pair.toLocaleString(undefined,{maximumFractionDigits:5})}`:'—';let change=0;if(pts.length>1){const first=Number(pts[0].rate),last=Number(pts[pts.length-1].rate);if(first)change=(last-first)/first*100;}const ch=document.getElementById('fxChange');if(ch){ch.textContent=`${change>=0?'+':''}${change.toFixed(2)}%`;ch.className=`fx-change ${change>0?'up':change<0?'down':''}`;}if(status)status.textContent='Latest central-bank reference trend';const upd=document.getElementById('fxUpdated');if(upd)upd.textContent=`Last updated: ${new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}`;}catch(e){drawFxChart([]);if(status)status.textContent='Reference history temporarily unavailable';const upd=document.getElementById('fxUpdated');if(upd)upd.textContent='Last update unavailable';}
+  try{const r=await fetch(`/api/fx/series?base=${state.primaryCurrency}&quote=${state.secondaryCurrency}&range=${range}`,{cache:'no-store'});const d=await r.json();if(!r.ok)throw new Error(d.error||'Exchange history unavailable');const pts=Array.isArray(d.points)?d.points:[];if(!pts.length)throw new Error('No exchange history available');drawFxChart(pts);const pair=currencyPairRate();const current=document.getElementById('fxCurrentRate');if(current)current.textContent=Number.isFinite(pair)?`${currencySymbol(state.secondaryCurrency)} ${pair.toLocaleString(undefined,{maximumFractionDigits:5})}`:'—';let change=0;if(pts.length>1){const first=Number(pts[0].rate),last=Number(pts[pts.length-1].rate);if(first)change=(last-first)/first*100;}const ch=document.getElementById('fxChange');if(ch){ch.textContent=`${change>=0?'+':''}${change.toFixed(2)}%`;ch.className=`fx-change ${change>0?'up':change<0?'down':''}`;}if(status)status.textContent='Latest central-bank reference trend';const upd=document.getElementById('fxUpdated');if(upd){const refDate=pts.length?pts[pts.length-1].date:'';const refreshed=new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});upd.textContent=refDate?`Reference: ${refDate} • refreshed ${refreshed}`:`Refreshed ${refreshed}`;}}catch(e){drawFxChart([]);if(status)status.textContent='Reference history temporarily unavailable';const upd=document.getElementById('fxUpdated');if(upd)upd.textContent='Last update unavailable';}
 }
 
-function setupFxInteractions(){document.querySelectorAll('#fxRange button').forEach(b=>b.addEventListener('click',()=>refreshFxChart(b.dataset.range)));window.addEventListener('resize',()=>{clearTimeout(setupFxInteractions._t);setupFxInteractions._t=setTimeout(()=>refreshFxChart(state.fxRange),180);});}
+function setupFxAutoRefresh(){
+  if(setupFxAutoRefresh._started)return; setupFxAutoRefresh._started=true;
+  let lastAttempt=0;
+  const refreshIfNeeded=()=>{
+    if(document.visibilityState==='hidden')return;
+    const now=Date.now();
+    if(now-lastAttempt<5*60*1000)return;
+    if(state.fxLastRefreshAt && now-state.fxLastRefreshAt<10*60*1000)return;
+    lastAttempt=now;
+    refreshExchangeRate(true).catch(()=>{});
+  };
+  setupFxAutoRefresh._timer=setInterval(refreshIfNeeded,15*60*1000);
+  window.addEventListener('focus',refreshIfNeeded);
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')refreshIfNeeded();});
+}
+
+function setupFxInteractions(){
+  document.querySelectorAll('#fxRange button').forEach(b=>b.addEventListener('click',()=>refreshFxChart(b.dataset.range)));
+  let lastWidth=window.innerWidth;
+  window.addEventListener('resize',()=>{
+    const width=window.innerWidth;
+    // Mobile browser chrome/keyboard can fire resize repeatedly without a real
+    // layout-width change. Avoid unnecessary network/chart work in that case.
+    if(Math.abs(width-lastWidth)<16)return;
+    lastWidth=width;
+    clearTimeout(setupFxInteractions._t);
+    setupFxInteractions._t=setTimeout(()=>{
+      if(document.getElementById('page-dashboard')?.classList.contains('active')) refreshFxChart(state.fxRange);
+    },450);
+  });
+}
 
 function setupDashboardWallpaper() {
-  const layer=document.getElementById('themeBgLayer');if(!layer)return;
-  const apply=()=>{const now=new Date(),key=`${now.getFullYear()}-${now.getMonth()+1}-${now.getDate()}-${now.getHours()}`,url=`https://picsum.photos/seed/rizq-premium-${encodeURIComponent(key)}/1920/1080`;const img=new Image();img.onload=()=>{layer.style.backgroundImage=`url("${url}")`;layer.classList.remove('live-wallpaper-fallback');layer.classList.add('active','live-wallpaper');};img.onerror=()=>{layer.classList.remove('live-wallpaper');layer.classList.add('active','live-wallpaper-fallback');};img.src=url;};
-  apply();const delay=()=>{const n=new Date(),next=new Date(n);next.setMinutes(60,0,0);return next-n+500;};setTimeout(()=>{apply();setInterval(apply,3600000);},delay());
+  const layer=document.getElementById('themeBgLayer');
+  if(!layer)return;
+  // Keep the dashboard background deterministic and local. Earlier builds fetched
+  // a new third-party Picsum image every hour, which added network work, privacy
+  // dependency and visible layout/paint churn on phones. The existing premium
+  // gradient fallback preserves the intended glass look with zero network cost.
+  layer.style.backgroundImage='';
+  layer.classList.remove('live-wallpaper');
+  layer.classList.add('active','live-wallpaper-fallback');
 }
 
 function setAzretAIState(mode) {
@@ -3450,11 +3498,11 @@ updateLiveStatus=function(text){_v16UpdateLiveStatus(text);const t=String(text||
 
 document.addEventListener('DOMContentLoaded',()=>{setupDashboardWallpaper();setupCurrencyPairSettings();setupFxInteractions();loadCurrencyCatalog();setAzretAIState('idle');});
 
-/* === YARIN V53 — Gold Saver, Smart Reminders & Finance Suite === */
+/* === YARIN V54 — Notification modal + Finance Suite === */
 (() => {
   const LEGACY_KEY = 'yarin_v48_';
   const SUITE_SYNC_KEYS = ['calendar','networth','goals','bills','gold_savings','gold_goal','gold_targets','gold_country'];
-  const SUITE_LOCAL_KEYS = ['gold_rate','gold_snapshots','gold_target'];
+  const SUITE_LOCAL_KEYS = ['gold_rate','gold_snapshots','gold_target','notification_read'];
   const SUITE_MAX_MONEY = 1e15;
   let suiteScope = 'account';
   let suiteReady = false;
@@ -3532,9 +3580,11 @@ document.addEventListener('DOMContentLoaded',()=>{setupDashboardWallpaper();setu
     if(!state.userId)return false;
     suiteScope=String(state.userId).replace(/[^a-zA-Z0-9_-]/g,'_').slice(0,80);
     if(!suiteScope)return false;
-    const migrateKeys=['calendar','networth','goals','bills','gold_savings','gold_rate','gold_snapshots','gold_goal','gold_target','gold_targets'];
-    for(const k of migrateKeys){const oldKey=LEGACY_KEY+k,newKey=scopedKey(k);if(localStorage.getItem(newKey)==null&&localStorage.getItem(oldKey)!=null)localStorage.setItem(newKey,localStorage.getItem(oldKey));localStorage.removeItem(oldKey);}
-    const oldCountry=localStorage.getItem(LEGACY_KEY+'gold_country');if(localStorage.getItem(scopedKey('gold_country'))==null&&oldCountry)localStorage.setItem(scopedKey('gold_country'),JSON.stringify(oldCountry));localStorage.removeItem(LEGACY_KEY+'gold_country');
+    // Never auto-assign old unscoped finance data to whichever account logs in
+    // first on a shared browser. V53+ server sync is account-scoped; stale legacy
+    // browser keys are removed instead of risking cross-account disclosure.
+    const migrateKeys=['calendar','networth','goals','bills','gold_savings','gold_rate','gold_snapshots','gold_goal','gold_target','gold_targets','gold_country'];
+    for(const k of migrateKeys)localStorage.removeItem(LEGACY_KEY+k);
     const legacyTarget=Number(read('gold_target',0));if(Number.isFinite(legacyTarget)&&legacyTarget>0){const cc=read('gold_country','AE');const cur=(countryMap[cc]||countryMap.AE).currency;const targets=read('gold_targets',{});if(!Number(targets?.[cur]))write('gold_targets',{...(targets&&typeof targets==='object'?targets:{}),[cur]:legacyTarget});rawWrite('gold_target',0);}
     return true;
   }
@@ -3558,6 +3608,7 @@ document.addEventListener('DOMContentLoaded',()=>{setupDashboardWallpaper();setu
   };
   const localDateKey = (d=new Date()) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   const countryMap={AE:{currency:'AED',name:'UAE'},IN:{currency:'INR',name:'India'},SA:{currency:'SAR',name:'Saudi Arabia'},QA:{currency:'QAR',name:'Qatar'},GB:{currency:'GBP',name:'United Kingdom'},US:{currency:'USD',name:'United States'}};
+  let lastGoldRefreshAt=0; let goldRefreshInFlight=false;
   const readList = k => { const v=read(k,[]); return Array.isArray(v)?v:[]; };
   const goldTargetFor = cur => { const all=read('gold_targets',{}); const v=Number(all&&typeof all==='object'?all[cur]:0); return Number.isFinite(v)&&v>0?v:0; };
   const setGoldTargetFor = (cur,value) => { const all=read('gold_targets',{}); const next={...(all&&typeof all==='object'&&!Array.isArray(all)?all:{})}; const v=Number(value); if(validSuiteMoney(v,false)) next[cur]=v; else delete next[cur]; write('gold_targets',next); };
@@ -3573,10 +3624,16 @@ document.addEventListener('DOMContentLoaded',()=>{setupDashboardWallpaper();setu
     bindGold(); bindCalendar(); bindNetWorth(); bindGoals(); bindBills(); bindVault(); bindNotifications();
     renderAll(); refreshGold();
     setInterval(refreshNotifications, 60000); setTimeout(refreshNotifications, 1800);
+    // Keep the Gold Saver reference fresh while the app remains open. The server
+    // still owns provider caching, so this is lightweight and avoids stale all-day values.
+    setInterval(()=>{if(!document.hidden && Date.now()-lastGoldRefreshAt>5*60*1000)refreshGold();},60000);
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden && Date.now()-lastGoldRefreshAt>2*60*1000)refreshGold();});
+    window.addEventListener('focus',()=>{if(Date.now()-lastGoldRefreshAt>2*60*1000)refreshGold();});
   }
 
   async function refreshGold(){
-    if(!$('goldCountry')) return;
+    if(!$('goldCountry') || goldRefreshInFlight) return;
+    goldRefreshInFlight=true;
     let cc=read('gold_country','AE')||$('goldCountry').value||'AE'; if(!countryMap[cc]) cc='AE'; $('goldCountry').value=cc;
     const cur=countryMap[cc].currency; $('goldMarketStatus').textContent='Refreshing live reference…';
     try{
@@ -3584,8 +3641,9 @@ document.addEventListener('DOMContentLoaded',()=>{setupDashboardWallpaper();setu
       const j=await r.json(); const perGram=Number(j.per_gram),usdOz=Number(j.usd_per_oz); if(!r.ok||!(perGram>0)||!(usdOz>0)) throw new Error(j.error||'No live gold price');
       write('gold_rate',{perGram,cur,usdOz,at:Date.now(),cc});
       let snaps=readList('gold_snapshots'); snaps.push({at:Date.now(),rate:perGram,cur}); snaps=snaps.filter(x=>Date.now()-Number(x.at||0)<1000*60*60*24*30).slice(-60); write('gold_snapshots',snaps);
-      $('goldMarketStatus').textContent='Live reference • updated now'; renderGold();
+      lastGoldRefreshAt=Date.now(); $('goldMarketStatus').textContent='Live reference • updated now'; renderGold();
     }catch(e){ const g=read('gold_rate',{}); const sameMarket=Number(g.perGram)>0&&g.cc===cc&&g.cur===cur; $('goldMarketStatus').textContent=sameMarket?'Offline • showing last saved reference':'Live rate unavailable for this market — try Refresh'; renderGold(); }
+    finally{ goldRefreshInFlight=false; }
   }
   function bindGold(){
     $('goldCountry')?.addEventListener('change',()=>{write('gold_country',$('goldCountry').value);refreshGold();});
@@ -3599,7 +3657,7 @@ document.addEventListener('DOMContentLoaded',()=>{setupDashboardWallpaper();setu
     let persistedCc=read('gold_country','AE');if(!countryMap[persistedCc])persistedCc='AE';if($('goldCountry').value!==persistedCc)$('goldCountry').value=persistedCc;
     const grams=a.reduce((s,x)=>s+Math.max(0,Number(x.grams)||0),0); const selectedCc=countryMap[$('goldCountry').value] ? $('goldCountry').value : 'AE'; const cur=countryMap[selectedCc].currency; const rateOk=Number(g.perGram)>0&&g.cc===selectedCc&&g.cur===cur; const current=grams*(rateOk?Number(g.perGram):0);
     $('goldSavedValue').textContent=rateOk?money(current,cur):'—'; $('goldSavedGrams').textContent=`${grams.toFixed(3)} g`; $('goldGramRate').textContent=rateOk?money(g.perGram,cur):'—'; $('goldGoalProgress').textContent=`${Math.min(100,grams/goal*100).toFixed(0)}%`; $('goldMarketPrice').textContent=rateOk?`${money(g.perGram,cur)} / g`:'—'; $('goldTargetPrice').value=goldTargetFor(cur)||'';
-    $('goldHistory').innerHTML=a.length?a.slice(0,30).map((x,i)=>`<div class="v48-list-item"><div><strong>${Number(x.grams).toFixed(3)} g</strong><small>${new Date(x.date).toLocaleDateString()} • ${money(x.amount,x.cur)} @ ${money(x.rate,x.cur)}/g</small></div><button data-gold-del="${i}">Delete</button></div>`).join(''):empty('No gold savings recorded yet.');
+    $('goldHistory').innerHTML=a.length?a.slice(0,30).map((x,i)=>{const dt=x.date?new Date(x.date):null;const dateLabel=dt&&Number.isFinite(dt.getTime())?dt.toLocaleDateString():(x.localDate?new Date(x.localDate+'T12:00:00').toLocaleDateString():'Saved entry');return `<div class="v48-list-item"><div><strong>${Number(x.grams).toFixed(3)} g</strong><small>${dateLabel} • ${money(x.amount,x.cur)} @ ${money(x.rate,x.cur)}/g</small></div><button data-gold-del="${i}">Delete</button></div>`;}).join(''):empty('No gold savings recorded yet.');
     document.querySelectorAll('[data-gold-del]').forEach(b=>b.onclick=()=>removeItem('gold_savings',Number(b.dataset.goldDel),renderGold)); drawGoldChart();
   }
   function drawGoldChart(){ const c=$('goldMiniChart'); if(!c||typeof AzretCharts==='undefined') return; const cc=$('goldCountry')?.value||read('gold_country','AE'),cur=(countryMap[cc]||countryMap.AE).currency; const pts=readList('gold_snapshots').filter(x=>x.cur===cur&&Number.isFinite(Number(x.rate))).slice(-30); AzretCharts.lineChart('goldMiniChart',pts.map(x=>new Date(Number(x.at)||Date.now()).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})),[{data:pts.map(x=>Number(x.rate))}]); }
@@ -3617,7 +3675,9 @@ document.addEventListener('DOMContentLoaded',()=>{setupDashboardWallpaper();setu
   function renderBills(){if(!$('billsList'))return;const a=readList('bills').map((x,_idx)=>({...x,_idx})).sort((x,y)=>Number(x.day)-Number(y.day));$('billsList').innerHTML=a.length?a.map(x=>`<div class="v48-list-item"><div><strong>${h(x.name)}</strong><small>${h(x.kind)} • ${money(x.amount,x.cur||suiteCurrency())} • due day ${Number(x.day)}</small></div><button data-bill-del="${x._idx}">Delete</button></div>`).join(''):empty('No recurring bills or subscriptions yet.');document.querySelectorAll('[data-bill-del]').forEach(b=>b.onclick=()=>removeItem('bills',Number(b.dataset.billDel),renderBills));}
 
   function vaultDb(){return new Promise((resolve,reject)=>{const q=indexedDB.open(`yarin_vault_v2_u${suiteScope}`,1);q.onupgradeneeded=()=>{if(!q.result.objectStoreNames.contains('docs'))q.result.createObjectStore('docs',{keyPath:'id'});};q.onsuccess=()=>resolve(q.result);q.onerror=()=>reject(q.error);});}
-  function bindVault(){ $('vaultAdd')?.addEventListener('click',async()=>{const f=$('vaultFile').files?.[0];if(!f)return toast('Choose a document first','error');if(f.size>8*1024*1024)return toast('Keep vault files under 8 MB','error');try{const db=await vaultDb(),tx=db.transaction('docs','readwrite');tx.objectStore('docs').put({id:Date.now(),name:f.name,type:f.type,size:f.size,added:Date.now(),blob:f});tx.oncomplete=()=>{db.close();$('vaultFile').value='';renderVault();toast('Document saved locally','success');};tx.onerror=()=>db.close();}catch(e){toast('Vault storage is unavailable in this browser','error');}}); }
+  let lastVaultId=0;
+  function nextVaultId(){const now=Date.now();lastVaultId=Math.max(now,lastVaultId+1);return lastVaultId;}
+  function bindVault(){ $('vaultAdd')?.addEventListener('click',async()=>{const f=$('vaultFile').files?.[0];if(!f)return toast('Choose a document first','error');if(f.size>8*1024*1024)return toast('Keep vault files under 8 MB','error');try{const db=await vaultDb(),tx=db.transaction('docs','readwrite');tx.objectStore('docs').put({id:nextVaultId(),name:f.name,type:f.type,size:f.size,added:Date.now(),blob:f});tx.oncomplete=()=>{db.close();$('vaultFile').value='';renderVault();toast('Document saved locally','success');};tx.onerror=()=>db.close();}catch(e){toast('Vault storage is unavailable in this browser','error');}}); }
   async function renderVault(){if(!$('vaultList'))return;try{const db=await vaultDb(),tx=db.transaction('docs','readonly'),q=tx.objectStore('docs').getAll();q.onsuccess=()=>{$('vaultList').innerHTML=q.result.length?q.result.map(x=>`<div class="v48-list-item"><div><strong>${h(x.name)}</strong><small>${(x.size/1024).toFixed(0)} KB • ${new Date(x.added).toLocaleDateString()}</small></div><span><button data-vault-open="${x.id}">Open</button> <button data-vault-del="${x.id}">Delete</button></span></div>`).join(''):empty('Your local document vault is empty.');document.querySelectorAll('[data-vault-open]').forEach(b=>b.onclick=()=>vaultOpen(Number(b.dataset.vaultOpen)));document.querySelectorAll('[data-vault-del]').forEach(b=>b.onclick=()=>vaultDelete(Number(b.dataset.vaultDel)));};tx.oncomplete=()=>db.close();tx.onerror=()=>db.close();}catch(_){$('vaultList').innerHTML=empty('Vault unavailable in this browser.');}}
   async function vaultOpen(id){const db=await vaultDb(),tx=db.transaction('docs','readonly'),q=tx.objectStore('docs').get(id);q.onsuccess=()=>{if(q.result?.blob){const url=URL.createObjectURL(q.result.blob),a=document.createElement('a');a.href=url;a.target='_blank';a.rel='noopener';a.style.display='none';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);}};tx.oncomplete=()=>db.close();tx.onerror=()=>db.close();}
   async function vaultDelete(id){const db=await vaultDb(),tx=db.transaction('docs','readwrite');tx.objectStore('docs').delete(id);tx.oncomplete=()=>{db.close();renderVault();};tx.onerror=()=>db.close();}
@@ -3651,9 +3711,124 @@ document.addEventListener('DOMContentLoaded',()=>{setupDashboardWallpaper();setu
 
   function localDayNumber(date){return Date.UTC(date.getFullYear(),date.getMonth(),date.getDate())/86400000;}
   function daysFromToday(date,now=new Date()){return Math.round(localDayNumber(date)-localDayNumber(now));}
-  function notifications(){const out=[],now=new Date(),today=now.getDate(),effectiveDay=Math.min(Math.max(1,Number(state.salaryCreditDay)||27),new Date(now.getFullYear(),now.getMonth()+1,0).getDate());const dash=state.dashboard||{};if(today>=effectiveDay&&Number(dash.monthly_income||0)<=0)out.push({page:'income',text:'Salary date has passed but no monthly income is recorded',sub:'Tap to review Income'});if(Number(dash.monthly_income||0)>0&&Number(dash.monthly_savings||0)<=0)out.push({page:'savings',text:'No monthly savings recorded yet',sub:'Tap to add this month’s saving'});readList('bills').forEach(x=>{const dueDay=Math.max(1,Math.min(31,Number(x.day)||1));let due=new Date(now.getFullYear(),now.getMonth(),Math.min(dueDay,new Date(now.getFullYear(),now.getMonth()+1,0).getDate()),23,59,59);if(due<now){const nm=now.getMonth()+1,ny=now.getFullYear()+Math.floor(nm/12),mm=nm%12;due=new Date(ny,mm,Math.min(dueDay,new Date(ny,mm+1,0).getDate()),23,59,59);}const delta=daysFromToday(due,now);if(delta>=0&&delta<=3)out.push({page:'bills',text:`${x.name} is due ${delta===0?'today':`in ${delta} day${delta===1?'':'s'}`}`,sub:`${money(x.amount,x.cur||suiteCurrency())} • ${x.kind}`});});readList('calendar').forEach(x=>{const d=new Date(x.date+'T12:00:00'),days=daysFromToday(d,now);if(days>=0&&days<=5)out.push({page:'financial-calendar',text:`${x.title} ${days===0?'is today':`in ${days} days`}`,sub:x.type});});const month=now.getMonth(),year=now.getFullYear();if(!readList('gold_savings').some(x=>{const d=x.localDate?new Date(x.localDate+'T12:00:00'):new Date(x.date);return !isNaN(d)&&d.getMonth()===month&&d.getFullYear()===year;}))out.push({page:'gold-saver',text:'No Gold Saver contribution recorded this month',sub:'Tap to review your gold goal'});const g=read('gold_rate',{}),cc=read('gold_country','AE'),cur=(countryMap[cc]||countryMap.AE).currency,target=goldTargetFor(cur);if(target>0&&g.perGram>0&&g.cc===cc&&g.cur===cur&&g.perGram<=target)out.push({page:'gold-saver',text:'Gold target price reached',sub:`Current reference ${money(g.perGram,g.cur)} / g`});readList('goals').forEach(x=>{if(x.date){const days=daysFromToday(new Date(x.date+'T12:00:00'),now),p=Number(x.saved||0)/Math.max(1,Number(x.target)||1);if(days>=0&&days<=30&&p<1)out.push({page:'goals',text:`${x.name} target date is approaching`,sub:`${Math.round(p*100)}% funded • ${days} days left`});}});return out.slice(0,12);}
-  function bindNotifications(){$('financeNotifBtn')?.addEventListener('click',()=>{$('financeNotifPanel').hidden=!$('financeNotifPanel').hidden;refreshNotifications();});$('financeNotifClose')?.addEventListener('click',()=>$('financeNotifPanel').hidden=true);}
-  function refreshNotifications(){if(!$('financeNotifCount'))return;const a=notifications();$('financeNotifCount').textContent=a.length;$('financeNotifCount').style.display=a.length?'block':'none';$('financeNotifList').innerHTML=a.length?a.map((x,i)=>`<button class="v48-notif-item" data-v48-notif="${i}">${h(x.text)}<small>${h(x.sub)}</small></button>`).join(''):empty('You are all caught up.');document.querySelectorAll('[data-v48-notif]').forEach(b=>b.onclick=()=>{const x=a[Number(b.dataset.v48Notif)];document.querySelector(`.nav-item[data-page="${x.page}"]`)?.click();$('financeNotifPanel').hidden=true;});}
+  function notifications(){
+    const out=[],now=new Date(),today=now.getDate();
+    const year=now.getFullYear(),month=now.getMonth();
+    const monthToken=`${year}-${String(month+1).padStart(2,'0')}`;
+    const effectiveDay=Math.min(
+      Math.max(1,Number(state.salaryCreditDay)||27),
+      new Date(year,month+1,0).getDate()
+    );
+    const dash=state.dashboard||{};
+
+    if(today>=effectiveDay&&Number(dash.monthly_income||0)<=0){
+      out.push({
+        id:`salary-missing:${monthToken}`,
+        page:'income',
+        text:'Salary date has passed but no monthly income is recorded',
+        sub:'Tap to review Income'
+      });
+    }
+    if(Number(dash.monthly_income||0)>0&&Number(dash.monthly_savings||0)<=0){
+      out.push({
+        id:`savings-missing:${monthToken}`,
+        page:'savings',
+        text:'No monthly savings recorded yet',
+        sub:'Tap to add this month’s saving'
+      });
+    }
+
+    readList('bills').forEach(x=>{
+      const dueDay=Math.max(1,Math.min(31,Number(x.day)||1));
+      let due=new Date(year,month,Math.min(dueDay,new Date(year,month+1,0).getDate()),23,59,59);
+      if(due<now){
+        const nextMonth=month+1,nextYear=year+Math.floor(nextMonth/12),normalizedMonth=nextMonth%12;
+        due=new Date(nextYear,normalizedMonth,Math.min(dueDay,new Date(nextYear,normalizedMonth+1,0).getDate()),23,59,59);
+      }
+      const delta=daysFromToday(due,now);
+      if(delta>=0&&delta<=3){
+        out.push({
+          id:`bill:${String(x.name||'')}|${String(x.kind||'')}|${String(x.amount||0)}|${localDateKey(due)}`,
+          page:'bills',
+          text:`${x.name} is due ${delta===0?'today':`in ${delta} day${delta===1?'':'s'}`}`,
+          sub:`${money(x.amount,x.cur||suiteCurrency())} • ${x.kind}`
+        });
+      }
+    });
+
+    readList('calendar').forEach(x=>{
+      const d=new Date(x.date+'T12:00:00'),days=daysFromToday(d,now);
+      if(days>=0&&days<=5){
+        out.push({
+          id:`calendar:${String(x.title||'')}|${String(x.type||'')}|${String(x.date||'')}`,
+          page:'financial-calendar',
+          text:`${x.title} ${days===0?'is today':`in ${days} days`}`,
+          sub:x.type
+        });
+      }
+    });
+
+    if(!readList('gold_savings').some(x=>{
+      const d=x.localDate?new Date(x.localDate+'T12:00:00'):new Date(x.date);
+      return !isNaN(d)&&d.getMonth()===month&&d.getFullYear()===year;
+    })){
+      out.push({
+        id:`gold-missing:${monthToken}`,
+        page:'gold-saver',
+        text:'No Gold Saver contribution recorded this month',
+        sub:'Tap to review your gold goal'
+      });
+    }
+
+    const g=read('gold_rate',{}),cc=read('gold_country','AE');
+    const cur=(countryMap[cc]||countryMap.AE).currency,target=goldTargetFor(cur);
+    if(target>0&&g.perGram>0&&g.cc===cc&&g.cur===cur&&g.perGram<=target){
+      out.push({
+        id:`gold-target:${cc}:${cur}:${localDateKey(now)}:${Number(target).toFixed(4)}`,
+        page:'gold-saver',
+        text:'Gold target price reached',
+        sub:`Current reference ${money(g.perGram,g.cur)} / g`
+      });
+    }
+
+    readList('goals').forEach(x=>{
+      if(!x.date)return;
+      const days=daysFromToday(new Date(x.date+'T12:00:00'),now);
+      const p=Number(x.saved||0)/Math.max(1,Number(x.target)||1);
+      if(days>=0&&days<=30&&p<1){
+        out.push({
+          id:`goal:${String(x.name||'')}|${String(x.date||'')}|${String(x.target||0)}`,
+          page:'goals',
+          text:`${x.name} target date is approaching`,
+          sub:`${Math.round(p*100)}% funded • ${days} days left`
+        });
+      }
+    });
+    return out;
+  }
+  const notificationKey = x => String(x.id||`${String(x.page||'general')}|${String(x.text||'')}`);
+  function notificationReadSet(){const a=read('notification_read',[]);return new Set(Array.isArray(a)?a.map(String):[]);}
+  function saveNotificationReadSet(set){rawWrite('notification_read',Array.from(set).slice(-1000));}
+  function closeNotifications(){const panel=$('financeNotifPanel'),btn=$('financeNotifBtn');if(!panel)return;panel.hidden=true;document.body.classList.remove('notification-modal-open');btn?.setAttribute('aria-expanded','false');}
+  function openNotifications(){const panel=$('financeNotifPanel'),btn=$('financeNotifBtn');if(!panel)return;refreshNotifications();panel.hidden=false;document.body.classList.add('notification-modal-open');btn?.setAttribute('aria-expanded','true');requestAnimationFrame(()=>$('financeNotifClose')?.focus());}
+  function bindNotifications(){
+    $('financeNotifBtn')?.addEventListener('click',()=>{const panel=$('financeNotifPanel');if(!panel)return;panel.hidden?openNotifications():closeNotifications();});
+    $('financeNotifClose')?.addEventListener('click',closeNotifications);
+    $('financeNotifPanel')?.addEventListener('click',e=>{if(e.target===$('financeNotifPanel'))closeNotifications();});
+    document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('financeNotifPanel')?.hidden)closeNotifications();});
+  }
+  function refreshNotifications(){
+    const count=$('financeNotifCount'),list=$('financeNotifList');if(!count||!list)return;
+    const a=notifications(),readSet=notificationReadSet(),unread=a.filter(x=>!readSet.has(notificationKey(x))).length,visible=a.slice(0,100);
+    count.textContent=unread>99?'99+':String(unread);count.hidden=unread===0;
+    $('financeNotifBtn')?.classList.toggle('has-unread',unread>0);
+    if(!a.length){
+      list.innerHTML='<div class="v54-notif-empty"><span>✓</span><strong>You are all caught up.</strong><small>No financial reminders need your attention right now.</small></div>';
+    }else{
+      list.innerHTML=visible.map((x,i)=>{const isRead=readSet.has(notificationKey(x));return `<button class="v54-notif-item ${isRead?'is-read':'is-unread'}" data-v54-notif="${i}"><span class="v54-notif-dot" aria-hidden="true"></span><span class="v54-notif-copy"><strong>${h(x.text)}</strong><small>${h(x.sub)}</small></span><span class="v54-notif-arrow" aria-hidden="true">›</span></button>`;}).join('')+(a.length>visible.length?`<div class="v54-notif-limit-note">Showing the first ${visible.length} of ${a.length} active reminders.</div>`:'');
+    }
+    document.querySelectorAll('[data-v54-notif]').forEach(b=>b.onclick=()=>{const x=visible[Number(b.dataset.v54Notif)];if(!x)return;const seen=notificationReadSet();seen.add(notificationKey(x));saveNotificationReadSet(seen);refreshNotifications();document.querySelector(`.nav-item[data-page="${x.page}"]`)?.click();closeNotifications();});
+  }
   function renderAll(){document.querySelectorAll('.suite-cur-unit').forEach(el=>el.textContent=suiteCurrency());renderGold();renderCalendar();renderNetWorth();renderGoals();renderBills();renderVault();renderHealth();refreshNotifications();}
 
   window.refreshYarinFinanceSuite=()=>{if(suiteReady)renderAll();};

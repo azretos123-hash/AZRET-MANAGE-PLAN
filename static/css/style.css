@@ -380,6 +380,38 @@ input,select,textarea{ font-family:inherit; }
   background:linear-gradient(120deg, rgba(30,77,183,0.14), rgba(212,175,106,0.08));
   animation:fadeUp .5s ease;
 }
+/* Currency-aware flag shade: a soft, non-interactive watermark that grows
+   from the right edge and dissolves before the salary text. Uses the device's
+   native colour-emoji font so it adds no image/network weight. */
+.currency-flag-watermark{
+  position:absolute; top:0; right:-1%; bottom:0; width:min(58%, 560px);
+  z-index:1; pointer-events:none; overflow:hidden;
+  display:flex; align-items:center; justify-content:flex-end; padding-right:3.5%;
+  opacity:.115;
+  -webkit-mask-image:linear-gradient(to left,#000 0%,rgba(0,0,0,.92) 30%,rgba(0,0,0,.48) 58%,rgba(0,0,0,.10) 78%,transparent 100%);
+  mask-image:linear-gradient(to left,#000 0%,rgba(0,0,0,.92) 30%,rgba(0,0,0,.48) 58%,rgba(0,0,0,.10) 78%,transparent 100%);
+  transition:opacity .45s ease, transform .55s var(--ease-luxe);
+  transform:translateX(0) scale(1);
+}
+.currency-flag-glyph{
+  display:block; font-size:clamp(150px,17vw,260px); line-height:1;
+  font-family:"Noto Color Emoji","Apple Color Emoji","Segoe UI Emoji",sans-serif;
+  filter:saturate(.95) contrast(1.04) drop-shadow(-18px 18px 28px rgba(15,42,94,.24));
+  transform:rotate(-4deg) scale(1.08); transform-origin:right center;
+  user-select:none; white-space:nowrap;
+}
+.salary-countdown-card.flag-changing .currency-flag-watermark{opacity:0;transform:translateX(24px) scale(.96);}
+/* Keep content crisp above the watermark. */
+.countdown-main-row,.countdown-daily-reminder{z-index:2;}
+[data-theme="dark"] .currency-flag-watermark{opacity:.09;}
+[data-theme="dark"] .currency-flag-glyph{filter:saturate(.86) brightness(.92) drop-shadow(-18px 18px 30px rgba(0,0,0,.34));}
+@media(max-width:700px){
+  .currency-flag-watermark{width:68%;right:-4%;padding-right:0;opacity:.085;}
+  .currency-flag-glyph{font-size:clamp(118px,42vw,175px);filter:saturate(.9) drop-shadow(-10px 12px 20px rgba(15,42,94,.18));}
+}
+@media(prefers-reduced-motion:reduce){
+  .currency-flag-watermark{transition:none;}
+}
 .countdown-main-row{ display:flex; align-items:center; gap:22px; position:relative; z-index:1; }
 .countdown-glow{
   position:absolute; inset:-40%; z-index:0; pointer-events:none;
@@ -2507,6 +2539,528 @@ body{background:var(--bg);}
 @media(max-width:390px){.auth-card-v26{width:calc(100% - 12px)!important;padding:22px 13px 24px!important}.auth-hero-v26{min-height:31dvh!important;padding-left:12px!important;padding-right:12px!important}.auth-options-row{font-size:.82rem!important}.forgot-password-link{font-size:.8rem!important}.otp-code-grid-v45{gap:4px!important}.otp-digit-v45{height:50px!important}}
 
 /* === YARIN V48 — Smart Finance Suite === */
-.v48-nav-emoji{width:19px;text-align:center;font-size:17px;color:var(--gold-500);font-weight:900}.v48-dashboard-title-row{display:flex;align-items:center;gap:12px}.v48-notif-btn{position:relative;border:1px solid rgba(21,200,220,.3);background:rgba(255,255,255,.5);border-radius:14px;padding:8px 11px;font-size:18px;cursor:pointer}.v48-notif-btn span{position:absolute;right:-7px;top:-7px;min-width:20px;height:20px;padding:0 5px;border-radius:999px;background:#ef4444;color:#fff;font:700 11px/20px system-ui}.v48-notif-panel{position:absolute;z-index:80;left:24px;top:102px;width:min(390px,calc(100vw - 40px));max-height:430px;overflow:auto;padding:12px;border:1px solid rgba(21,200,220,.22);border-radius:20px;background:rgba(7,18,42,.96);color:#fff;box-shadow:0 24px 70px rgba(0,0,0,.35);backdrop-filter:blur(20px)}.v48-notif-head{display:flex;justify-content:space-between;align-items:center;padding:5px 6px 10px}.v48-notif-head button{border:0;background:transparent;color:#fff;font-size:24px;cursor:pointer}.v48-notif-item{display:block;width:100%;text-align:left;padding:11px 12px;margin:6px 0;border:1px solid rgba(255,255,255,.09);border-radius:13px;background:rgba(255,255,255,.06);color:inherit;cursor:pointer}.v48-notif-item small{display:block;opacity:.65;margin-top:3px}.v48-sub{margin-top:5px;color:var(--text-muted);max-width:720px}.v48-kpi-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:16px}.v48-kpi{padding:20px}.v48-kpi small{display:block;color:var(--text-muted);margin-bottom:8px}.v48-kpi strong{font-size:24px}.v48-kpi.accent{border-color:rgba(212,175,55,.45);box-shadow:inset 0 0 28px rgba(212,175,55,.06)}.v48-two{grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr)}.v48-section-head,.v48-row{display:flex;align-items:center;justify-content:space-between;gap:12px}.v48-row{margin-top:14px}.v48-row input{flex:1}.v48-market-price{display:flex;align-items:baseline;gap:12px;margin:18px 0}.v48-market-price strong{font-size:32px}.v48-market-price span{color:var(--text-muted)}.v48-list{display:grid;gap:9px;margin-top:12px}.v48-list-item{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:12px 14px;border:1px solid var(--border);border-radius:14px;background:rgba(255,255,255,.22)}[data-theme="dark"] .v48-list-item{background:rgba(255,255,255,.035)}.v48-list-item strong{display:block}.v48-list-item small{color:var(--text-muted)}.v48-list-item button{border:0;background:rgba(239,68,68,.1);color:#ef4444;border-radius:10px;padding:7px 9px;cursor:pointer}.v48-progress{height:8px;border-radius:999px;background:rgba(127,127,127,.15);overflow:hidden;margin-top:8px}.v48-progress i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#d4af37,#17c7dc);width:0}.v48-empty{padding:20px;text-align:center;color:var(--text-muted);border:1px dashed var(--border);border-radius:14px}.v48-health-card{display:flex;align-items:center;gap:24px;padding:28px}.v48-score-ring{width:130px;height:130px;flex:0 0 130px;border-radius:50%;display:grid;place-content:center;text-align:center;background:conic-gradient(#17c7dc var(--score,0%),rgba(127,127,127,.14) 0);position:relative}.v48-score-ring:before{content:"";position:absolute;inset:10px;border-radius:50%;background:var(--surface,#fff)}[data-theme="dark"] .v48-score-ring:before{background:#0c1830}.v48-score-ring strong,.v48-score-ring span{position:relative;z-index:1}.v48-score-ring strong{font-size:38px}.v48-health-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:16px}.v48-health-chip{padding:16px;border-radius:16px;border:1px solid var(--border);background:var(--card-bg,rgba(255,255,255,.45))}.v48-health-chip b{display:block;font-size:20px;margin-top:5px}
+.v48-nav-emoji{width:19px;text-align:center;font-size:17px;color:inherit;font-weight:900}.v48-dashboard-title-row{display:flex;align-items:center;gap:12px}.v48-notif-btn{position:relative;border:1px solid rgba(21,200,220,.3);background:rgba(255,255,255,.5);border-radius:14px;padding:8px 11px;font-size:18px;cursor:pointer}.v48-notif-btn span{position:absolute;right:-7px;top:-7px;min-width:20px;height:20px;padding:0 5px;border-radius:999px;background:#ef4444;color:#fff;font:700 11px/20px system-ui}.v48-notif-panel{position:absolute;z-index:80;left:24px;top:102px;width:min(390px,calc(100vw - 40px));max-height:430px;overflow:auto;padding:12px;border:1px solid rgba(21,200,220,.22);border-radius:20px;background:rgba(7,18,42,.96);color:#fff;box-shadow:0 24px 70px rgba(0,0,0,.35);backdrop-filter:blur(20px)}.v48-notif-head{display:flex;justify-content:space-between;align-items:center;padding:5px 6px 10px}.v48-notif-head button{border:0;background:transparent;color:#fff;font-size:24px;cursor:pointer}.v48-notif-item{display:block;width:100%;text-align:left;padding:11px 12px;margin:6px 0;border:1px solid rgba(255,255,255,.09);border-radius:13px;background:rgba(255,255,255,.06);color:inherit;cursor:pointer}.v48-notif-item small{display:block;opacity:.65;margin-top:3px}.v48-sub{margin-top:5px;color:var(--text-muted);max-width:720px}.v48-kpi-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:16px}.v48-kpi{padding:20px}.v48-kpi small{display:block;color:var(--text-muted);margin-bottom:8px}.v48-kpi strong{font-size:24px}.v48-kpi.accent{border-color:rgba(212,175,55,.45);box-shadow:inset 0 0 28px rgba(212,175,55,.06)}.v48-two{grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr)}.v48-section-head,.v48-row{display:flex;align-items:center;justify-content:space-between;gap:12px}.v48-row{margin-top:14px}.v48-row input{flex:1}.v48-market-price{display:flex;align-items:baseline;gap:12px;margin:18px 0}.v48-market-price strong{font-size:32px}.v48-market-price span{color:var(--text-muted)}.v48-list{display:grid;gap:9px;margin-top:12px}.v48-list-item{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:12px 14px;border:1px solid var(--border);border-radius:14px;background:rgba(255,255,255,.22)}[data-theme="dark"] .v48-list-item{background:rgba(255,255,255,.035)}.v48-list-item strong{display:block}.v48-list-item small{color:var(--text-muted)}.v48-list-item button{border:0;background:rgba(239,68,68,.1);color:#ef4444;border-radius:10px;padding:7px 9px;cursor:pointer}.v48-progress{height:8px;border-radius:999px;background:rgba(127,127,127,.15);overflow:hidden;margin-top:8px}.v48-progress i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#d4af37,#17c7dc);width:0}.v48-empty{padding:20px;text-align:center;color:var(--text-muted);border:1px dashed var(--border);border-radius:14px}.v48-health-card{display:flex;align-items:center;gap:24px;padding:28px}.v48-score-ring{width:130px;height:130px;flex:0 0 130px;border-radius:50%;display:grid;place-content:center;text-align:center;background:conic-gradient(#17c7dc var(--score,0%),rgba(127,127,127,.14) 0);position:relative}.v48-score-ring:before{content:"";position:absolute;inset:10px;border-radius:50%;background:var(--surface,#fff)}[data-theme="dark"] .v48-score-ring:before{background:#0c1830}.v48-score-ring strong,.v48-score-ring span{position:relative;z-index:1}.v48-score-ring strong{font-size:38px}.v48-health-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:16px}.v48-health-chip{padding:16px;border-radius:16px;border:1px solid var(--border);background:var(--card-bg,rgba(255,255,255,.45))}.v48-health-chip b{display:block;font-size:20px;margin-top:5px}
 @media(max-width:900px){.v48-kpi-grid{grid-template-columns:repeat(2,1fr)}.v48-two{grid-template-columns:1fr}.v48-health-grid{grid-template-columns:1fr 1fr}.v48-notif-panel{left:12px;top:92px}}
 @media(max-width:520px){.v48-kpi-grid{grid-template-columns:1fr 1fr;gap:9px}.v48-kpi{padding:14px}.v48-kpi strong{font-size:18px}.v48-health-card{align-items:flex-start;gap:15px;padding:18px}.v48-score-ring{width:100px;height:100px;flex-basis:100px}.v48-score-ring strong{font-size:29px}.v48-health-grid{grid-template-columns:1fr}.v48-list-item{align-items:flex-start}.v48-market-price{display:block}.v48-row{align-items:stretch;flex-direction:column}.v48-row .btn{width:100%}}
+
+/* ========================================================================== 
+   V54 — Global notification center: 3D green bell + unread badge + blur modal
+   ========================================================================== */
+.v54-notif-trigger{
+  position:relative; flex:0 0 48px; width:48px; height:48px; padding:0; margin:0;
+  border:0; border-radius:50%; background:transparent; cursor:pointer;
+  display:grid; place-items:center; isolation:isolate;
+  -webkit-tap-highlight-color:transparent;
+}
+.v54-notif-orb{
+  width:44px; height:44px; border-radius:50%; display:block; overflow:visible;
+  transform:translateZ(0); transition:transform .2s ease, filter .2s ease;
+  filter:drop-shadow(0 7px 9px rgba(38,135,0,.24));
+}
+.v54-notif-bell{display:block;width:100%;height:100%;overflow:visible}
+.v54-notif-trigger:hover .v54-notif-orb,.v54-notif-trigger:focus-visible .v54-notif-orb{transform:translateY(-1px) scale(1.045);filter:drop-shadow(0 9px 11px rgba(38,135,0,.32))}
+.v54-notif-trigger:focus-visible{outline:3px solid rgba(46,125,255,.28);outline-offset:3px}
+.v54-notif-trigger.has-unread .v54-notif-orb:after{content:"";position:absolute;inset:3px;border-radius:50%;box-shadow:0 0 0 0 rgba(119,235,0,.45);animation:v54NotifPulse 2.2s ease-out infinite;pointer-events:none}
+.v54-notif-count{
+  position:absolute; z-index:3; top:-3px; right:-5px; min-width:21px; height:21px; padding:0 5px;
+  display:grid; place-items:center; border-radius:999px; border:2px solid #fff;
+  background:#f04444; color:#fff; box-shadow:0 4px 10px rgba(158,24,24,.28);
+  font:800 10.5px/1 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; letter-spacing:-.02em;
+}
+.v54-notif-count[hidden]{display:none!important}
+@keyframes v54NotifPulse{0%{box-shadow:0 0 0 0 rgba(119,235,0,.42)}70%,100%{box-shadow:0 0 0 11px rgba(119,235,0,0)}}
+
+.v54-notif-overlay{
+  position:fixed; inset:0; z-index:10000; display:flex; align-items:center; justify-content:center;
+  padding:24px; background:rgba(3,10,24,.42);
+  backdrop-filter:blur(14px) saturate(82%); -webkit-backdrop-filter:blur(14px) saturate(82%);
+  animation:v54NotifOverlayIn .18s ease-out;
+}
+.v54-notif-overlay[hidden]{display:none!important}
+body.notification-modal-open{overflow:hidden!important}
+.v54-notif-modal{
+  width:min(520px,calc(100vw - 32px)); max-height:min(72vh,640px); overflow:hidden;
+  display:flex; flex-direction:column; border-radius:24px;
+  border:1px solid rgba(151,191,255,.22);
+  background:linear-gradient(155deg,#102446 0%,#0a1a35 47%,#061329 100%);
+  color:#f8fbff; box-shadow:0 34px 90px rgba(0,0,0,.48),inset 0 1px 0 rgba(255,255,255,.08);
+  animation:v54NotifModalIn .22s cubic-bezier(.2,.85,.35,1.08);
+}
+/* Intentionally theme-independent: same notification window in Light and Dark mode. */
+[data-theme="light"] .v54-notif-modal,[data-theme="dark"] .v54-notif-modal{background:linear-gradient(155deg,#102446 0%,#0a1a35 47%,#061329 100%);color:#f8fbff}
+.v54-notif-head{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:19px 20px 16px;border-bottom:1px solid rgba(255,255,255,.09);background:rgba(255,255,255,.025)}
+.v54-notif-head-title{display:flex;align-items:center;gap:12px;min-width:0}
+.v54-notif-head-title>div{min-width:0}
+.v54-notif-head-title strong{display:block;font-size:17px;line-height:1.2;color:#fff}
+.v54-notif-head-title small{display:block;margin-top:4px;color:#9db0cd;font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.v54-notif-mini-bell{width:36px;height:36px;flex:0 0 36px;display:grid;place-items:center;border-radius:12px;background:linear-gradient(145deg,#9af51c,#43bd00);color:#fff;box-shadow:0 8px 20px rgba(59,181,0,.22),inset 0 1px 1px rgba(255,255,255,.35)}
+.v54-notif-mini-bell svg{width:19px;height:19px;filter:drop-shadow(0 2px 2px rgba(20,75,0,.28))}
+.v54-notif-close{width:36px;height:36px;flex:0 0 36px;border:1px solid rgba(255,255,255,.10);border-radius:12px;background:rgba(255,255,255,.055);color:#eaf2ff;font:400 25px/1 system-ui;cursor:pointer;transition:background .18s ease,transform .18s ease}
+.v54-notif-close:hover,.v54-notif-close:focus-visible{background:rgba(255,255,255,.12);transform:scale(1.03);outline:none}
+.v54-notif-list{padding:12px;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:rgba(150,180,225,.32) transparent}
+.v54-notif-item{position:relative;width:100%;display:grid;grid-template-columns:10px minmax(0,1fr) 18px;align-items:center;gap:10px;margin:0 0 8px;padding:13px 13px;border-radius:15px;border:1px solid rgba(255,255,255,.085);background:rgba(255,255,255,.052);color:#f7fbff;text-align:left;cursor:pointer;transition:transform .16s ease,background .16s ease,border-color .16s ease}
+.v54-notif-item:last-child{margin-bottom:0}
+.v54-notif-item:hover,.v54-notif-item:focus-visible{transform:translateY(-1px);background:rgba(255,255,255,.085);border-color:rgba(116,232,40,.25);outline:none}
+.v54-notif-item.is-read{opacity:.69}
+.v54-notif-item.is-unread{background:linear-gradient(90deg,rgba(101,215,22,.105),rgba(255,255,255,.05));border-color:rgba(117,232,39,.18)}
+.v54-notif-dot{width:7px;height:7px;border-radius:50%;background:#73e91b;box-shadow:0 0 9px rgba(115,233,27,.6)}
+.v54-notif-item.is-read .v54-notif-dot{background:#64758e;box-shadow:none}
+.v54-notif-copy{display:block;min-width:0}
+.v54-notif-copy strong{display:block;color:#f7fbff;font-size:13px;line-height:1.35;font-weight:700}
+.v54-notif-copy small{display:block;margin-top:4px;color:#9aaecb;font-size:11.5px;line-height:1.35}
+.v54-notif-arrow{color:#91a4c0;font-size:23px;line-height:1;text-align:right}
+.v54-notif-empty{min-height:180px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:28px 20px;color:#9fb1cc}
+.v54-notif-empty>span{width:46px;height:46px;display:grid;place-items:center;border-radius:50%;margin-bottom:12px;background:rgba(105,225,28,.12);color:#79ed25;font-size:22px;border:1px solid rgba(121,237,37,.18)}
+.v54-notif-empty strong{color:#f5f9ff;font-size:14px}
+.v54-notif-empty small{margin-top:5px;font-size:11.5px;max-width:300px;line-height:1.45}
+
+.v54-notif-limit-note{
+  padding:10px 12px 4px;
+  color:#91a5c3;
+  font:600 11px/1.4 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  text-align:center;
+}
+@keyframes v54NotifOverlayIn{from{opacity:0}to{opacity:1}}
+@keyframes v54NotifModalIn{from{opacity:0;transform:translateY(9px) scale(.975)}to{opacity:1;transform:none}}
+
+@media(max-width:767px){
+  .v54-notif-trigger{flex-basis:44px;width:44px;height:44px}
+  .v54-notif-orb{width:40px;height:40px}
+  .v54-notif-count{top:-2px;right:-4px}
+  .v54-notif-overlay{padding:14px;align-items:center}
+  .v54-notif-modal{width:min(100%,480px);max-height:78dvh;border-radius:21px}
+  .v54-notif-head{padding:16px 15px 14px}
+  .v54-notif-list{padding:10px}
+}
+@media(max-width:430px){
+  .v54-notif-trigger{flex-basis:40px;width:40px;height:40px}
+  .v54-notif-orb{width:37px;height:37px}
+  .v54-notif-count{min-width:19px;height:19px;font-size:9.5px;right:-5px}
+}
+
+/* ==========================================================================
+   V56 — Mobile dashboard/sidebar consistency fixes
+   - Sidebar brand row keeps only the Light/Dark theme control on phones.
+   - Sign Out + Contact Us live at the bottom of the scrollable menu.
+   - Azret AI keeps its full desktop-style greeting/copy on mobile.
+   - Global notification bell remains in the mobile top bar.
+   - Smart Finance Suite icons inherit the standard sidebar color.
+   ========================================================================== */
+.sidebar .nav-item .v48-nav-emoji{
+  color:currentColor!important;
+  -webkit-text-fill-color:currentColor!important;
+  filter:none!important;
+  text-shadow:none!important;
+}
+
+@media (max-width:900px){
+  /* The mobile drawer header should contain branding + theme only. */
+  .mobile-top-logout-v45,
+  .sidebar-close{
+    display:none!important;
+    visibility:hidden!important;
+    opacity:0!important;
+    pointer-events:none!important;
+  }
+  .sidebar-brand{
+    flex:0 0 auto!important;
+    align-items:center!important;
+  }
+  .brand-theme-toggle{
+    display:inline-flex!important;
+    visibility:visible!important;
+    opacity:1!important;
+    margin-left:auto!important;
+    flex:0 0 44px!important;
+  }
+
+  /* Let the footer actions be reached naturally by scrolling the drawer.
+     Sign Out comes first, Contact Us is the final menu item. */
+  .sidebar{
+    padding-bottom:max(12px,env(safe-area-inset-bottom))!important;
+    overflow:hidden!important;
+  }
+  .sidebar-nav{
+    display:flex!important;
+    flex:1 1 auto!important;
+    min-height:0!important;
+    overflow-y:auto!important;
+    overscroll-behavior:contain!important;
+    padding-bottom:calc(16px + env(safe-area-inset-bottom))!important;
+    -webkit-overflow-scrolling:touch!important;
+  }
+  .sidebar>.sidebar-logout{
+    display:none!important;
+  }
+  .mobile-sidebar-logout-v44{
+    display:flex!important;
+    visibility:visible!important;
+    opacity:1!important;
+    position:relative!important;
+    inset:auto!important;
+    order:1000!important;
+    z-index:auto!important;
+    margin-top:10px!important;
+    margin-bottom:0!important;
+    background:transparent!important;
+    border:1px solid rgba(255,91,108,.28)!important;
+    box-shadow:none!important;
+    color:#f0525f!important;
+  }
+  .sidebar-nav .nav-item[data-page="contact"]{
+    order:1001!important;
+    margin-top:2px!important;
+  }
+
+  /* Restore the full assistant card on phone/tablet instead of an empty pill. */
+  #page-dashboard>.rizq-ai-dock{
+    position:relative!important;
+    top:auto!important;
+    right:auto!important;
+    left:auto!important;
+    width:min(245px,100%)!important;
+    min-height:90px!important;
+    margin:0 0 14px auto!important;
+    padding:10px 12px 10px 84px!important;
+    border-radius:22px!important;
+    transform:none!important;
+    transform-origin:center!important;
+    z-index:4!important;
+  }
+  #page-dashboard>.rizq-ai-dock:hover{
+    transform:translateY(-1px)!important;
+  }
+  #page-dashboard>.rizq-ai-dock .rizq-ai-copy{
+    display:flex!important;
+    min-height:66px!important;
+  }
+  #page-dashboard>.rizq-ai-dock .rizq-ai-avatar-wrap{
+    left:10px!important;
+    bottom:10px!important;
+    width:68px!important;
+    height:68px!important;
+  }
+  #page-dashboard>.rizq-ai-dock .rizq-ai-halo{
+    left:3px!important;
+    bottom:3px!important;
+    width:82px!important;
+    height:82px!important;
+  }
+  #page-dashboard>.rizq-ai-dock .rizq-ai-hello{
+    font-size:20px!important;
+    max-width:94px!important;
+  }
+  #page-dashboard>.rizq-ai-dock .rizq-ai-sub{
+    display:block!important;
+    max-width:132px!important;
+    font-size:10.5px!important;
+    line-height:1.25!important;
+  }
+
+  /* Keep the notification center in the topbar on mobile; never let old
+     dashboard notification styles reposition it into page content. */
+  .topbar>.v54-notif-trigger{
+    display:grid!important;
+    position:relative!important;
+    inset:auto!important;
+    order:3!important;
+    margin:0!important;
+    z-index:2!important;
+  }
+  .topbar>.topbar-search{order:2!important;min-width:0!important;}
+  .topbar>.menu-toggle{order:1!important;}
+  .topbar>.topbar-greetclock{order:4!important;}
+  .topbar>.topbar-actions{order:5!important;}
+}
+
+@media (max-width:560px){
+  .topbar{
+    flex-wrap:nowrap!important;
+    gap:6px!important;
+    padding-left:8px!important;
+    padding-right:8px!important;
+  }
+  .menu-toggle{
+    flex:0 0 42px!important;
+    width:42px!important;
+    min-width:42px!important;
+  }
+  .topbar-search{
+    flex:1 1 86px!important;
+    min-width:66px!important;
+    padding-left:10px!important;
+    padding-right:8px!important;
+  }
+  .topbar>.v54-notif-trigger{
+    flex:0 0 40px!important;
+    width:40px!important;
+    height:40px!important;
+  }
+  .topbar>.v54-notif-trigger .v54-notif-orb{
+    width:37px!important;
+    height:37px!important;
+  }
+  .topbar-actions{
+    flex:0 0 auto!important;
+    min-width:0!important;
+  }
+  .currency-switch{
+    transform:none!important;
+    padding:2px!important;
+  }
+  .cur-opt{
+    padding:7px 8px!important;
+    font-size:11px!important;
+  }
+}
+
+@media (max-width:380px){
+  .topbar{gap:4px!important;padding-left:6px!important;padding-right:6px!important;}
+  .menu-toggle{flex-basis:40px!important;width:40px!important;min-width:40px!important;}
+  .topbar>.v54-notif-trigger{flex-basis:36px!important;width:36px!important;height:36px!important;}
+  .topbar>.v54-notif-trigger .v54-notif-orb{width:34px!important;height:34px!important;}
+  .topbar-search{flex-basis:62px!important;min-width:54px!important;padding-left:8px!important;padding-right:6px!important;}
+  .cur-opt{padding:6px 6px!important;font-size:10.5px!important;}
+  #page-dashboard>.rizq-ai-dock{width:min(230px,100%)!important;}
+}
+
+/* V56 mobile drawer polish: while the full drawer is open, the fixed bottom
+   quick-nav gets out of the way so the final Sign Out / Contact Us rows are
+   completely reachable and visible. */
+@media (max-width:900px){
+  body.sidebar-mobile-open .mobile-bottom-nav{
+    opacity:0!important;
+    visibility:hidden!important;
+    pointer-events:none!important;
+    transform:translateY(100%)!important;
+  }
+}
+
+/* ======================================================================
+   V58 FINAL — compact/stable/low-lag mobile login + mobile polish
+   ====================================================================== */
+@media (max-width:900px){
+  .auth-body.auth-v26{
+    min-height:100svh!important;
+    overflow-x:hidden!important;
+    overflow-y:auto!important;
+    overscroll-behavior-y:contain;
+    background:#031027!important;
+  }
+  .auth-cinematic-bg{
+    position:fixed!important;inset:0!important;animation:none!important;
+    will-change:auto!important;filter:none!important;transform:none!important;
+  }
+  .auth-bg-slide-v47{
+    inset:0!important;transform:none!important;transition:none!important;animation:none!important;
+    filter:saturate(.88) brightness(.60)!important;background-position:center!important;
+  }
+  .auth-bg-slide-v47:not(.active){display:none!important}
+  .auth-cinematic-bg:before{animation:none!important;opacity:.12!important}
+  .auth-cinematic-bg:after{animation:none!important;filter:none!important;opacity:.22!important}
+  .auth-aurora,.auth-stars,.auth-light-ribbon,.auth-water-glow{display:none!important}
+
+  .auth-shell-v26{
+    width:100%!important;max-width:none!important;min-height:100svh!important;height:auto!important;
+    display:flex!important;flex-direction:column!important;justify-content:flex-start!important;
+    padding:6px 0 calc(12px + env(safe-area-inset-bottom))!important;gap:4px!important;box-sizing:border-box!important;
+  }
+  .auth-hero-v26{
+    min-height:auto!important;padding:8px 12px 6px!important;justify-content:center!important;
+    animation:none!important;box-sizing:border-box!important;
+  }
+  .yarin-emblem-shell{
+    width:52px!important;height:52px!important;margin:0 auto 3px!important;border-radius:17px!important;
+    animation:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;
+    box-shadow:0 7px 17px rgba(0,0,0,.28),0 0 15px rgba(38,163,255,.10)!important;
+  }
+  .yarin-emblem-shell:before{display:none!important}
+  .yarin-emblem-shell img{filter:drop-shadow(0 5px 9px rgba(0,0,0,.25))!important}
+  .yarin-title-v45{gap:6px!important}
+  .yarin-name-separator{height:24px!important}
+  .yarin-title-v45 .rizq-word-en{font-size:clamp(1.85rem,9.5vw,2.65rem)!important;letter-spacing:.05em!important;animation:none!important}
+  .yarin-title-v45 .rizq-word-ar{font-size:clamp(1.55rem,7.9vw,2.15rem)!important;animation:none!important}
+  .hero-money-line{font-size:.9rem!important;line-height:1.12!important;margin:4px 0 0!important}
+  .hero-smart-line{font-size:.62rem!important;line-height:1.15!important;letter-spacing:.1em!important;margin:2px 0 0!important}
+  .hero-mini-divider,.hero-public-copy{display:none!important}
+
+  .auth-card-v26{
+    width:calc(100% - 16px)!important;max-width:500px!important;margin:0 auto!important;
+    padding:13px 14px 15px!important;border-radius:20px!important;min-height:auto!important;
+    overflow:visible!important;animation:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;
+    box-shadow:0 15px 36px rgba(0,0,0,.36),inset 0 0 0 1px rgba(62,214,222,.05)!important;
+    box-sizing:border-box!important;
+  }
+  .auth-card-v26:before{animation:none!important;opacity:.50!important}
+  .auth-card-scan{display:none!important}
+  .auth-card-header{margin-bottom:7px!important}
+  .auth-section-kicker{font-size:.58rem!important;letter-spacing:.26em!important;margin-bottom:4px!important}
+  .auth-section-kicker span{width:27px!important}
+  .auth-card-header h2{font-size:clamp(1.65rem,7.8vw,2.15rem)!important;line-height:1!important;margin:3px 0!important}
+  .auth-title-ornament{width:138px!important;margin:5px auto 7px!important}
+
+  .auth-form-v26{gap:5px!important}
+  .auth-form-v26>label{font-size:.78rem!important;margin-top:1px!important}
+  .auth-input-wrap{min-height:47px!important;border-radius:14px!important}
+  .auth-input-wrap:before{display:none!important}
+  .auth-input-wrap input{min-height:45px!important;padding:10px 39px 10px 38px!important;border-radius:13px!important;font-size:16px!important}
+  .auth-input-icon{left:13px!important;font-size:.9rem!important}
+  .password-toggle-v26{right:4px!important;padding:7px!important}
+  .auth-options-row{margin:1px 0 3px!important;gap:7px!important}
+  .remember-row{font-size:.76rem!important;gap:6px!important}
+  .remember-row input{width:15px!important;height:15px!important}
+  .forgot-password-link{font-size:.76rem!important;padding:3px 0!important}
+  .auth-primary-v26,.auth-secondary-v26{min-height:46px!important;font-size:.91rem!important;border-radius:14px!important}
+  .auth-or-v26{margin:8px 0!important}
+  .secure-login-v26{margin-top:8px!important;padding-bottom:0!important}
+  .secure-login-v26 strong{font-size:.80rem!important}
+  .secure-login-v26 p{font-size:.69rem!important;margin-top:3px!important}
+
+  .v54-notif-overlay{-webkit-backdrop-filter:blur(7px) saturate(108%)!important;backdrop-filter:blur(7px) saturate(108%)!important}
+  .auth-shell-v26,.auth-card-v26,.auth-hero-v26{scroll-behavior:auto!important}
+  .auth-v26 *{scroll-behavior:auto!important}
+}
+@media (max-width:390px){
+  .auth-card-v26{width:calc(100% - 10px)!important;padding:12px 11px 13px!important}
+  .auth-hero-v26{padding-top:6px!important;padding-bottom:5px!important}
+  .yarin-emblem-shell{width:48px!important;height:48px!important}
+  .auth-options-row{font-size:.73rem!important}
+  .forgot-password-link,.remember-row{font-size:.72rem!important}
+}
+@media (max-width:900px) and (max-height:740px){
+  .yarin-emblem-shell{display:none!important}
+  .auth-hero-v26{padding-top:5px!important;padding-bottom:4px!important}
+  .yarin-title-v45 .rizq-word-en{font-size:1.8rem!important}
+  .yarin-title-v45 .rizq-word-ar{font-size:1.5rem!important}
+  .hero-money-line{font-size:.82rem!important}
+  .hero-smart-line{font-size:.58rem!important}
+  .auth-card-v26{padding-top:10px!important;padding-bottom:11px!important}
+  .secure-login-v26 p{display:none!important}
+}
+
+/* ======================================================================
+   V59 — browser viewport fit + compact password reset dialog
+   Keeps the full design in installed PWA/full-height windows, but adapts
+   desktop Chrome/Edge windows where the browser chrome reduces page height.
+   ====================================================================== */
+.auth-body.auth-v26{min-height:100dvh}
+@media (min-width:901px){
+  .auth-body.auth-v26{overflow-y:auto!important;overflow-x:hidden!important}
+  .auth-shell-v26{min-height:100dvh!important;height:auto!important}
+  .forgot-dialog{min-height:100dvh!important;box-sizing:border-box!important;overflow-y:auto!important}
+}
+
+@media (min-width:901px) and (max-height:820px){
+  .auth-shell-v26{
+    width:min(1220px,95vw)!important;
+    min-height:100dvh!important;
+    grid-template-columns:minmax(0,1.05fr) minmax(380px,.82fr)!important;
+    gap:clamp(22px,3.8vw,58px)!important;
+    padding:10px 0!important;
+  }
+  .auth-hero-v26{padding:8px 10px!important}
+  .yarin-emblem-shell{width:82px!important;margin-bottom:8px!important;border-radius:24px!important}
+  .yarin-emblem-shell:before{inset:-4px!important;border-radius:28px!important;filter:blur(6px)!important}
+  .yarin-title-v45{gap:4px!important}
+  .yarin-name-separator{height:46px!important}
+  .yarin-title-v45 .rizq-word-en{font-size:clamp(3.45rem,5.8vw,5.15rem)!important;line-height:.9!important}
+  .yarin-title-v45 .rizq-word-ar{font-size:clamp(3.35rem,5.6vw,4.95rem)!important;line-height:.9!important;margin-top:2px!important}
+  .hero-money-line{font-size:1.16rem!important;margin-top:8px!important}
+  .hero-smart-line{font-size:.82rem!important;margin-top:5px!important;letter-spacing:.07em!important}
+  .hero-mini-divider{margin:7px auto!important;width:min(260px,54%)!important}
+  .hero-public-copy{font-size:.79rem!important;line-height:1.45!important;max-width:470px!important}
+
+  .auth-card-v26{
+    max-width:500px!important;
+    padding:20px 23px 22px!important;
+    border-radius:24px!important;
+  }
+  .auth-card-v26:before{border-radius:26px!important}
+  .auth-card-header{margin-bottom:12px!important}
+  .auth-section-kicker{font-size:.63rem!important;letter-spacing:.34em!important;margin-bottom:7px!important}
+  .auth-card-header h2{font-size:2rem!important;line-height:1!important}
+  .auth-title-ornament{width:160px!important;margin:7px auto 0!important}
+  .auth-form-v26{gap:6px!important}
+  .auth-form-v26 label{font-size:.82rem!important;margin-top:2px!important}
+  .auth-input-wrap input{min-height:47px!important;padding:12px 44px 12px 42px!important;font-size:.92rem!important}
+  .auth-options-row{margin:2px 0 4px!important}
+  .remember-row,.forgot-password-link{font-size:.82rem!important}
+  .auth-primary-v26,.auth-secondary-v26{min-height:48px!important;font-size:1rem!important}
+  .auth-or-v26{margin:11px 0!important}
+  .secure-login-v26{margin-top:10px!important}
+  .secure-login-v26 strong{font-size:.86rem!important}
+  .secure-login-v26 p{font-size:.72rem!important;margin-top:4px!important}
+
+  .forgot-dialog{padding:12px!important;place-items:center!important}
+  .forgot-dialog-card.reset-card-v39{
+    width:min(420px,90vw)!important;
+    max-height:calc(100dvh - 24px)!important;
+    padding:18px 20px 20px!important;
+    border-radius:20px!important;
+    overflow-y:auto!important;
+    scrollbar-width:thin;
+  }
+  .forgot-dialog-card h3{font-size:1.55rem!important;margin-bottom:6px!important}
+  .forgot-dialog-card>p{font-size:.82rem!important;line-height:1.45!important;margin-bottom:10px!important}
+  .reset-back-v43{padding-bottom:7px!important;font-size:.76rem!important}
+  .reset-badge-v39{padding:5px 8px!important;font-size:.62rem!important;margin-bottom:7px!important}
+  .reset-progress-v46{margin:8px 0 12px!important;gap:6px!important}
+  .reset-progress-v46>i{width:22px!important}
+  .reset-progress-v46>span{font-size:.68rem!important;gap:5px!important}
+  .reset-progress-v46>span b{width:22px!important;height:22px!important;font-size:.66rem!important}
+  .reset-step-v39{gap:7px!important}
+  .reset-step-v39 label{font-size:.80rem!important}
+  .reset-note-v39{font-size:.72rem!important;line-height:1.35!important}
+  .reset-step-v39 .auth-primary-v26{margin-top:2px!important}
+  .otp-digit-v45{height:46px!important;font-size:1.05rem!important}
+}
+
+@media (min-width:901px) and (max-height:680px){
+  .auth-shell-v26{padding:5px 0!important;gap:24px!important}
+  .yarin-emblem-shell{width:68px!important;margin-bottom:5px!important}
+  .yarin-name-separator{height:38px!important}
+  .yarin-title-v45 .rizq-word-en{font-size:3.35rem!important}
+  .yarin-title-v45 .rizq-word-ar{font-size:3.15rem!important}
+  .hero-money-line{font-size:1rem!important;margin-top:5px!important}
+  .hero-smart-line{font-size:.72rem!important;margin-top:3px!important}
+  .hero-mini-divider{margin:5px auto!important}
+  .hero-public-copy{display:none!important}
+  .auth-card-v26{padding:15px 20px 17px!important}
+  .auth-card-header{margin-bottom:8px!important}
+  .auth-section-kicker{margin-bottom:4px!important}
+  .auth-card-header h2{font-size:1.75rem!important}
+  .auth-title-ornament{margin-top:5px!important}
+  .auth-input-wrap input{min-height:43px!important;padding-top:9px!important;padding-bottom:9px!important}
+  .auth-primary-v26,.auth-secondary-v26{min-height:44px!important}
+  .auth-or-v26{margin:7px 0!important}
+  .secure-login-v26{margin-top:7px!important}
+  .secure-login-v26 p{display:none!important}
+  .forgot-dialog-card.reset-card-v39{padding:14px 18px 16px!important}
+  .forgot-dialog-card h3{font-size:1.42rem!important}
+  .reset-progress-v46{margin:6px 0 9px!important}
+}
+
+@media (max-width:900px){
+  .forgot-dialog-card.reset-card-v39{
+    width:calc(100% - 12px)!important;
+    max-width:440px!important;
+    max-height:calc(100dvh - 16px)!important;
+    margin:8px auto!important;
+    padding:17px 14px 18px!important;
+    overflow-y:auto!important;
+  }
+  .forgot-dialog-card h3{font-size:1.45rem!important;margin-bottom:6px!important}
+  .forgot-dialog-card>p{font-size:.78rem!important;line-height:1.4!important;margin-bottom:10px!important}
+  .reset-progress-v46{margin:7px 0 11px!important}
+  .reset-step-v39{gap:7px!important}
+  .reset-step-v39 label{font-size:.78rem!important}
+  .reset-note-v39{font-size:.70rem!important}
+}
+
+/* V60 — deep audit release: no visual override required here. */
+
+.currency-flag-glyph.currency-code-watermark{
+  font-family:Manrope,Inter,sans-serif;font-weight:800;letter-spacing:.04em;
+  font-size:clamp(96px,13vw,210px);color:var(--blue-700);opacity:.78;
+}
+[data-theme="dark"] .currency-flag-glyph.currency-code-watermark{color:var(--blue-300);}

@@ -8,15 +8,15 @@
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#06101f">
   <link rel="icon" id="faviconLink" href="{{ url_for('static', filename='icons/icon-192.png') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=53">
-  <link rel="preload" as="image" href="https://upload.wikimedia.org/wikipedia/commons/1/1f/Dubai_Night_Time_%28Pexels-804915%29.jpg">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=64">
+  <link rel="preload" as="image" media="(min-width: 901px)" href="https://upload.wikimedia.org/wikipedia/commons/1/1f/Dubai_Night_Time_%28Pexels-804915%29.jpg">
 </head>
 <body class="auth-body auth-v26">
   <div class="auth-cinematic-bg" aria-hidden="true">
     <div class="auth-bg-slides-v47">
-      <div class="auth-bg-slide-v47 active" style="background-image:url('https://upload.wikimedia.org/wikipedia/commons/1/1f/Dubai_Night_Time_%28Pexels-804915%29.jpg')"></div>
-      <div class="auth-bg-slide-v47" style="background-image:url('https://imgengine.khaleejtimes.com/khaleejtimes/import/images/3688569a-edc7-4df5-92fb-a236452330be-org.jpg?format=auto&width=1200')"></div>
-      <div class="auth-bg-slide-v47" style="background-image:url('https://marinadubai.ae/.fast_background/8/89/def_89d6cc449fc9dcf894c0547cce40543c84f702a8_2_.jpg')"></div>
+      <div class="auth-bg-slide-v47 active" style="background-image:url('/static/images/dubai-night.svg')" data-bg-desktop="https://upload.wikimedia.org/wikipedia/commons/1/1f/Dubai_Night_Time_%28Pexels-804915%29.jpg"></div>
+      <div class="auth-bg-slide-v47" data-bg="https://imgengine.khaleejtimes.com/khaleejtimes/import/images/3688569a-edc7-4df5-92fb-a236452330be-org.jpg?format=auto&width=1200"></div>
+      <div class="auth-bg-slide-v47" data-bg="https://marinadubai.ae/.fast_background/8/89/def_89d6cc449fc9dcf894c0547cce40543c84f702a8_2_.jpg"></div>
     </div>
     <div class="auth-aurora auth-aurora-blue"></div>
     <div class="auth-aurora auth-aurora-gold"></div>
@@ -54,7 +54,7 @@
           <label for="username">Username or Email</label>
           <div class="auth-input-wrap">
             <span class="auth-input-icon" aria-hidden="true">♙</span>
-            <input type="text" id="username" placeholder="Enter your username or email" required autofocus autocomplete="username">
+            <input type="text" id="username" placeholder="Enter your username or email" required autocomplete="username">
           </div>
 
           <label for="password">Password</label>
@@ -289,7 +289,11 @@ async function submitJson(url,payload,errorEl,button){
 
 document.getElementById('loginForm').addEventListener('submit',e=>{
   e.preventDefault();
-  submitJson('/api/login',{username:document.getElementById('username').value.trim(),password:document.getElementById('password').value},document.getElementById('loginError'),e.currentTarget.querySelector('button[type=submit]'));
+  submitJson('/api/login',{
+    username:document.getElementById('username').value.trim(),
+    password:document.getElementById('password').value,
+    remember:document.getElementById('rememberMe').checked
+  },document.getElementById('loginError'),e.currentTarget.querySelector('button[type=submit]'));
 });
 
 document.getElementById('registerForm').addEventListener('submit',e=>{
@@ -300,10 +304,21 @@ document.getElementById('registerForm').addEventListener('submit',e=>{
 });
 
 
-// V47: rotate Dubai login backgrounds without disturbing the form.
+// V59: mobile performance guard. Phones use the tiny local Dubai SVG;
+// desktop/tablet loads the photo backgrounds lazily and keeps the slideshow.
 (()=>{
   const slides=[...document.querySelectorAll('.auth-bg-slide-v47')];
   if(slides.length<2)return;
+  const mobile=window.matchMedia('(max-width: 900px)').matches;
+  if(mobile){
+    slides[0].style.backgroundImage='url("/static/images/dubai-night.svg")';
+    slides.slice(1).forEach(slide=>{ slide.removeAttribute('data-bg'); slide.style.backgroundImage='none'; });
+    return;
+  }
+  slides.forEach(slide=>{
+    const bg=slide.dataset.bgDesktop||slide.dataset.bg;
+    if(bg){ slide.style.backgroundImage=`url("${bg}")`; }
+  });
   let i=0;
   setInterval(()=>{slides[i].classList.remove('active');i=(i+1)%slides.length;slides[i].classList.add('active');},9000);
 })();
