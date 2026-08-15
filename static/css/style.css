@@ -528,7 +528,7 @@ table tbody tr.empty-row:hover{ background:transparent; }
 }
 .form-card input:focus, .form-card select:focus, .form-card textarea:focus{ border-color:var(--blue-400); box-shadow:0 0 0 3px rgba(76,141,255,0.15); }
 .field-row{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-.field-hint{ font-size:11.5px; color:var(--text-muted); margin:-4px 0 4px; line-height:1.4; }
+.field-hint{ font-size:11.5px; color:var(--text-muted); margin:8px 0 4px; line-height:1.5; display:block; clear:both; overflow-wrap:anywhere; }
 .form-actions{ display:flex; gap:10px; margin-top:18px; }
 
 .table-card-head{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px; flex-wrap:wrap; }
@@ -3440,3 +3440,158 @@ body.notification-modal-open{overflow:hidden!important}
    V69 — Full right-half currency flag panel
    The flag is no longer a small watermark; the card's right half is the flag.
    ========================================================================== */
+
+/* ==========================================================================
+   V70 — Helper/disclaimer spacing hardening
+   Prevent helper text from touching buttons or being squeezed against card
+   edges on narrow/mobile layouts. Applies to every shared finance form.
+   ========================================================================== */
+.form-card .btn + .field-hint,
+.v66-form-card .btn + .field-hint{
+  margin-top:12px;
+  margin-bottom:0;
+  padding-top:2px;
+  line-height:1.55;
+}
+.v66-form-card > .field-hint:last-child{
+  margin-bottom:0;
+}
+#page-gold-saver .v66-form-card,
+.v66-vault-grid .v66-form-card{
+  padding-bottom:26px;
+}
+@media (max-width:900px){
+  .v66-form-card{
+    padding-bottom:22px;
+  }
+  .form-card .field-hint,
+  .v66-form-card .field-hint{
+    font-size:12px;
+    line-height:1.55;
+  }
+  .form-card .btn + .field-hint,
+  .v66-form-card .btn + .field-hint{
+    margin-top:12px;
+    padding-top:2px;
+  }
+}
+
+
+/* ==========================================================================
+   V71 — Settings form consistency + spacing
+   Every Settings control must use the same theme-aware field treatment as the
+   finance forms. This closes the gap left by V67 where salary/profile fields
+   could fall back to the browser's tiny native controls.
+   ========================================================================== */
+#page-settings form input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+#page-settings form select,
+#page-settings form textarea{
+  width:100%;
+  min-width:0;
+  min-height:44px;
+  box-sizing:border-box;
+  padding:11px 13px;
+  border-radius:12px;
+  border:1px solid var(--v31-field-border)!important;
+  background:var(--v31-field-bg)!important;
+  color:var(--v31-field-text)!important;
+  box-shadow:var(--v31-field-shadow)!important;
+  caret-color:var(--blue-500);
+  font:600 14px/1.35 var(--font-body);
+  transition:border-color .18s ease,box-shadow .18s ease,background .18s ease;
+}
+#page-settings form input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):hover,
+#page-settings form select:hover,
+#page-settings form textarea:hover{
+  background:var(--v31-field-bg-hover)!important;
+  border-color:var(--v31-field-border-hover)!important;
+}
+#page-settings form input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):focus,
+#page-settings form select:focus,
+#page-settings form textarea:focus{
+  outline:none!important;
+  background:var(--v31-field-bg-focus)!important;
+  color:var(--v31-field-text)!important;
+  border-color:var(--v31-field-border-focus)!important;
+  box-shadow:0 0 0 3px rgba(76,141,255,.14),var(--v31-field-shadow)!important;
+}
+#page-settings form input::placeholder,
+#page-settings form textarea::placeholder{
+  color:var(--v31-field-placeholder)!important;
+  opacity:1;
+}
+#page-settings form select option{
+  background:var(--v31-option-bg)!important;
+  color:var(--v31-option-text)!important;
+}
+#page-settings form label{
+  display:block;
+  margin:0 0 7px;
+  color:var(--text-muted);
+  font-size:12.5px;
+  font-weight:650;
+  line-height:1.35;
+}
+#page-settings .card > form + form{
+  margin-top:20px!important;
+  padding-top:18px;
+  border-top:1px dashed var(--border);
+}
+#page-settings .field-hint{
+  margin-top:9px;
+  margin-bottom:0;
+  line-height:1.55;
+}
+#page-settings .form-actions{
+  margin-top:14px;
+}
+#page-settings .form-actions .btn-primary{
+  min-height:44px;
+}
+#page-settings #salaryCreditDay{
+  max-width:100%;
+}
+#page-settings .currency-select-grid > div{
+  min-width:0;
+}
+#page-settings .currency-select-grid select{
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+#page-settings .currency-swap-btn{
+  flex:0 0 auto;
+}
+[data-theme="light"] #page-settings :is(input,select,textarea){color-scheme:light;}
+[data-theme="dark"] #page-settings :is(input,select,textarea){color-scheme:dark;}
+
+/* A three-column Settings page leaves the Appearance card too narrow for two
+   long currency names side-by-side. Stack the pair there instead of clipping. */
+@media (max-width:1500px){
+  #page-settings .currency-select-grid{
+    grid-template-columns:1fr;
+    gap:9px;
+    align-items:stretch;
+  }
+  #page-settings .currency-swap-btn{
+    justify-self:center;
+    transform:rotate(90deg);
+  }
+  #page-settings .currency-swap-btn:hover{
+    transform:rotate(270deg);
+  }
+}
+@media (max-width:900px){
+  #page-settings .settings-grid{
+    grid-template-columns:1fr;
+  }
+  #page-settings .card{
+    padding:20px;
+  }
+  #page-settings form input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+  #page-settings form select,
+  #page-settings form textarea{
+    min-height:46px;
+    font-size:16px; /* prevents mobile Safari/Chrome zoom-on-focus */
+  }
+}
