@@ -215,7 +215,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/service-worker.js').catch(() => {});
+    navigator.serviceWorker.register('/service-worker.js', { updateViaCache: 'none' }).catch(() => {});
   });
 }
 
@@ -246,20 +246,26 @@ function updateGreetingClock() {
   if (greetingEl) greetingEl.textContent = greeting;
   const nameEl = document.getElementById('greetingName');
   if (nameEl) nameEl.textContent = state.username || 'User';
+  const mobileGreetingEl = document.getElementById('mobileGreetingText');
+  if (mobileGreetingEl) mobileGreetingEl.textContent = greeting;
+  const mobileNameEl = document.getElementById('mobileGreetingName');
+  if (mobileNameEl) mobileNameEl.textContent = state.username || 'User';
 
+  const timeText = now.toLocaleTimeString(undefined, {
+    hour: '2-digit', minute: '2-digit', second: '2-digit'
+  });
   const timeEl = document.getElementById('clockTime');
-  if (timeEl) {
-    timeEl.textContent = now.toLocaleTimeString(undefined, {
-      hour: '2-digit', minute: '2-digit', second: '2-digit'
-    });
-  }
+  if (timeEl) timeEl.textContent = timeText;
+  const mobileTimeEl = document.getElementById('mobileClockTime');
+  if (mobileTimeEl) mobileTimeEl.textContent = now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
 
+  const dateText = now.toLocaleDateString(undefined, {
+    weekday: 'short', day: 'numeric', month: 'short', year: 'numeric'
+  });
   const dateEl = document.getElementById('clockDate');
-  if (dateEl) {
-    dateEl.textContent = now.toLocaleDateString(undefined, {
-      weekday: 'short', day: 'numeric', month: 'short', year: 'numeric'
-    });
-  }
+  if (dateEl) dateEl.textContent = dateText;
+  const mobileDateEl = document.getElementById('mobileClockDate');
+  if (mobileDateEl) mobileDateEl.textContent = dateText;
 }
 
 /** Fetches the current username and syncs it everywhere it's displayed:
@@ -333,9 +339,7 @@ function setupSidebar() {
     window.location.href = '/login';
   };
   const logoutBtn = document.getElementById('logoutBtn');
-  const mobileSidebarLogout = document.getElementById('mobileSidebarLogout');
   if (logoutBtn) logoutBtn.addEventListener('click', performLogout);
-  if (mobileSidebarLogout) mobileSidebarLogout.addEventListener('click', performLogout);
 
   document.getElementById('themeToggle').addEventListener('click', () => {
     setTheme(state.theme === 'light' ? 'dark' : 'light');
@@ -375,6 +379,29 @@ function setupTopbar() {
 
   const searchInput = document.getElementById('globalSearch');
   const resultsBox = document.getElementById('globalSearchResults');
+  const mobileSearchToggle = document.getElementById('mobileSearchToggle');
+  const mobileSearchClose = document.getElementById('mobileSearchClose');
+  const isMobileSearch = () => window.matchMedia('(max-width: 767px)').matches;
+  const openMobileSearch = () => {
+    if (!isMobileSearch()) return;
+    document.body.classList.add('mobile-search-open');
+    mobileSearchToggle?.setAttribute('aria-label', 'Search');
+    window.setTimeout(() => searchInput?.focus({ preventScroll: true }), 40);
+  };
+  const closeMobileSearch = () => {
+    document.body.classList.remove('mobile-search-open');
+    resultsBox?.classList.remove('show');
+    searchInput?.blur();
+  };
+  mobileSearchToggle?.addEventListener('click', (event) => {
+    event.preventDefault();
+    if (!isMobileSearch()) { searchInput?.focus(); return; }
+    openMobileSearch();
+  });
+  mobileSearchClose?.addEventListener('click', (event) => { event.preventDefault(); closeMobileSearch(); });
+  searchInput?.addEventListener('focus', () => { if (isMobileSearch()) document.body.classList.add('mobile-search-open'); });
+  searchInput?.addEventListener('keydown', (event) => { if (event.key === 'Escape' && isMobileSearch()) closeMobileSearch(); });
+  window.addEventListener('resize', () => { if (!isMobileSearch()) document.body.classList.remove('mobile-search-open'); }, { passive: true });
   let searchTimer;
   searchInput.addEventListener('input', () => {
     clearTimeout(searchTimer);
@@ -383,7 +410,10 @@ function setupTopbar() {
     searchTimer = setTimeout(() => runGlobalSearch(q), 300);
   });
   document.addEventListener('click', (e) => {
-    if (!e.target.closest('.topbar-search')) resultsBox.classList.remove('show');
+    if (!e.target.closest('.topbar-search')) {
+      resultsBox.classList.remove('show');
+      if (isMobileSearch() && document.body.classList.contains('mobile-search-open')) closeMobileSearch();
+    }
   });
 
   document.getElementById('refreshRate').addEventListener('click', () => refreshExchangeRate(false));
@@ -1868,8 +1898,33 @@ function computeTotals(table, rows) {
     const goal = Math.max(...rows.map(r => Number(r.goal) || 0), 0);
     document.getElementById('savings-total').textContent = fmt(total);
     const pct = goal > 0 ? Math.min(100, Math.round((total / goal) * 100)) : 0;
-    document.getElementById('savings-goal-pct').textContent = pct + '%';
-    document.getElementById('savings-goal-fill').style.width = pct + '%';
+    const pctEl = document.getElementById('savings-goal-pct');
+    const fillEl = document.getElementById('savings-goal-fill');
+    const savedEl = document.getElementById('savings-goal-saved');
+    const targetEl = document.getElementById('savings-goal-target');
+    const messageEl = document.getElementById('savings-goal-message');
+    if (pctEl) pctEl.textContent = pct + '%';
+    if (fillEl) {
+      fillEl.style.width = pct + '%';
+      fillEl.dataset.progress = String(pct);
+    }
+    if (savedEl) savedEl.textContent = fmt(total);
+    if (targetEl) targetEl.textContent = goal > 0 ? fmt(goal) : 'Not set';
+    if (messageEl) {
+      messageEl.textContent = goal <= 0
+        ? 'Set a goal — give every saved dirham a destination.'
+        : pct >= 100
+          ? 'Goal reached. That discipline looks good on you.'
+          : pct >= 75
+            ? 'Almost there — protect the streak and finish strong.'
+            : pct >= 50
+              ? 'Halfway and climbing. Keep the momentum alive.'
+              : pct >= 25
+                ? 'Momentum is building — another deposit moves the line.'
+                : total > 0
+                  ? 'Great start. Small deposits become serious progress.'
+                  : 'Start small. Your future self will notice.';
+    }
   }
 
   if (table === 'emi') {
@@ -2527,6 +2582,7 @@ function setupCalculators() {
   // Simple calculator
   const display = document.getElementById('calcDisplay');
   const buttonsEl = document.getElementById('calcButtons');
+  if (!display || !buttonsEl) return;
   const keys = ['7', '8', '9', '÷', '4', '5', '6', '×', '1', '2', '3', '−', 'C', '⌫', '0', '+', '.', '='];
   let expr = '';
 
@@ -2547,6 +2603,7 @@ function setupCalculators() {
           if (!/^[0-9.+\-*/() ]+$/.test(safe)) throw new Error('invalid');
           // eslint-disable-next-line no-eval
           const result = Function(`"use strict"; return (${safe})`)();
+          if (!Number.isFinite(result)) throw new Error('non-finite');
           expr = String(Math.round(result * 1e6) / 1e6);
         } catch (e) { expr = 'Error'; }
       } else {
@@ -2562,7 +2619,7 @@ function setupCalculators() {
   const convTo = document.getElementById('convTo');
   const convResult = document.getElementById('convResult');
   function runConv() {
-    const amt = parseFloat(convAmount.value) || 0;
+    const amt = Math.max(0, parseFloat(convAmount.value) || 0);
     let result;
     if (convFrom.value === convTo.value) result = amt;
     else result = fromAED(toAED(amt, convFrom.value), convTo.value);
@@ -2591,9 +2648,9 @@ function setupCalculators() {
   const savRate = document.getElementById('savCalcRate');
   const savResult = document.getElementById('savCalcResult');
   function runSavCalc() {
-    const monthly = parseFloat(savMonthly.value) || 0;
-    const months = parseInt(savMonths.value) || 0;
-    const annualRate = parseFloat(savRate.value) || 0;
+    const monthly = Math.max(0, parseFloat(savMonthly.value) || 0);
+    const months = Math.max(0, parseInt(savMonths.value, 10) || 0);
+    const annualRate = Math.max(0, parseFloat(savRate.value) || 0);
     const monthlyRate = annualRate / 100 / 12;
     let total = 0;
     for (let i = 0; i < months; i++) {
@@ -2611,14 +2668,18 @@ function setupCalculators() {
   const emiN = document.getElementById('emiCalcMonths');
   const emiResult = document.getElementById('emiCalcResult');
   function runEmiCalc() {
-    const p = parseFloat(emiP.value) || 0;
-    const annualRate = parseFloat(emiR.value) || 0;
-    const n = parseInt(emiN.value) || 1;
+    const p = Math.max(0, parseFloat(emiP.value) || 0);
+    const annualRate = Math.max(0, parseFloat(emiR.value) || 0);
+    const n = Math.max(1, parseInt(emiN.value, 10) || 1);
     const r = annualRate / 100 / 12;
     let emi;
     if (r === 0) emi = p / n;
     else emi = (p * r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
     const totalPay = emi * n;
+    if (!Number.isFinite(emi) || !Number.isFinite(totalPay)) {
+      emiResult.textContent = 'Enter valid loan values';
+      return;
+    }
     emiResult.textContent = `Monthly EMI: ${fmt(emi)}  ·  Total Payable: ${fmt(totalPay)}`;
   }
   [emiP, emiR, emiN].forEach(el => el.addEventListener('input', runEmiCalc));
@@ -2630,18 +2691,64 @@ function setupCalculators() {
    ========================================================================== */
 function setupFloatingCalculator() {
   const btn = document.getElementById('floatingCalculatorBtn');
-  const menu = document.getElementById('floatingCalculatorMenu');
-  if (!btn) return;
+  const win = document.getElementById('floatingCalculatorWindow');
+  const header = document.getElementById('floatingCalcWindowHeader');
+  const body = document.getElementById('floatingCalcBody');
+  const title = document.getElementById('floatingCalcTitle');
+  const counter = document.getElementById('floatingCalcCounter');
+  const nextBtn = document.getElementById('floatingCalcNext');
+  const minBtn = document.getElementById('floatingCalcMinimize');
+  const closeBtn = document.getElementById('floatingCalcClose');
+  if (!btn || !win || !header || !body) return;
 
-  const STORAGE_KEY = 'yarin_floating_calculator_position_v82';
-  const LEGACY_STORAGE_KEY = 'yarin_floating_calculator_position_v81';
+  const STORAGE_KEY = 'yarin_floating_calculator_position_v84';
+  const LEGACY_KEYS = ['yarin_floating_calculator_position_v83','yarin_floating_calculator_position_v82','yarin_floating_calculator_position_v81'];
+  const WINDOW_KEY = 'yarin_floating_calculator_window_position_v84';
+  const DATA_KEY = 'yarin_floating_calculator_data_v85';
   const EDGE_GAP = 8;
+  const calcOrder = ['simple','currency','savings','emi'];
+  const calcTitles = {simple:'Calculator',currency:'Currency Calculator',savings:'Savings Calculator',emi:'EMI Calculator'};
+  const calcIcons = {simple:'⌗',currency:'⇄',savings:'＋',emi:'％'};
+  let activeCalc = 'simple';
   let drag = null;
-  let menuOpen = false;
+  let windowDrag = null;
+  let isOpen = false;
+  let isMinimized = false;
+  let miniExpr = '';
+
+  function readCalculatorData() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(DATA_KEY) || 'null');
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch (_) { return {}; }
+  }
+
+  function saveCalculatorData() {
+    const data = {
+      activeCalc,
+      miniExpr,
+      currency: {
+        amount: document.getElementById('floatingConvAmount')?.value ?? '',
+        from: document.getElementById('floatingConvFrom')?.value ?? '',
+        to: document.getElementById('floatingConvTo')?.value ?? ''
+      },
+      savings: {
+        monthly: document.getElementById('floatingSavMonthly')?.value ?? '',
+        months: document.getElementById('floatingSavMonths')?.value ?? '',
+        rate: document.getElementById('floatingSavRate')?.value ?? ''
+      },
+      emi: {
+        principal: document.getElementById('floatingEmiPrincipal')?.value ?? '',
+        rate: document.getElementById('floatingEmiRate')?.value ?? '',
+        months: document.getElementById('floatingEmiMonths')?.value ?? ''
+      }
+    };
+    try { localStorage.setItem(DATA_KEY, JSON.stringify(data)); } catch (_) {}
+  }
 
   const clamp = (value, min, max) => Math.min(Math.max(value, min), Math.max(min, max));
 
-  function viewportBounds() {
+  function triggerBounds() {
     const rect = btn.getBoundingClientRect();
     return {
       maxX: Math.max(EDGE_GAP, window.innerWidth - rect.width - EDGE_GAP),
@@ -2649,32 +2756,8 @@ function setupFloatingCalculator() {
     };
   }
 
-  function positionMenu() {
-    if (!menu || !menuOpen) return;
-    const btnRect = btn.getBoundingClientRect();
-    const menuRect = menu.getBoundingClientRect();
-    const width = menuRect.width || 258;
-    const height = menuRect.height || 214;
-    let left = btnRect.left + (btnRect.width / 2) - (width / 2);
-    left = clamp(left, EDGE_GAP, Math.max(EDGE_GAP, window.innerWidth - width - EDGE_GAP));
-    let top = btnRect.top - height - 10;
-    if (top < EDGE_GAP) top = btnRect.bottom + 10;
-    top = clamp(top, EDGE_GAP, Math.max(EDGE_GAP, window.innerHeight - height - EDGE_GAP));
-    menu.style.left = `${left}px`;
-    menu.style.top = `${top}px`;
-  }
-
-  function setMenu(open) {
-    if (!menu) return;
-    menuOpen = !!open;
-    menu.hidden = !menuOpen;
-    btn.setAttribute('aria-expanded', menuOpen ? 'true' : 'false');
-    btn.classList.toggle('menu-open-v82', menuOpen);
-    if (menuOpen) requestAnimationFrame(positionMenu);
-  }
-
-  function place(x, y, persist = false) {
-    const bounds = viewportBounds();
+  function placeTrigger(x, y, persist = false) {
+    const bounds = triggerBounds();
     const left = clamp(Number(x) || 0, EDGE_GAP, bounds.maxX);
     const top = clamp(Number(y) || 0, EDGE_GAP, bounds.maxY);
     btn.style.left = `${left}px`;
@@ -2684,134 +2767,317 @@ function setupFloatingCalculator() {
     if (persist) {
       try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ x: left, y: top })); } catch (_) {}
     }
-    if (menuOpen) requestAnimationFrame(positionMenu);
   }
 
-  function restore() {
+  function restoreTrigger() {
     let saved = null;
     try {
-      saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY) || 'null');
+      const raw = localStorage.getItem(STORAGE_KEY) || LEGACY_KEYS.map(k => localStorage.getItem(k)).find(Boolean) || 'null';
+      saved = JSON.parse(raw);
     } catch (_) {}
     if (saved && Number.isFinite(Number(saved.x)) && Number.isFinite(Number(saved.y))) {
-      requestAnimationFrame(() => place(saved.x, saved.y, false));
+      requestAnimationFrame(() => placeTrigger(saved.x, saved.y, false));
     }
   }
 
-  const targetMap = {
-    simple: 'calcCardSimple',
-    currency: 'calcCardCurrency',
-    savings: 'calcCardSavings',
-    emi: 'calcCardEmi',
-  };
+  function windowBounds() {
+    const rect = win.getBoundingClientRect();
+    return {
+      maxX: Math.max(EDGE_GAP, window.innerWidth - rect.width - EDGE_GAP),
+      maxY: Math.max(EDGE_GAP, window.innerHeight - rect.height - EDGE_GAP),
+    };
+  }
 
-  function openCalculator(target = 'all') {
-    document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
-    loadPage('calculator');
-    setMenu(false);
+  function placeWindow(x, y, persist = false) {
+    const bounds = windowBounds();
+    const left = clamp(Number(x) || 0, EDGE_GAP, bounds.maxX);
+    const top = clamp(Number(y) || 0, EDGE_GAP, bounds.maxY);
+    win.style.left = `${left}px`;
+    win.style.top = `${top}px`;
+    win.style.right = 'auto';
+    win.style.bottom = 'auto';
+    if (persist) {
+      try { localStorage.setItem(WINDOW_KEY, JSON.stringify({ x: left, y: top })); } catch (_) {}
+    }
+  }
+
+  function centerWindow() {
     requestAnimationFrame(() => {
-      if (target === 'all') {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-        return;
-      }
-      const card = document.getElementById(targetMap[target]);
-      if (!card) return;
-      card.classList.remove('calc-shortcut-focus-v82');
-      card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      requestAnimationFrame(() => card.classList.add('calc-shortcut-focus-v82'));
-      setTimeout(() => card.classList.remove('calc-shortcut-focus-v82'), 1200);
+      const rect = win.getBoundingClientRect();
+      placeWindow((window.innerWidth - rect.width) / 2, Math.max(18, (window.innerHeight - rect.height) / 2), false);
     });
   }
 
-  if (menu) {
-    menu.querySelectorAll('[data-calc-shortcut]').forEach(shortcut => {
-      shortcut.addEventListener('click', event => {
-        event.stopPropagation();
-        openCalculator(shortcut.dataset.calcShortcut || 'all');
-      });
+  function restoreWindow() {
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem(WINDOW_KEY) || 'null'); } catch (_) {}
+    requestAnimationFrame(() => {
+      if (saved && Number.isFinite(Number(saved.x)) && Number.isFinite(Number(saved.y))) placeWindow(saved.x, saved.y, false);
+      else centerWindow();
     });
   }
 
+  function setView(name) {
+    if (!calcOrder.includes(name)) name = 'simple';
+    activeCalc = name;
+    document.querySelectorAll('.floating-calc-view-v84').forEach(view => {
+      const active = view.dataset.floatingCalc === name;
+      view.hidden = !active;
+      view.classList.toggle('active', active);
+    });
+    title.textContent = calcTitles[name];
+    counter.textContent = `${calcOrder.indexOf(name) + 1} / ${calcOrder.length}`;
+    const icon = win.querySelector('.floating-calc-app-icon-v84');
+    if (icon) icon.textContent = calcIcons[name];
+    isMinimized = false;
+    win.classList.remove('is-minimized-v84');
+    body.hidden = false;
+    minBtn?.setAttribute('aria-label','Minimize calculator');
+    saveCalculatorData();
+    requestAnimationFrame(() => {
+      const rect = win.getBoundingClientRect();
+      placeWindow(rect.left, rect.top, false);
+    });
+  }
+
+  function openWindow() {
+    if (!isOpen) {
+      isOpen = true;
+      win.hidden = false;
+      win.setAttribute('aria-hidden','false');
+      btn.setAttribute('aria-expanded','true');
+      restoreWindow();
+    }
+    if (isMinimized) {
+      isMinimized = false;
+      win.classList.remove('is-minimized-v84');
+      body.hidden = false;
+    }
+    setView(activeCalc);
+  }
+
+  function closeWindow() {
+    saveCalculatorData();
+    isOpen = false;
+    isMinimized = false;
+    win.hidden = true;
+    win.setAttribute('aria-hidden','true');
+    btn.setAttribute('aria-expanded','false');
+    win.classList.remove('is-minimized-v84');
+    body.hidden = false;
+  }
+
+  function toggleMinimize() {
+    if (!isOpen) return;
+    isMinimized = !isMinimized;
+    win.classList.toggle('is-minimized-v84', isMinimized);
+    body.hidden = isMinimized;
+    if (minBtn) minBtn.setAttribute('aria-label', isMinimized ? 'Restore calculator' : 'Minimize calculator');
+    requestAnimationFrame(() => {
+      const rect = win.getBoundingClientRect();
+      placeWindow(rect.left, rect.top, true);
+    });
+  }
+
+  // Compact simple calculator — includes All Clear and one-character Backspace.
+  const miniDisplay = document.getElementById('floatingCalcDisplay');
+  const miniKeys = document.getElementById('floatingCalcKeys');
+  const simpleKeys = ['C','⌫','÷','×','7','8','9','−','4','5','6','+','1','2','3','=','0','.'];
+  function renderMiniDisplay() { if (miniDisplay) miniDisplay.textContent = miniExpr || '0'; }
+  function pressMiniKey(k) {
+    if (k === 'C') miniExpr = '';
+    else if (k === '⌫') miniExpr = miniExpr === 'Error' ? '' : miniExpr.slice(0,-1);
+    else if (k === '=') {
+      try {
+        const safe = miniExpr.replace(/×/g,'*').replace(/÷/g,'/').replace(/−/g,'-');
+        if (!safe || !/^[0-9.+\-*/() ]+$/.test(safe)) throw new Error('invalid');
+        const result = Function(`"use strict"; return (${safe})`)();
+        if (!Number.isFinite(result)) throw new Error('non-finite');
+        miniExpr = String(Math.round(result * 1e6) / 1e6);
+      } catch (_) { miniExpr = 'Error'; }
+    } else miniExpr = miniExpr === 'Error' ? k : miniExpr + k;
+    saveCalculatorData();
+    renderMiniDisplay();
+  }
+  if (miniKeys) {
+    miniKeys.innerHTML = simpleKeys.map(k => `<button type="button" data-floating-key="${k}" class="${['÷','×','−','+'].includes(k)?'op-v84':k==='='?'eq-v84':k==='C'?'clear-v84':k==='⌫'?'erase-v84':''}" aria-label="${k==='C'?'All clear':k==='⌫'?'Backspace':k}">${k}</button>`).join('');
+    miniKeys.querySelectorAll('button').forEach(k => k.addEventListener('click', () => pressMiniKey(k.dataset.floatingKey)));
+  }
+
+  // Currency mini calculator, synced to the account pair.
+  const fAmount = document.getElementById('floatingConvAmount');
+  const fFrom = document.getElementById('floatingConvFrom');
+  const fTo = document.getElementById('floatingConvTo');
+  const fSwap = document.getElementById('floatingConvSwap');
+  const fResult = document.getElementById('floatingConvResult');
+  function syncFloatingPair() {
+    if (!fFrom || !fTo) return;
+    const pair = [state.primaryCurrency, state.secondaryCurrency];
+    const oldFrom = fFrom.value, oldTo = fTo.value;
+    fFrom.innerHTML = pair.map(c => `<option value="${c}">${c}</option>`).join('');
+    fTo.innerHTML = pair.map(c => `<option value="${c}">${c}</option>`).join('');
+    fFrom.value = pair.includes(oldFrom) ? oldFrom : pair[0];
+    fTo.value = pair.includes(oldTo) && oldTo !== fFrom.value ? oldTo : pair[1];
+  }
+  function runFloatingConv() {
+    syncFloatingPair();
+    const amt = Math.max(0, parseFloat(fAmount?.value) || 0);
+    if (!fFrom || !fTo || !fResult) return;
+    const result = fFrom.value === fTo.value ? amt : fromAED(toAED(amt, fFrom.value), fTo.value);
+    fResult.textContent = Number.isFinite(result)
+      ? `${currencySymbol(fFrom.value)} ${amt.toLocaleString(undefined,{maximumFractionDigits:2})} = ${currencySymbol(fTo.value)} ${result.toLocaleString(undefined,{maximumFractionDigits:2})}`
+      : 'Exchange rate unavailable';
+    saveCalculatorData();
+  }
+  [fAmount,fFrom,fTo].filter(Boolean).forEach(el => el.addEventListener('input', runFloatingConv));
+  fSwap?.addEventListener('click', () => {
+    const value = fFrom.value; fFrom.value = fTo.value; fTo.value = value;
+    fSwap.classList.remove('swap-v84'); void fSwap.offsetWidth; fSwap.classList.add('swap-v84');
+    runFloatingConv();
+  });
+
+  // Savings mini calculator.
+  const fsMonthly = document.getElementById('floatingSavMonthly');
+  const fsMonths = document.getElementById('floatingSavMonths');
+  const fsRate = document.getElementById('floatingSavRate');
+  const fsResult = document.getElementById('floatingSavResult');
+  function runFloatingSavings() {
+    const monthly = Math.max(0, parseFloat(fsMonthly?.value) || 0);
+    const months = Math.max(0, parseInt(fsMonths?.value,10) || 0);
+    const monthlyRate = Math.max(0, parseFloat(fsRate?.value) || 0) / 100 / 12;
+    let total = 0;
+    for (let i=0;i<months;i++){ total += monthly; total += total * monthlyRate; }
+    if (fsResult) fsResult.textContent = `Projected Total: ${fmt(total)}`;
+    saveCalculatorData();
+  }
+  [fsMonthly,fsMonths,fsRate].filter(Boolean).forEach(el => el.addEventListener('input', runFloatingSavings));
+
+  // EMI mini calculator.
+  const feP = document.getElementById('floatingEmiPrincipal');
+  const feR = document.getElementById('floatingEmiRate');
+  const feN = document.getElementById('floatingEmiMonths');
+  const feResult = document.getElementById('floatingEmiResult');
+  function runFloatingEmi() {
+    const p = Math.max(0, parseFloat(feP?.value) || 0);
+    const annual = Math.max(0, parseFloat(feR?.value) || 0);
+    const n = Math.max(1, parseInt(feN?.value,10) || 1);
+    const r = annual / 100 / 12;
+    const emi = r === 0 ? p / n : (p*r*Math.pow(1+r,n))/(Math.pow(1+r,n)-1);
+    const total = emi*n;
+    if (!feResult) return;
+    feResult.textContent = Number.isFinite(emi) && Number.isFinite(total)
+      ? `Monthly EMI: ${fmt(emi)}  ·  Total: ${fmt(total)}` : 'Enter valid loan values';
+    saveCalculatorData();
+  }
+  [feP,feR,feN].filter(Boolean).forEach(el => el.addEventListener('input', runFloatingEmi));
+
+  nextBtn?.addEventListener('click', e => {
+    e.stopPropagation();
+    const idx = calcOrder.indexOf(activeCalc);
+    setView(calcOrder[(idx + 1) % calcOrder.length]);
+    if (activeCalc === 'currency') runFloatingConv();
+    if (activeCalc === 'savings') runFloatingSavings();
+    if (activeCalc === 'emi') runFloatingEmi();
+  });
+  minBtn?.addEventListener('click', e => { e.stopPropagation(); toggleMinimize(); });
+  closeBtn?.addEventListener('click', e => { e.stopPropagation(); closeWindow(); });
+
+  // Floating trigger drag; a tap opens/restores the compact window.
   btn.addEventListener('pointerdown', event => {
     if (event.button !== undefined && event.button !== 0) return;
     const rect = btn.getBoundingClientRect();
-    drag = {
-      id: event.pointerId,
-      offsetX: event.clientX - rect.left,
-      offsetY: event.clientY - rect.top,
-      startX: event.clientX,
-      startY: event.clientY,
-      moved: false,
-    };
+    drag = {id:event.pointerId,offsetX:event.clientX-rect.left,offsetY:event.clientY-rect.top,startX:event.clientX,startY:event.clientY,moved:false};
     btn.setPointerCapture?.(event.pointerId);
     btn.classList.add('is-dragging');
     event.preventDefault();
   });
-
   btn.addEventListener('pointermove', event => {
     if (!drag || drag.id !== event.pointerId) return;
-    const distance = Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY);
-    if (distance > 5) {
-      drag.moved = true;
-      if (menuOpen) setMenu(false);
-    }
+    if (Math.hypot(event.clientX-drag.startX,event.clientY-drag.startY)>5) drag.moved=true;
     if (!drag.moved) return;
-    place(event.clientX - drag.offsetX, event.clientY - drag.offsetY, false);
+    placeTrigger(event.clientX-drag.offsetX,event.clientY-drag.offsetY,false);
     event.preventDefault();
   });
-
-  const finishDrag = event => {
+  const finishTriggerDrag = event => {
     if (!drag || drag.id !== event.pointerId) return;
-    const wasMoved = drag.moved;
-    const rect = btn.getBoundingClientRect();
+    const moved = drag.moved; const rect = btn.getBoundingClientRect();
     try { btn.releasePointerCapture?.(event.pointerId); } catch (_) {}
-    drag = null;
-    btn.classList.remove('is-dragging');
-    if (wasMoved) place(rect.left, rect.top, true);
-    else setMenu(!menuOpen);
+    drag=null; btn.classList.remove('is-dragging');
+    if (moved) placeTrigger(rect.left,rect.top,true); else openWindow();
     event.preventDefault();
   };
-
-  btn.addEventListener('pointerup', finishDrag);
+  btn.addEventListener('pointerup', finishTriggerDrag);
   btn.addEventListener('pointercancel', event => {
     if (!drag || drag.id !== event.pointerId) return;
-    const rect = btn.getBoundingClientRect();
-    drag = null;
-    btn.classList.remove('is-dragging');
-    place(rect.left, rect.top, true);
+    const rect=btn.getBoundingClientRect(); drag=null; btn.classList.remove('is-dragging'); placeTrigger(rect.left,rect.top,true);
   });
-
   btn.addEventListener('keydown', event => {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      setMenu(!menuOpen);
-    } else if (event.key === 'Escape') {
-      setMenu(false);
-    }
+    if (event.key==='Enter' || event.key===' '){ event.preventDefault(); openWindow(); }
+    else if (event.key==='Escape') closeWindow();
   });
 
-  document.addEventListener('pointerdown', event => {
-    if (!menuOpen || !menu) return;
-    if (event.target === btn || btn.contains(event.target) || menu.contains(event.target)) return;
-    setMenu(false);
+  // Calculator window itself can be moved by its title bar.
+  header.addEventListener('pointerdown', event => {
+    if (event.target.closest('button')) return;
+    if (event.button !== undefined && event.button !== 0) return;
+    const rect=win.getBoundingClientRect();
+    windowDrag={id:event.pointerId,offsetX:event.clientX-rect.left,offsetY:event.clientY-rect.top};
+    header.setPointerCapture?.(event.pointerId);
+    win.classList.add('is-window-dragging-v84');
+    event.preventDefault();
   });
+  header.addEventListener('pointermove', event => {
+    if (!windowDrag || windowDrag.id !== event.pointerId) return;
+    placeWindow(event.clientX-windowDrag.offsetX,event.clientY-windowDrag.offsetY,false);
+    event.preventDefault();
+  });
+  const finishWindowDrag = event => {
+    if (!windowDrag || windowDrag.id !== event.pointerId) return;
+    const rect=win.getBoundingClientRect();
+    try { header.releasePointerCapture?.(event.pointerId); } catch (_) {}
+    windowDrag=null; win.classList.remove('is-window-dragging-v84'); placeWindow(rect.left,rect.top,true);
+  };
+  header.addEventListener('pointerup', finishWindowDrag);
+  header.addEventListener('pointercancel', finishWindowDrag);
 
   document.addEventListener('keydown', event => {
-    if (event.key === 'Escape' && menuOpen) setMenu(false);
+    if (event.key === 'Escape' && isOpen) closeWindow();
   });
 
   let resizeTimer;
   window.addEventListener('resize', () => {
     clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(() => {
-      const rect = btn.getBoundingClientRect();
-      if (btn.style.left || btn.style.top) place(rect.left, rect.top, true);
-      positionMenu();
-    }, 120);
+    resizeTimer=setTimeout(() => {
+      const b=btn.getBoundingClientRect(); if (btn.style.left || btn.style.top) placeTrigger(b.left,b.top,true);
+      if (isOpen) { const r=win.getBoundingClientRect(); placeWindow(r.left,r.top,true); }
+    },120);
   });
 
-  restore();
-}
+  // V85: restore every calculator's working data. Closing or switching calculators never clears it.
+  const savedCalcData = readCalculatorData();
+  if (typeof savedCalcData.miniExpr === 'string') miniExpr = savedCalcData.miniExpr;
 
+  if (fAmount && savedCalcData.currency && savedCalcData.currency.amount !== undefined) fAmount.value = savedCalcData.currency.amount;
+  if (fsMonthly && savedCalcData.savings && savedCalcData.savings.monthly !== undefined) fsMonthly.value = savedCalcData.savings.monthly;
+  if (fsMonths && savedCalcData.savings && savedCalcData.savings.months !== undefined) fsMonths.value = savedCalcData.savings.months;
+  if (fsRate && savedCalcData.savings && savedCalcData.savings.rate !== undefined) fsRate.value = savedCalcData.savings.rate;
+  if (feP && savedCalcData.emi && savedCalcData.emi.principal !== undefined) feP.value = savedCalcData.emi.principal;
+  if (feR && savedCalcData.emi && savedCalcData.emi.rate !== undefined) feR.value = savedCalcData.emi.rate;
+  if (feN && savedCalcData.emi && savedCalcData.emi.months !== undefined) feN.value = savedCalcData.emi.months;
+
+  restoreTrigger();
+  syncFloatingPair();
+  if (savedCalcData.currency) {
+    if (fFrom && [state.primaryCurrency,state.secondaryCurrency].includes(savedCalcData.currency.from)) fFrom.value = savedCalcData.currency.from;
+    if (fTo && [state.primaryCurrency,state.secondaryCurrency].includes(savedCalcData.currency.to)) fTo.value = savedCalcData.currency.to;
+    if (fFrom && fTo && fFrom.value === fTo.value) fTo.value = fFrom.value === state.primaryCurrency ? state.secondaryCurrency : state.primaryCurrency;
+  }
+  runFloatingConv();
+  runFloatingSavings();
+  runFloatingEmi();
+  renderMiniDisplay();
+  saveCalculatorData();
+}
 /* ==========================================================================
    SETTINGS
    ========================================================================== */
@@ -3430,6 +3696,15 @@ function syncCurrencyPairUI() {
     sel.innerHTML = pair.map(c => `<option value="${c}">${c}</option>`).join('');
     sel.value = pair.includes(old) ? old : (sel === fromSel ? pair[0] : pair[1]);
   });
+  const floatingFrom = document.getElementById('floatingConvFrom'), floatingTo = document.getElementById('floatingConvTo');
+  [floatingFrom, floatingTo].forEach(sel => {
+    if (!sel) return;
+    const old = sel.value;
+    sel.innerHTML = pair.map(c => `<option value="${c}">${c}</option>`).join('');
+    sel.value = pair.includes(old) ? old : (sel === floatingFrom ? pair[0] : pair[1]);
+  });
+  if (floatingFrom && floatingTo && floatingFrom.value === floatingTo.value) floatingTo.value = pair[1];
+  document.getElementById('floatingConvAmount')?.dispatchEvent(new Event('input', { bubbles: true }));
   document.querySelectorAll('.dual-currency-toggle').forEach(toggle => {
     const buttons=[...toggle.querySelectorAll('.dc-btn')];
     buttons.slice(0,2).forEach((btn,i)=>{ btn.dataset.cur=pair[i]; btn.textContent=pair[i]; });

@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="YARIN يارين">
 <link rel="icon" id="faviconLink" href="{{ url_for('static', filename='icons/icon-192.png') }}">
 <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/icon-192.png') }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=82">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=88">
 </head>
 <body data-theme="light">
 <script>window.START_SPLASH = {{ start_splash|tojson }};</script>
@@ -139,10 +139,6 @@
         <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01"/></svg>
         <span>About</span>
       </button>
-      <button id="mobileSidebarLogout" class="nav-item mobile-sidebar-logout-v44" type="button">
-        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
-        <span>Sign Out</span>
-      </button>
       <button class="nav-item" data-page="contact">
         <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><path d="M4 6l8 6 8-6"/></svg>
         <span>Contact Us</span>
@@ -163,9 +159,12 @@
         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
       </button>
 
-      <div class="topbar-search">
-        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-        <input type="text" id="globalSearch" placeholder="Search everything…">
+      <div class="topbar-search" id="topbarSearchShell">
+        <button type="button" class="mobile-search-toggle-v87" id="mobileSearchToggle" aria-label="Open search" aria-controls="globalSearch">
+          <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        </button>
+        <input type="text" id="globalSearch" placeholder="Search everything…" autocomplete="off">
+        <button type="button" class="mobile-search-close-v87" id="mobileSearchClose" aria-label="Close search">×</button>
         <div id="globalSearchResults" class="global-search-results"></div>
       </div>
 
@@ -235,6 +234,14 @@
 
       <!-- ============ DASHBOARD ============ -->
       <section class="page active" id="page-dashboard">
+        <div class="mobile-dashboard-status-v87" aria-label="Current greeting and local time">
+          <div class="mobile-status-person-v87">
+            <span class="mobile-status-orb-v87" aria-hidden="true"></span>
+            <div><small id="mobileGreetingText">Good Evening</small><strong id="mobileGreetingName">User</strong></div>
+          </div>
+          <div class="mobile-status-time-v87"><strong id="mobileClockTime">--:--</strong><small id="mobileClockDate">—</small></div>
+        </div>
+
         <button id="assistantBtn" class="rizq-ai-dock" aria-label="Open Azret AI" title="Talk to Azret AI">
           <span class="rizq-ai-halo" aria-hidden="true"></span>
           <span class="rizq-ai-avatar-wrap">
@@ -612,7 +619,29 @@
 
       <!-- ============ SAVINGS ============ -->
       <section class="page" id="page-savings">
-        <div class="page-head"><h2>Savings</h2></div>
+        <div class="page-head savings-head-v86">
+          <div class="savings-title-v86">
+            <p class="savings-kicker-v86">BUILD YOUR FUTURE</p>
+            <h2>Savings</h2>
+          </div>
+          <div class="savings-momentum-v86" aria-label="Savings goal progress">
+            <div class="savings-momentum-top-v86">
+              <div class="savings-momentum-copy-v86">
+                <span class="savings-momentum-label-v86">Savings Momentum</span>
+                <strong id="savings-goal-message">Start small. Your future self will notice.</strong>
+              </div>
+              <div class="savings-momentum-pct-v86" id="savings-goal-pct">0%</div>
+            </div>
+            <div class="savings-progress-track-v86">
+              <div class="savings-progress-fill-v86" id="savings-goal-fill"></div>
+              <span class="savings-progress-shine-v86" aria-hidden="true"></span>
+            </div>
+            <div class="savings-momentum-bottom-v86">
+              <span>Saved <b id="savings-goal-saved">AED 0.00</b></span>
+              <span>Goal <b id="savings-goal-target">Not set</b></span>
+            </div>
+          </div>
+        </div>
         <div class="module-grid">
           <div class="card glass form-card">
             <h3 id="savings-form-title">Add Savings</h3>
@@ -666,10 +695,6 @@
             </div>
             <div class="running-total">
               Running Total: <strong id="savings-total">AED 0.00</strong>
-            </div>
-            <div class="goal-progress">
-              <div class="goal-progress-label"><span>Goal Progress</span><span id="savings-goal-pct">0%</span></div>
-              <div class="progress-bar"><div class="progress-fill" id="savings-goal-fill"></div></div>
             </div>
             <div class="table-wrap">
               <table><thead><tr><th>Type</th><th>Amount</th><th>Date</th><th>Notes</th><th></th></tr></thead>
@@ -1129,7 +1154,7 @@
           <div class="card glass calc-card calc-card-v82" id="calcCardCurrency" data-calc-section="currency">
             <h3 id="currencyCalcTitle">AED ↔ INR Calculator</h3>
             <label>Amount</label>
-            <input type="number" id="convAmount" value="100" step="0.01">
+            <input type="number" id="convAmount" value="100" min="0" step="0.01" inputmode="decimal">
             <label>From</label>
             <select id="convFrom"><option value="AED">AED</option><option value="INR">INR</option></select>
             <button id="convSwapCurrencies" class="currency-swap-btn-v82" type="button" aria-label="Swap currencies" title="Swap currencies">
@@ -1145,22 +1170,22 @@
           <div class="card glass calc-card calc-card-v82" id="calcCardSavings" data-calc-section="savings">
             <h3>Savings Calculator</h3>
             <label>Monthly Contribution</label>
-            <input type="number" id="savCalcMonthly" value="500" step="0.01">
+            <input type="number" id="savCalcMonthly" value="500" min="0" step="0.01" inputmode="decimal">
             <label>Months</label>
-            <input type="number" id="savCalcMonths" value="12" step="1">
+            <input type="number" id="savCalcMonths" value="12" min="1" step="1" inputmode="numeric">
             <label>Annual Interest % (optional)</label>
-            <input type="number" id="savCalcRate" value="0" step="0.01">
+            <input type="number" id="savCalcRate" value="0" min="0" step="0.01" inputmode="decimal">
             <div class="calc-result" id="savCalcResult">—</div>
           </div>
 
           <div class="card glass calc-card calc-card-v82" id="calcCardEmi" data-calc-section="emi">
             <h3>EMI Calculator</h3>
             <label>Loan Amount</label>
-            <input type="number" id="emiCalcPrincipal" value="10000" step="0.01">
+            <input type="number" id="emiCalcPrincipal" value="10000" min="0" step="0.01" inputmode="decimal">
             <label>Annual Interest %</label>
-            <input type="number" id="emiCalcRate" value="5" step="0.01">
+            <input type="number" id="emiCalcRate" value="5" min="0" step="0.01" inputmode="decimal">
             <label>Tenure (months)</label>
-            <input type="number" id="emiCalcMonths" value="12" step="1">
+            <input type="number" id="emiCalcMonths" value="12" min="1" step="1" inputmode="numeric">
             <div class="calc-result" id="emiCalcResult">—</div>
           </div>
         </div>
@@ -1523,32 +1548,72 @@
   </div>
 </div>
 
-<!-- V82: draggable floating Calculator with quick shortcuts (sidebar Calculator removed) -->
-<button id="floatingCalculatorBtn" class="floating-calculator-v82" type="button" aria-label="Calculator shortcuts" aria-haspopup="menu" aria-expanded="false" title="Calculator shortcuts — drag to move">
+<!-- V84: draggable floating Calculator opens a compact calculator window -->
+<button id="floatingCalculatorBtn" class="floating-calculator-v82 floating-calculator-v84" type="button" aria-label="Open calculator" aria-controls="floatingCalculatorWindow" aria-expanded="false" title="Calculator — drag to move">
   <svg viewBox="0 0 24 24" width="25" height="25" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
     <rect x="4" y="2.5" width="16" height="19" rx="3"/>
     <path d="M7.5 6.5h9M8 11h1M12 11h1M16 11h1M8 15h1M12 15h1M16 15h1M8 19h1M12 19h1M16 19h1"/>
   </svg>
   <span class="floating-calculator-grip-v82" aria-hidden="true">···</span>
 </button>
-<div id="floatingCalculatorMenu" class="floating-calculator-menu-v82" role="menu" aria-label="Calculator shortcuts" hidden>
-  <div class="floating-calculator-menu-head-v82">
-    <strong>Calculator</strong>
-    <span>Quick shortcuts</span>
+
+<section id="floatingCalculatorWindow" class="floating-calc-window-v84" aria-label="Floating calculator" aria-hidden="true" hidden>
+  <header id="floatingCalcWindowHeader" class="floating-calc-header-v84">
+    <div class="floating-calc-title-wrap-v84">
+      <span class="floating-calc-app-icon-v84" aria-hidden="true">⌗</span>
+      <div><strong id="floatingCalcTitle">Calculator</strong><small id="floatingCalcCounter">1 / 4</small></div>
+    </div>
+    <div class="floating-calc-window-controls-v84">
+      <button id="floatingCalcNext" type="button" aria-label="Next calculator" title="Next calculator">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h13"/><path d="m14 7 5 5-5 5"/></svg>
+      </button>
+      <button id="floatingCalcMinimize" type="button" aria-label="Minimize calculator" title="Minimize">−</button>
+      <button id="floatingCalcClose" type="button" aria-label="Close calculator" title="Close">×</button>
+    </div>
+  </header>
+  <div id="floatingCalcBody" class="floating-calc-body-v84">
+    <section class="floating-calc-view-v84 active" data-floating-calc="simple">
+      <div id="floatingCalcDisplay" class="floating-calc-display-v84">0</div>
+      <div id="floatingCalcKeys" class="floating-calc-keys-v84" aria-label="Calculator keypad"></div>
+    </section>
+
+    <section class="floating-calc-view-v84" data-floating-calc="currency" hidden>
+      <label>Amount</label>
+      <input id="floatingConvAmount" type="number" min="0" step="0.01" value="100" inputmode="decimal">
+      <div class="floating-currency-pair-v84">
+        <div><label>From</label><select id="floatingConvFrom"></select></div>
+        <button id="floatingConvSwap" class="floating-currency-swap-v84" type="button" aria-label="Swap currencies" title="Swap currencies">⇄</button>
+        <div><label>To</label><select id="floatingConvTo"></select></div>
+      </div>
+      <div id="floatingConvResult" class="floating-calc-result-v84">—</div>
+    </section>
+
+    <section class="floating-calc-view-v84" data-floating-calc="savings" hidden>
+      <label>Monthly Contribution</label>
+      <input id="floatingSavMonthly" type="number" min="0" step="0.01" value="500" inputmode="decimal">
+      <label>Months</label>
+      <input id="floatingSavMonths" type="number" min="1" step="1" value="12" inputmode="numeric">
+      <label>Annual Interest %</label>
+      <input id="floatingSavRate" type="number" min="0" step="0.01" value="0" inputmode="decimal">
+      <div id="floatingSavResult" class="floating-calc-result-v84">—</div>
+    </section>
+
+    <section class="floating-calc-view-v84" data-floating-calc="emi" hidden>
+      <label>Loan Amount</label>
+      <input id="floatingEmiPrincipal" type="number" min="0" step="0.01" value="10000" inputmode="decimal">
+      <label>Annual Interest %</label>
+      <input id="floatingEmiRate" type="number" min="0" step="0.01" value="5" inputmode="decimal">
+      <label>Tenure (months)</label>
+      <input id="floatingEmiMonths" type="number" min="1" step="1" value="12" inputmode="numeric">
+      <div id="floatingEmiResult" class="floating-calc-result-v84">—</div>
+    </section>
   </div>
-  <div class="floating-calculator-shortcuts-v82">
-    <button type="button" role="menuitem" data-calc-shortcut="simple"><span>⌗</span><b>Simple</b></button>
-    <button type="button" role="menuitem" data-calc-shortcut="currency"><span>⇄</span><b>Currency</b></button>
-    <button type="button" role="menuitem" data-calc-shortcut="savings"><span>＋</span><b>Savings</b></button>
-    <button type="button" role="menuitem" data-calc-shortcut="emi"><span>％</span><b>EMI</b></button>
-  </div>
-  <button type="button" class="floating-calculator-all-v82" data-calc-shortcut="all" role="menuitem">Open all calculators</button>
-</div>
+</section>
 
 <div id="toast" class="toast"></div>
 
-<script src="{{ url_for('static', filename='js/charts.js') }}?v=82"></script>
-<script src="/static/js/app.js?v=82"></script>
+<script src="{{ url_for('static', filename='js/charts.js') }}?v=88"></script>
+<script src="/static/js/app.js?v=88"></script>
 
   <!-- Mobile bottom navigation -->
   <nav class="mobile-bottom-nav" id="mobileBottomNav" aria-label="Mobile navigation">

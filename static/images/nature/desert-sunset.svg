@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 760" role="img" aria-label="Desert Sunset nature wallpaper">
+    <defs>
+      <linearGradient id="sky" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2a1620"/><stop offset=".55" stop-color="#b85f46"/><stop offset="1" stop-color="#07111f"/></linearGradient>
+      <radialGradient id="sun"><stop stop-color="#ffd08a" stop-opacity=".95"/><stop offset=".28" stop-color="#ffd08a" stop-opacity=".44"/><stop offset="1" stop-color="#ffd08a" stop-opacity="0"/></radialGradient>
+      <linearGradient id="water" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#b85f46" stop-opacity=".78"/><stop offset="1" stop-color="#03121f"/></linearGradient>
+      <linearGradient id="fade" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".35"/></linearGradient>
+      <filter id="blur"><feGaussianBlur stdDeviation="16"/></filter>
+    </defs>
+    <rect width="1280" height="760" fill="url(#sky)"/>
+    <circle cx="923" cy="218" r="260" fill="url(#sun)"/>
+    <g fill="#fff"><circle cx="327" cy="72" r="1" opacity="0.43"/><circle cx="457" cy="193" r="1" opacity="0.47"/><circle cx="620" cy="38" r="2" opacity="0.36"/><circle cx="803" cy="240" r="1" opacity="0.38"/><circle cx="515" cy="69" r="2" opacity="0.35"/><circle cx="663" cy="211" r="1" opacity="0.28"/><circle cx="238" cy="148" r="1" opacity="0.43"/><circle cx="69" cy="258" r="2" opacity="0.42"/><circle cx="325" cy="130" r="1" opacity="0.27"/><circle cx="126" cy="57" r="1" opacity="0.45"/><circle cx="95" cy="92" r="1" opacity="0.37"/><circle cx="1157" cy="143" r="1" opacity="0.30"/><circle cx="123" cy="232" r="1" opacity="0.22"/><circle cx="1090" cy="213" r="2" opacity="0.38"/><circle cx="825" cy="223" r="2" opacity="0.39"/><circle cx="250" cy="122" r="1" opacity="0.25"/><circle cx="1005" cy="90" r="2" opacity="0.22"/><circle cx="221" cy="150" r="1" opacity="0.28"/><circle cx="671" cy="31" r="1" opacity="0.24"/><circle cx="243" cy="210" r="1" opacity="0.47"/><circle cx="865" cy="120" r="1" opacity="0.34"/><circle cx="194" cy="259" r="1" opacity="0.30"/><circle cx="623" cy="249" r="1" opacity="0.21"/><circle cx="880" cy="33" r="1" opacity="0.39"/><circle cx="158" cy="141" r="1" opacity="0.21"/><circle cx="853" cy="66" r="2" opacity="0.23"/><circle cx="1030" cy="34" r="1" opacity="0.37"/><circle cx="574" cy="181" r="2" opacity="0.31"/><circle cx="710" cy="21" r="2" opacity="0.45"/><circle cx="1210" cy="244" r="1" opacity="0.42"/><circle cx="1097" cy="198" r="1" opacity="0.46"/><circle cx="888" cy="41" r="1" opacity="0.31"/><circle cx="1099" cy="31" r="2" opacity="0.22"/><circle cx="1115" cy="92" r="1" opacity="0.46"/></g>
+    <path d="M0 520Q270 370 560 530T980 500T1280 470V760H0Z" fill="#b56a47" opacity=".82"/><path d="M0 615Q300 470 660 610T1280 560V760H0Z" fill="#6e392d" opacity=".88"/>
+    <rect width="1280" height="760" fill="url(#fade)"/>
+    <rect x="1" y="1" width="1278" height="758" rx="2" fill="none" stroke="#fff" stroke-opacity=".035"/>
+    </svg>

@@ -8,28 +8,30 @@
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#06101f">
   <link rel="icon" id="faviconLink" href="{{ url_for('static', filename='icons/icon-192.png') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=75">
-  <link rel="preload" as="image" href="/static/images/world/new-york.svg">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=88">
+  <link rel="preload" as="image" href="/static/images/nature/misty-mountains.svg">
 </head>
 <body class="auth-body auth-v26">
   <div class="auth-cinematic-bg" aria-hidden="true">
     <div class="auth-bg-slides-v47" id="authWallpaperRotator" data-interval="60000">
-      <div class="auth-bg-slide-v47" data-place="New York, USA" style="background-image:url('/static/images/world/new-york.svg')"></div>
-      <div class="auth-bg-slide-v47" data-place="Paris, France" style="background-image:url('/static/images/world/paris.svg')"></div>
-      <div class="auth-bg-slide-v47" data-place="Tokyo, Japan" style="background-image:url('/static/images/world/tokyo.svg')"></div>
-      <div class="auth-bg-slide-v47" data-place="London, United Kingdom" style="background-image:url('/static/images/world/london.svg')"></div>
-      <div class="auth-bg-slide-v47" data-place="Singapore" style="background-image:url('/static/images/world/singapore.svg')"></div>
-      <div class="auth-bg-slide-v47" data-place="Sydney, Australia" style="background-image:url('/static/images/world/sydney.svg')"></div>
-      <div class="auth-bg-slide-v47" data-place="Istanbul, Türkiye" style="background-image:url('/static/images/world/istanbul.svg')"></div>
-      <div class="auth-bg-slide-v47" data-place="Cairo, Egypt" style="background-image:url('/static/images/world/cairo.svg')"></div>
-      <div class="auth-bg-slide-v47" data-place="Rio de Janeiro, Brazil" style="background-image:url('/static/images/world/rio.svg')"></div>
-      <div class="auth-bg-slide-v47" data-place="Toronto, Canada" style="background-image:url('/static/images/world/toronto.svg')"></div>
-      <div class="auth-bg-slide-v47" data-place="Swiss Alps, Switzerland" style="background-image:url('/static/images/world/alps.svg')"></div>
-      <div class="auth-bg-slide-v47" data-place="Maldives" style="background-image:url('/static/images/world/maldives.svg')"></div>
-      <div class="auth-bg-slide-v47" data-place="Rome, Italy" style="background-image:url('/static/images/world/rome.svg')"></div>
-      <div class="auth-bg-slide-v47" data-place="Barcelona, Spain" style="background-image:url('/static/images/world/barcelona.svg')"></div>
-      <div class="auth-bg-slide-v47" data-place="Seoul, South Korea" style="background-image:url('/static/images/world/seoul.svg')"></div>
-      <div class="auth-bg-slide-v47" data-place="Cape Town, South Africa" style="background-image:url('/static/images/world/cape-town.svg')"></div>
+      <div class="auth-bg-slide-v47" data-place="Misty Mountains" style="background-image:url('/static/images/nature/misty-mountains.svg')"></div>
+      <div class="auth-bg-slide-v47" data-place="Pine Lake" style="background-image:url('/static/images/nature/pine-lake.svg')"></div>
+      <div class="auth-bg-slide-v47" data-place="Ocean Dawn" style="background-image:url('/static/images/nature/ocean-dawn.svg')"></div>
+      <div class="auth-bg-slide-v47" data-place="Waterfall Valley" style="background-image:url('/static/images/nature/waterfall-valley.svg')"></div>
+      <div class="auth-bg-slide-v47" data-place="Desert Sunset" style="background-image:url('/static/images/nature/desert-sunset.svg')"></div>
+      <div class="auth-bg-slide-v47" data-place="Aurora Lake" style="background-image:url('/static/images/nature/aurora-lake.svg')"></div>
+      <div class="auth-bg-slide-v47" data-place="Tropical Lagoon" style="background-image:url('/static/images/nature/tropical-lagoon.svg')"></div>
+      <div class="auth-bg-slide-v47" data-place="Autumn Forest" style="background-image:url('/static/images/nature/autumn-forest.svg')"></div>
+      <div class="auth-bg-slide-v47" data-place="Glacier Lake" style="background-image:url('/static/images/nature/glacier-lake.svg')"></div>
+      <div class="auth-bg-slide-v47" data-place="Lavender Hills" style="background-image:url('/static/images/nature/lavender-hills.svg')"></div>
+      <div class="auth-bg-slide-v47" data-place="Rainforest River" style="background-image:url('/static/images/nature/rainforest-river.svg')"></div>
+      <div class="auth-bg-slide-v47" data-place="Starry Canyon" style="background-image:url('/static/images/nature/starry-canyon.svg')"></div>
+      <div class="auth-bg-slide-v47" data-place="Meadow Sunrise" style="background-image:url('/static/images/nature/meadow-sunrise.svg')"></div>
+      <div class="auth-bg-slide-v47" data-place="Snowy Pines" style="background-image:url('/static/images/nature/snowy-pines.svg')"></div>
+      <div class="auth-bg-slide-v47" data-place="Volcano Lake" style="background-image:url('/static/images/nature/volcano-lake.svg')"></div>
+      <div class="auth-bg-slide-v47" data-place="Cliff Ocean" style="background-image:url('/static/images/nature/cliff-ocean.svg')"></div>
+      <div class="auth-bg-slide-v47" data-place="Bamboo Mist" style="background-image:url('/static/images/nature/bamboo-mist.svg')"></div>
+      <div class="auth-bg-slide-v47" data-place="Island Sunset" style="background-image:url('/static/images/nature/island-sunset.svg')"></div>
     </div>
     <div class="auth-aurora auth-aurora-blue"></div>
     <div class="auth-aurora auth-aurora-gold"></div>
@@ -317,17 +319,17 @@ document.getElementById('registerForm').addEventListener('submit',e=>{
 });
 
 
-// V74: worldwide, non-repeating local wallpaper rotator.
+// V88: nature-only, non-repeating local wallpaper rotator.
 // Every bundled destination is shown once before any destination can repeat.
-// The shuffle state is kept for this browser tab, so reloads do not restart
-// the same image immediately. Rotation pauses while the tab is hidden.
+// The shuffle state is kept in this browser so reloads/new tabs continue the unseen queue.
+// A wallpaper is not repeated until the whole nature set has been shown. Rotation pauses while the tab is hidden.
 (()=>{
   const host=document.getElementById('authWallpaperRotator');
   const slides=[...(host?.querySelectorAll('.auth-bg-slide-v47')||[])];
   if(!host||!slides.length)return;
 
   const interval=Math.max(30000,Number(host.dataset.interval)||60000);
-  const stateKey='yarin-world-wallpaper-v74';
+  const stateKey='yarin-nature-wallpaper-v88';
   let timer=0;
 
   const randomInt=(max)=>{
@@ -348,13 +350,14 @@ document.getElementById('registerForm').addEventListener('submit',e=>{
   };
   const readState=()=>{
     try{
-      const x=JSON.parse(sessionStorage.getItem(stateKey)||'null');
+      const x=JSON.parse(localStorage.getItem(stateKey)||'null');
       if(x && Array.isArray(x.order) && x.order.length===slides.length && x.order.every(i=>Number.isInteger(i)&&i>=0&&i<slides.length) && Number.isInteger(x.pos)) return x;
     }catch(_){ }
     return null;
   };
-  const writeState=(x)=>{try{sessionStorage.setItem(stateKey,JSON.stringify(x));}catch(_){}};
+  const writeState=(x)=>{try{localStorage.setItem(stateKey,JSON.stringify(x));}catch(_){}};
   let state=readState();
+  const restoredState=!!state;
   if(!state){state={order:shuffled(),pos:0,last:-1};writeState(state);}
   if(state.pos<0||state.pos>=state.order.length)state.pos=0;
 
@@ -381,7 +384,10 @@ document.getElementById('registerForm').addEventListener('submit',e=>{
     timer=window.setTimeout(()=>{advance();schedule();},interval);
   };
 
-  show(state.order[state.pos]);
+  // If this tab is reloaded, move to the next unseen wallpaper instead of
+  // replaying the one the user just saw. A new tab continues the same unseen queue.
+  if(restoredState) advance();
+  else show(state.order[state.pos]);
   schedule();
   document.addEventListener('visibilitychange',()=>{
     if(document.hidden){clearTimeout(timer);timer=0;}
@@ -389,7 +395,7 @@ document.getElementById('registerForm').addEventListener('submit',e=>{
   });
 })();
 
-if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('/service-worker.js').catch(()=>{}));}
+if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('/service-worker.js',{updateViaCache:'none'}).catch(()=>{}));}
 </script>
 </body>
 </html>

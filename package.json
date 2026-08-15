@@ -1,6 +1,6 @@
 {
   "name": "yarin-finance",
-  "version": "1.0.64",
+  "version": "1.0.83",
   "description": "YARIN يارين — Your Money. Your Future. — public multi-user personal finance platform",
   "scripts": {
     "dev": "python3 app.py",

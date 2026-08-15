@@ -7,7 +7,7 @@
    from being replayed after logout on the same device.
 */
 
-const CACHE_NAME = 'yarin-cache-v82';
+const CACHE_NAME = 'yarin-cache-v88';
 const STATIC_ASSETS = [
   '/manifest.json',
   '/static/css/style.css',
@@ -17,22 +17,24 @@ const STATIC_ASSETS = [
   '/static/icons/icon-512.png',
   '/static/icons/yarin-emblem.webp',
   '/static/icons/rizq-ai-wave.webp',
-  '/static/images/world/new-york.svg',
-  '/static/images/world/paris.svg',
-  '/static/images/world/tokyo.svg',
-  '/static/images/world/london.svg',
-  '/static/images/world/singapore.svg',
-  '/static/images/world/sydney.svg',
-  '/static/images/world/istanbul.svg',
-  '/static/images/world/cairo.svg',
-  '/static/images/world/rio.svg',
-  '/static/images/world/toronto.svg',
-  '/static/images/world/alps.svg',
-  '/static/images/world/maldives.svg',
-  '/static/images/world/rome.svg',
-  '/static/images/world/barcelona.svg',
-  '/static/images/world/seoul.svg',
-  '/static/images/world/cape-town.svg',
+  '/static/images/nature/misty-mountains.svg',
+  '/static/images/nature/pine-lake.svg',
+  '/static/images/nature/ocean-dawn.svg',
+  '/static/images/nature/waterfall-valley.svg',
+  '/static/images/nature/desert-sunset.svg',
+  '/static/images/nature/aurora-lake.svg',
+  '/static/images/nature/tropical-lagoon.svg',
+  '/static/images/nature/autumn-forest.svg',
+  '/static/images/nature/glacier-lake.svg',
+  '/static/images/nature/lavender-hills.svg',
+  '/static/images/nature/rainforest-river.svg',
+  '/static/images/nature/starry-canyon.svg',
+  '/static/images/nature/meadow-sunrise.svg',
+  '/static/images/nature/snowy-pines.svg',
+  '/static/images/nature/volcano-lake.svg',
+  '/static/images/nature/cliff-ocean.svg',
+  '/static/images/nature/bamboo-mist.svg',
+  '/static/images/nature/island-sunset.svg',
 ];
 
 self.addEventListener('install', (event) => {
