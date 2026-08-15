@@ -2691,6 +2691,13 @@ def get_advice():
     local_today = str(request.args.get('today') or '').strip()
     if local_today and not _valid_date(local_today):
         local_today = ''
+    tip_day = local_today or datetime.now(timezone.utc).strftime('%Y-%m-%d')
+    try:
+        tip_date = datetime.strptime(tip_day, '%Y-%m-%d')
+    except ValueError:
+        tip_date = datetime.now(timezone.utc)
+        tip_day = tip_date.strftime('%Y-%m-%d')
+
     dash = db.get_dashboard_data(session['user_id'], reference_date=local_today or None)
     income = dash['total_income']
     expenses = dash['total_expenses']
@@ -2703,6 +2710,7 @@ def get_advice():
     cat_row = cursor.fetchone()
     conn.close()
 
+    # Start with personalised tips based on the user's own records.
     tips = []
     monthly_income = float(dash.get('monthly_income') or 0)
     monthly_expense = float(dash.get('monthly_expense') or 0)
@@ -2713,23 +2721,76 @@ def get_advice():
         tips.append("Add this month's income records to unlock personalised financial insights.")
     else:
         if monthly_expense > monthly_income:
-            tips.append("Your expenses currently exceed your income this month. Review non-essential spending.")
+            tips.append("Your expenses currently exceed your income this month. Review non-essential spending first.")
         if savings_rate < 20:
-            tips.append(f"Your recorded savings rate this month is {savings_rate}%. Aim for a sustainable regular saving habit.")
+            tips.append(f"Your recorded savings rate this month is {savings_rate}%. Build a sustainable regular saving habit at a level you can maintain.")
         else:
-            tips.append(f"Great job — you've recorded {savings_rate}% of this month's income as savings. Keep this momentum going.")
+            tips.append(f"Great job — you've recorded {savings_rate}% of this month's income as savings. Keep the habit consistent.")
 
     if cat_row and cat_row['t'] > 0:
-        tips.append(f"Your highest spending category is '{cat_row['category']}'. Look for ways to trim it.")
+        tips.append(f"Your highest spending category is '{cat_row['category']}'. Review it for one easy saving opportunity.")
 
     if outstanding > 0:
         cur, shown = _display_money(outstanding, session['user_id'])
-        tips.append(f"You have {cur} {shown:,.2f} in outstanding debt. Prioritise clearing high-interest amounts first.")
+        tips.append(f"You have {cur} {shown:,.2f} in outstanding debt. Keep repayments organised and prioritise expensive debt where practical.")
     else:
-        tips.append("You currently have no outstanding debt. Excellent financial discipline.")
+        tips.append("You currently have no outstanding debt. Protect that position by planning larger purchases before committing.")
 
     if savings <= 0:
-        tips.append("Start a small recurring savings habit — even a fixed amount every payday adds up.")
+        tips.append("Start a small recurring savings habit — even a fixed amount every payday builds momentum.")
+
+    # A larger evergreen bank keeps the About page useful even when the user's
+    # financial records do not change. The rotation is deterministic by local
+    # date, so refreshing the page does not make the advice jump around; the
+    # selection advances automatically on the next day.
+    daily_tip_bank = [
+        "Review your next seven days of bills before making optional purchases.",
+        "Move savings shortly after payday so saving happens before discretionary spending.",
+        "Keep a small emergency buffer separate from everyday spending money.",
+        "For a non-essential purchase, a short cooling-off period can prevent impulse spending.",
+        "Review recurring subscriptions regularly and cancel anything you no longer use.",
+        "Give each savings goal a target amount and a realistic target date.",
+        "Check your net worth periodically; the long-term direction matters more than one day's number.",
+        "When income increases, consider increasing savings before increasing lifestyle spending.",
+        "Use a shopping list and a spending limit before you start shopping.",
+        "Record cash spending too — small untracked purchases can hide the real monthly picture.",
+        "Compare fees and exchange rates before an international transfer; the headline rate is not always the final cost.",
+        "Keep debt and bill due dates visible in your financial calendar to reduce missed-payment risk.",
+        "Split large annual expenses into smaller monthly saving amounts so they are easier to absorb.",
+        "A weekly five-minute money review can catch overspending earlier than a month-end review.",
+        "If one category keeps exceeding plan, adjust the plan instead of repeatedly ignoring the difference.",
+        "Keep essential expenses and optional spending mentally separate when deciding what can be reduced.",
+        "Use notes for unusual expenses so future-you remembers why a month looked different.",
+        "Before taking a new EMI, check how the payment fits alongside your existing monthly commitments.",
+        "Build your emergency reserve gradually toward an amount that matches your own responsibilities and risk level.",
+        "For irregular income, plan around a conservative baseline rather than your best month.",
+        "Track progress toward goals in small milestones; visible progress makes consistency easier.",
+        "Review your financial records after salary day while the month is still easy to plan.",
+        "Keep important receipts and financial documents organised so warranties, claims and records are easy to find.",
+        "If a purchase has ongoing costs, include maintenance, fees and subscriptions in the real price.",
+        "Use separate goals for short-term wants and long-term priorities so one does not quietly consume the other.",
+        "A budget is more useful when it reflects real behaviour; update it when your routine genuinely changes.",
+        "Before lending or transferring money, make sure your own upcoming essentials remain covered.",
+        "Celebrate progress without spending away the progress — choose rewards that fit the plan."
+    ]
+
+    # Stable user offset + changing date offset. Step 5 is coprime with the
+    # 28-item bank, giving a long non-repeating walk through the tip pool.
+    user_hash = int(hashlib.sha256(str(session['user_id']).encode('utf-8')).hexdigest()[:8], 16)
+    start_idx = (tip_date.toordinal() + user_hash) % len(daily_tip_bank)
+    daily_candidates = [daily_tip_bank[(start_idx + i * 5) % len(daily_tip_bank)] for i in range(len(daily_tip_bank))]
+
+    # Preserve personalised insights first, then fill to eight useful tips.
+    deduped = []
+    seen = set()
+    for tip in tips + daily_candidates:
+        key = tip.strip().casefold()
+        if key and key not in seen:
+            seen.add(key)
+            deduped.append(tip)
+        if len(deduped) >= 8:
+            break
+    tips = deduped
 
     if savings_rate >= 30:
         health = "Excellent"
@@ -2744,15 +2805,24 @@ def get_advice():
         "Every dirham saved today builds the freedom of tomorrow.",
         "Small consistent habits create big financial results.",
         "You are the CEO of your own finances — lead wisely.",
-        "Discipline today, comfort tomorrow."
+        "Discipline today, comfort tomorrow.",
+        "A clear plan turns money decisions into calmer decisions.",
+        "Progress grows when good choices become routine.",
+        "A small improvement repeated is more powerful than a perfect plan abandoned.",
+        "Know where your money is going, then tell it where to go next.",
+        "Financial confidence is built one organised decision at a time.",
+        "Protect tomorrow by giving today's money a purpose.",
+        "Consistency beats intensity in long-term money habits.",
+        "Track the trend, improve the habit, and let time do its work."
     ]
+    motivational_text = motivational[(tip_date.toordinal() + user_hash) % len(motivational)]
 
-    import random
     return jsonify({
         'tips': tips,
         'health': health,
         'savings_rate': savings_rate,
-        'motivational': random.choice(motivational)
+        'motivational': motivational_text,
+        'daily_label': tip_date.strftime('%a, %d %b')
     })
 
 @app.route('/api/income-profile', methods=['GET'])

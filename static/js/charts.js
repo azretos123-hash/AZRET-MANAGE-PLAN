@@ -23,9 +23,14 @@ const AzretCharts = (function () {
     const dpr = window.devicePixelRatio || 1;
     const rect = canvas.getBoundingClientRect();
     const w = rect.width || canvas.parentElement.clientWidth || 400;
-    const h = canvas.height ? parseInt(canvas.getAttribute('height')) : 220;
-    canvas.width = w * dpr;
-    canvas.height = h * dpr;
+    // Use the rendered CSS height first. Setting canvas.height below changes the
+    // HTML backing-store attribute, so reading that attribute on the next draw
+    // used to multiply the logical height by devicePixelRatio over and over.
+    // That made charts grow/distort after refreshes on high-DPI/mobile screens.
+    const attrH = parseInt(canvas.getAttribute('height'), 10) || 220;
+    const h = rect.height || attrH;
+    canvas.width = Math.max(1, Math.round(w * dpr));
+    canvas.height = Math.max(1, Math.round(h * dpr));
     canvas.style.width = w + 'px';
     canvas.style.height = h + 'px';
     const ctx = canvas.getContext('2d');
@@ -113,14 +118,29 @@ const AzretCharts = (function () {
       });
     });
 
-    // x labels
+    // x labels — keep them readable on dense/mobile charts.  Older builds
+    // drew every timestamp, which caused the Gold Saver labels to overlap
+    // into one unreadable line.  Pick evenly-spaced representative labels
+    // based on the actual rendered width, while always keeping first/last.
     ctx.fillStyle = colors.text;
-    ctx.font = '10px sans-serif';
+    ctx.font = (w < 520 ? '9px' : '10px') + ' sans-serif';
     ctx.textAlign = 'center';
-    labels.forEach((lab, i) => {
-      const x = pad.l + stepX * i;
-      ctx.fillText(lab, x, h - 8);
-    });
+    if (labels.length) {
+      const maxVisible = Math.max(2, Math.floor(plotW / (w < 520 ? 64 : 78)));
+      const visibleCount = Math.min(labels.length, maxVisible);
+      const indexes = new Set();
+      if (visibleCount === 1) {
+        indexes.add(0);
+      } else {
+        for (let j = 0; j < visibleCount; j++) {
+          indexes.add(Math.round(j * (labels.length - 1) / (visibleCount - 1)));
+        }
+      }
+      indexes.forEach(i => {
+        const x = pad.l + stepX * i;
+        ctx.fillText(labels[i], x, h - 8);
+      });
+    }
   }
 
   function barChart(canvasId, labels, series) {

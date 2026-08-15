@@ -8,15 +8,28 @@
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#06101f">
   <link rel="icon" id="faviconLink" href="{{ url_for('static', filename='icons/icon-192.png') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=64">
-  <link rel="preload" as="image" media="(min-width: 901px)" href="https://upload.wikimedia.org/wikipedia/commons/1/1f/Dubai_Night_Time_%28Pexels-804915%29.jpg">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=75">
+  <link rel="preload" as="image" href="/static/images/world/new-york.svg">
 </head>
 <body class="auth-body auth-v26">
   <div class="auth-cinematic-bg" aria-hidden="true">
-    <div class="auth-bg-slides-v47">
-      <div class="auth-bg-slide-v47 active" style="background-image:url('/static/images/dubai-night.svg')" data-bg-desktop="https://upload.wikimedia.org/wikipedia/commons/1/1f/Dubai_Night_Time_%28Pexels-804915%29.jpg"></div>
-      <div class="auth-bg-slide-v47" data-bg="https://imgengine.khaleejtimes.com/khaleejtimes/import/images/3688569a-edc7-4df5-92fb-a236452330be-org.jpg?format=auto&width=1200"></div>
-      <div class="auth-bg-slide-v47" data-bg="https://marinadubai.ae/.fast_background/8/89/def_89d6cc449fc9dcf894c0547cce40543c84f702a8_2_.jpg"></div>
+    <div class="auth-bg-slides-v47" id="authWallpaperRotator" data-interval="60000">
+      <div class="auth-bg-slide-v47" data-place="New York, USA" style="background-image:url('/static/images/world/new-york.svg')"></div>
+      <div class="auth-bg-slide-v47" data-place="Paris, France" style="background-image:url('/static/images/world/paris.svg')"></div>
+      <div class="auth-bg-slide-v47" data-place="Tokyo, Japan" style="background-image:url('/static/images/world/tokyo.svg')"></div>
+      <div class="auth-bg-slide-v47" data-place="London, United Kingdom" style="background-image:url('/static/images/world/london.svg')"></div>
+      <div class="auth-bg-slide-v47" data-place="Singapore" style="background-image:url('/static/images/world/singapore.svg')"></div>
+      <div class="auth-bg-slide-v47" data-place="Sydney, Australia" style="background-image:url('/static/images/world/sydney.svg')"></div>
+      <div class="auth-bg-slide-v47" data-place="Istanbul, Türkiye" style="background-image:url('/static/images/world/istanbul.svg')"></div>
+      <div class="auth-bg-slide-v47" data-place="Cairo, Egypt" style="background-image:url('/static/images/world/cairo.svg')"></div>
+      <div class="auth-bg-slide-v47" data-place="Rio de Janeiro, Brazil" style="background-image:url('/static/images/world/rio.svg')"></div>
+      <div class="auth-bg-slide-v47" data-place="Toronto, Canada" style="background-image:url('/static/images/world/toronto.svg')"></div>
+      <div class="auth-bg-slide-v47" data-place="Swiss Alps, Switzerland" style="background-image:url('/static/images/world/alps.svg')"></div>
+      <div class="auth-bg-slide-v47" data-place="Maldives" style="background-image:url('/static/images/world/maldives.svg')"></div>
+      <div class="auth-bg-slide-v47" data-place="Rome, Italy" style="background-image:url('/static/images/world/rome.svg')"></div>
+      <div class="auth-bg-slide-v47" data-place="Barcelona, Spain" style="background-image:url('/static/images/world/barcelona.svg')"></div>
+      <div class="auth-bg-slide-v47" data-place="Seoul, South Korea" style="background-image:url('/static/images/world/seoul.svg')"></div>
+      <div class="auth-bg-slide-v47" data-place="Cape Town, South Africa" style="background-image:url('/static/images/world/cape-town.svg')"></div>
     </div>
     <div class="auth-aurora auth-aurora-blue"></div>
     <div class="auth-aurora auth-aurora-gold"></div>
@@ -304,23 +317,76 @@ document.getElementById('registerForm').addEventListener('submit',e=>{
 });
 
 
-// V59: mobile performance guard. Phones use the tiny local Dubai SVG;
-// desktop/tablet loads the photo backgrounds lazily and keeps the slideshow.
+// V74: worldwide, non-repeating local wallpaper rotator.
+// Every bundled destination is shown once before any destination can repeat.
+// The shuffle state is kept for this browser tab, so reloads do not restart
+// the same image immediately. Rotation pauses while the tab is hidden.
 (()=>{
-  const slides=[...document.querySelectorAll('.auth-bg-slide-v47')];
-  if(slides.length<2)return;
-  const mobile=window.matchMedia('(max-width: 900px)').matches;
-  if(mobile){
-    slides[0].style.backgroundImage='url("/static/images/dubai-night.svg")';
-    slides.slice(1).forEach(slide=>{ slide.removeAttribute('data-bg'); slide.style.backgroundImage='none'; });
-    return;
-  }
-  slides.forEach(slide=>{
-    const bg=slide.dataset.bgDesktop||slide.dataset.bg;
-    if(bg){ slide.style.backgroundImage=`url("${bg}")`; }
+  const host=document.getElementById('authWallpaperRotator');
+  const slides=[...(host?.querySelectorAll('.auth-bg-slide-v47')||[])];
+  if(!host||!slides.length)return;
+
+  const interval=Math.max(30000,Number(host.dataset.interval)||60000);
+  const stateKey='yarin-world-wallpaper-v74';
+  let timer=0;
+
+  const randomInt=(max)=>{
+    if(window.crypto?.getRandomValues){
+      const a=new Uint32Array(1); window.crypto.getRandomValues(a); return a[0]%max;
+    }
+    return Math.floor(Math.random()*max);
+  };
+  const shuffled=(avoidFirst=-1)=>{
+    const order=slides.map((_,i)=>i);
+    for(let i=order.length-1;i>0;i--){
+      const j=randomInt(i+1); [order[i],order[j]]=[order[j],order[i]];
+    }
+    if(order.length>1 && order[0]===avoidFirst){
+      const j=1+randomInt(order.length-1); [order[0],order[j]]=[order[j],order[0]];
+    }
+    return order;
+  };
+  const readState=()=>{
+    try{
+      const x=JSON.parse(sessionStorage.getItem(stateKey)||'null');
+      if(x && Array.isArray(x.order) && x.order.length===slides.length && x.order.every(i=>Number.isInteger(i)&&i>=0&&i<slides.length) && Number.isInteger(x.pos)) return x;
+    }catch(_){ }
+    return null;
+  };
+  const writeState=(x)=>{try{sessionStorage.setItem(stateKey,JSON.stringify(x));}catch(_){}};
+  let state=readState();
+  if(!state){state={order:shuffled(),pos:0,last:-1};writeState(state);}
+  if(state.pos<0||state.pos>=state.order.length)state.pos=0;
+
+  const show=(index)=>{
+    slides.forEach((slide,i)=>{
+      const active=i===index;
+      slide.classList.toggle('active',active);
+      slide.setAttribute('aria-hidden',active?'false':'true');
+    });
+  };
+  const advance=()=>{
+    state.last=state.order[state.pos];
+    state.pos+=1;
+    if(state.pos>=state.order.length){
+      state.order=shuffled(state.last);
+      state.pos=0;
+    }
+    writeState(state);
+    show(state.order[state.pos]);
+  };
+  const schedule=()=>{
+    clearTimeout(timer);
+    if(document.hidden)return;
+    timer=window.setTimeout(()=>{advance();schedule();},interval);
+  };
+
+  show(state.order[state.pos]);
+  schedule();
+  document.addEventListener('visibilitychange',()=>{
+    if(document.hidden){clearTimeout(timer);timer=0;}
+    else{schedule();}
   });
-  let i=0;
-  setInterval(()=>{slides[i].classList.remove('active');i=(i+1)%slides.length;slides[i].classList.add('active');},9000);
 })();
 
 if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('/service-worker.js').catch(()=>{}));}

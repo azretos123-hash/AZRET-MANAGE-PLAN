@@ -186,6 +186,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupIncomeProfile();
   setupSalaryPlanner();
   setupCalculators();
+  setupFloatingCalculator();
   setupSettingsPage();
   setupReportButtons();
   setupSalaryCountdown();
@@ -2306,6 +2307,8 @@ async function loadAbout() {
     document.getElementById('healthBadge').textContent = data.health;
     document.getElementById('motivationalText').textContent = `"${data.motivational}"`;
     document.getElementById('tipsList').innerHTML = data.tips.map(t => `<li>${escapeHtml(t)}</li>`).join('');
+    const tipsDateLabel = document.getElementById('tipsDateLabel');
+    if (tipsDateLabel) tipsDateLabel.textContent = data.daily_label || 'Today';
   } catch (e) { toast('Could not load advice', 'error'); }
 }
 
@@ -2524,18 +2527,20 @@ function setupCalculators() {
   // Simple calculator
   const display = document.getElementById('calcDisplay');
   const buttonsEl = document.getElementById('calcButtons');
-  const keys = ['7', '8', '9', '÷', '4', '5', '6', '×', '1', '2', '3', '−', 'C', '0', '.', '+', '='];
+  const keys = ['7', '8', '9', '÷', '4', '5', '6', '×', '1', '2', '3', '−', 'C', '⌫', '0', '+', '.', '='];
   let expr = '';
 
   buttonsEl.innerHTML = keys.map(k => {
-    const cls = ['÷', '×', '−', '+'].includes(k) ? 'op' : (k === '=' ? 'eq' : '');
-    return `<button class="${cls}" data-key="${k}">${k}</button>`;
+    const cls = ['÷', '×', '−', '+'].includes(k) ? 'op' : (k === '=' ? 'eq' : (k === '⌫' ? 'backspace-v82' : ''));
+    const label = k === 'C' ? 'All clear' : (k === '⌫' ? 'Backspace' : k);
+    return `<button class="${cls}" data-key="${k}" aria-label="${label}" title="${label}">${k}</button>`;
   }).join('');
 
   buttonsEl.querySelectorAll('button').forEach(btn => {
     btn.addEventListener('click', () => {
       const k = btn.dataset.key;
       if (k === 'C') { expr = ''; }
+      else if (k === '⌫') { expr = expr === 'Error' ? '' : expr.slice(0, -1); }
       else if (k === '=') {
         try {
           const safe = expr.replace(/×/g, '*').replace(/÷/g, '/').replace(/−/g, '-');
@@ -2566,6 +2571,18 @@ function setupCalculators() {
       : 'Exchange rate unavailable';
   }
   [convAmount, convFrom, convTo].forEach(el => el.addEventListener('input', runConv));
+  const convSwap = document.getElementById('convSwapCurrencies');
+  if (convSwap) {
+    convSwap.addEventListener('click', () => {
+      const from = convFrom.value;
+      convFrom.value = convTo.value;
+      convTo.value = from;
+      convSwap.classList.remove('swap-animate-v82');
+      void convSwap.offsetWidth;
+      convSwap.classList.add('swap-animate-v82');
+      runConv();
+    });
+  }
   runConv();
 
   // Savings calculator
@@ -2606,6 +2623,193 @@ function setupCalculators() {
   }
   [emiP, emiR, emiN].forEach(el => el.addEventListener('input', runEmiCalc));
   runEmiCalc();
+}
+
+/* ==========================================================================
+   V82 — DRAGGABLE FLOATING CALCULATOR + QUICK SHORTCUT MENU
+   ========================================================================== */
+function setupFloatingCalculator() {
+  const btn = document.getElementById('floatingCalculatorBtn');
+  const menu = document.getElementById('floatingCalculatorMenu');
+  if (!btn) return;
+
+  const STORAGE_KEY = 'yarin_floating_calculator_position_v82';
+  const LEGACY_STORAGE_KEY = 'yarin_floating_calculator_position_v81';
+  const EDGE_GAP = 8;
+  let drag = null;
+  let menuOpen = false;
+
+  const clamp = (value, min, max) => Math.min(Math.max(value, min), Math.max(min, max));
+
+  function viewportBounds() {
+    const rect = btn.getBoundingClientRect();
+    return {
+      maxX: Math.max(EDGE_GAP, window.innerWidth - rect.width - EDGE_GAP),
+      maxY: Math.max(EDGE_GAP, window.innerHeight - rect.height - EDGE_GAP),
+    };
+  }
+
+  function positionMenu() {
+    if (!menu || !menuOpen) return;
+    const btnRect = btn.getBoundingClientRect();
+    const menuRect = menu.getBoundingClientRect();
+    const width = menuRect.width || 258;
+    const height = menuRect.height || 214;
+    let left = btnRect.left + (btnRect.width / 2) - (width / 2);
+    left = clamp(left, EDGE_GAP, Math.max(EDGE_GAP, window.innerWidth - width - EDGE_GAP));
+    let top = btnRect.top - height - 10;
+    if (top < EDGE_GAP) top = btnRect.bottom + 10;
+    top = clamp(top, EDGE_GAP, Math.max(EDGE_GAP, window.innerHeight - height - EDGE_GAP));
+    menu.style.left = `${left}px`;
+    menu.style.top = `${top}px`;
+  }
+
+  function setMenu(open) {
+    if (!menu) return;
+    menuOpen = !!open;
+    menu.hidden = !menuOpen;
+    btn.setAttribute('aria-expanded', menuOpen ? 'true' : 'false');
+    btn.classList.toggle('menu-open-v82', menuOpen);
+    if (menuOpen) requestAnimationFrame(positionMenu);
+  }
+
+  function place(x, y, persist = false) {
+    const bounds = viewportBounds();
+    const left = clamp(Number(x) || 0, EDGE_GAP, bounds.maxX);
+    const top = clamp(Number(y) || 0, EDGE_GAP, bounds.maxY);
+    btn.style.left = `${left}px`;
+    btn.style.top = `${top}px`;
+    btn.style.right = 'auto';
+    btn.style.bottom = 'auto';
+    if (persist) {
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ x: left, y: top })); } catch (_) {}
+    }
+    if (menuOpen) requestAnimationFrame(positionMenu);
+  }
+
+  function restore() {
+    let saved = null;
+    try {
+      saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY) || 'null');
+    } catch (_) {}
+    if (saved && Number.isFinite(Number(saved.x)) && Number.isFinite(Number(saved.y))) {
+      requestAnimationFrame(() => place(saved.x, saved.y, false));
+    }
+  }
+
+  const targetMap = {
+    simple: 'calcCardSimple',
+    currency: 'calcCardCurrency',
+    savings: 'calcCardSavings',
+    emi: 'calcCardEmi',
+  };
+
+  function openCalculator(target = 'all') {
+    document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+    loadPage('calculator');
+    setMenu(false);
+    requestAnimationFrame(() => {
+      if (target === 'all') {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+      const card = document.getElementById(targetMap[target]);
+      if (!card) return;
+      card.classList.remove('calc-shortcut-focus-v82');
+      card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      requestAnimationFrame(() => card.classList.add('calc-shortcut-focus-v82'));
+      setTimeout(() => card.classList.remove('calc-shortcut-focus-v82'), 1200);
+    });
+  }
+
+  if (menu) {
+    menu.querySelectorAll('[data-calc-shortcut]').forEach(shortcut => {
+      shortcut.addEventListener('click', event => {
+        event.stopPropagation();
+        openCalculator(shortcut.dataset.calcShortcut || 'all');
+      });
+    });
+  }
+
+  btn.addEventListener('pointerdown', event => {
+    if (event.button !== undefined && event.button !== 0) return;
+    const rect = btn.getBoundingClientRect();
+    drag = {
+      id: event.pointerId,
+      offsetX: event.clientX - rect.left,
+      offsetY: event.clientY - rect.top,
+      startX: event.clientX,
+      startY: event.clientY,
+      moved: false,
+    };
+    btn.setPointerCapture?.(event.pointerId);
+    btn.classList.add('is-dragging');
+    event.preventDefault();
+  });
+
+  btn.addEventListener('pointermove', event => {
+    if (!drag || drag.id !== event.pointerId) return;
+    const distance = Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY);
+    if (distance > 5) {
+      drag.moved = true;
+      if (menuOpen) setMenu(false);
+    }
+    if (!drag.moved) return;
+    place(event.clientX - drag.offsetX, event.clientY - drag.offsetY, false);
+    event.preventDefault();
+  });
+
+  const finishDrag = event => {
+    if (!drag || drag.id !== event.pointerId) return;
+    const wasMoved = drag.moved;
+    const rect = btn.getBoundingClientRect();
+    try { btn.releasePointerCapture?.(event.pointerId); } catch (_) {}
+    drag = null;
+    btn.classList.remove('is-dragging');
+    if (wasMoved) place(rect.left, rect.top, true);
+    else setMenu(!menuOpen);
+    event.preventDefault();
+  };
+
+  btn.addEventListener('pointerup', finishDrag);
+  btn.addEventListener('pointercancel', event => {
+    if (!drag || drag.id !== event.pointerId) return;
+    const rect = btn.getBoundingClientRect();
+    drag = null;
+    btn.classList.remove('is-dragging');
+    place(rect.left, rect.top, true);
+  });
+
+  btn.addEventListener('keydown', event => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      setMenu(!menuOpen);
+    } else if (event.key === 'Escape') {
+      setMenu(false);
+    }
+  });
+
+  document.addEventListener('pointerdown', event => {
+    if (!menuOpen || !menu) return;
+    if (event.target === btn || btn.contains(event.target) || menu.contains(event.target)) return;
+    setMenu(false);
+  });
+
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && menuOpen) setMenu(false);
+  });
+
+  let resizeTimer;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      const rect = btn.getBoundingClientRect();
+      if (btn.style.left || btn.style.top) place(rect.left, rect.top, true);
+      positionMenu();
+    }, 120);
+  });
+
+  restore();
 }
 
 /* ==========================================================================
@@ -3608,7 +3812,24 @@ document.addEventListener('DOMContentLoaded',()=>{setupDashboardWallpaper();setu
   };
   const localDateKey = (d=new Date()) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   const countryMap={AE:{currency:'AED',name:'UAE'},IN:{currency:'INR',name:'India'},SA:{currency:'SAR',name:'Saudi Arabia'},QA:{currency:'QAR',name:'Qatar'},GB:{currency:'GBP',name:'United Kingdom'},US:{currency:'USD',name:'United States'}};
-  let lastGoldRefreshAt=0; let goldRefreshInFlight=false;
+  let lastGoldRefreshAt=0; let goldRefreshInFlight=false; let goldChartRange='1M';
+  const GOLD_RANGE_MS={
+    '7D':7*24*60*60*1000,
+    '1M':31*24*60*60*1000,
+    '3M':93*24*60*60*1000,
+    '1Y':366*24*60*60*1000
+  };
+  function compactGoldSnapshots(items,now=Date.now()){
+    const valid=(Array.isArray(items)?items:[]).filter(x=>x&&typeof x.cur==='string'&&Number.isFinite(Number(x.rate))&&Number(x.rate)>0&&Number.isFinite(Number(x.at))).filter(x=>now-Number(x.at)<=GOLD_RANGE_MS['1Y']).sort((a,b)=>Number(a.at)-Number(b.at));
+    const buckets=new Map();
+    valid.forEach(x=>{
+      const at=Number(x.at),age=Math.max(0,now-at);
+      const bucketMs=age<=2*24*60*60*1000?15*60*1000:age<=31*24*60*60*1000?2*60*60*1000:24*60*60*1000;
+      const key=`${x.cur}:${Math.floor(at/bucketMs)}`;
+      buckets.set(key,{at,rate:Number(x.rate),cur:x.cur});
+    });
+    return Array.from(buckets.values()).sort((a,b)=>a.at-b.at).slice(-3000);
+  }
   const readList = k => { const v=read(k,[]); return Array.isArray(v)?v:[]; };
   const goldTargetFor = cur => { const all=read('gold_targets',{}); const v=Number(all&&typeof all==='object'?all[cur]:0); return Number.isFinite(v)&&v>0?v:0; };
   const setGoldTargetFor = (cur,value) => { const all=read('gold_targets',{}); const next={...(all&&typeof all==='object'&&!Array.isArray(all)?all:{})}; const v=Number(value); if(validSuiteMoney(v,false)) next[cur]=v; else delete next[cur]; write('gold_targets',next); };
@@ -3640,15 +3861,20 @@ document.addEventListener('DOMContentLoaded',()=>{setupDashboardWallpaper();setu
       const r=await fetch(`/api/gold/rate?currency=${encodeURIComponent(cur)}`,{cache:'no-store'});
       const j=await r.json(); const perGram=Number(j.per_gram),usdOz=Number(j.usd_per_oz); if(!r.ok||!(perGram>0)||!(usdOz>0)) throw new Error(j.error||'No live gold price');
       write('gold_rate',{perGram,cur,usdOz,at:Date.now(),cc});
-      let snaps=readList('gold_snapshots'); snaps.push({at:Date.now(),rate:perGram,cur}); snaps=snaps.filter(x=>Date.now()-Number(x.at||0)<1000*60*60*24*30).slice(-60); write('gold_snapshots',snaps);
+      const snapNow=Date.now(); let snaps=readList('gold_snapshots'); snaps.push({at:snapNow,rate:perGram,cur}); snaps=compactGoldSnapshots(snaps,snapNow); write('gold_snapshots',snaps);
       lastGoldRefreshAt=Date.now(); $('goldMarketStatus').textContent='Live reference • updated now'; renderGold();
-    }catch(e){ const g=read('gold_rate',{}); const sameMarket=Number(g.perGram)>0&&g.cc===cc&&g.cur===cur; $('goldMarketStatus').textContent=sameMarket?'Offline • showing last saved reference':'Live rate unavailable for this market — try Refresh'; renderGold(); }
+    }catch(e){ const g=read('gold_rate',{}); const sameMarket=Number(g.perGram)>0&&g.cc===cc&&g.cur===cur; $('goldMarketStatus').textContent=sameMarket?'Offline • showing last saved reference':'Live rate unavailable • automatic retry is active'; renderGold(); }
     finally{ goldRefreshInFlight=false; }
   }
   function bindGold(){
     $('goldCountry')?.addEventListener('change',()=>{write('gold_country',$('goldCountry').value);refreshGold();});
-    $('refreshGoldRate')?.addEventListener('click',refreshGold);
-    $('addGoldSaving')?.addEventListener('click',()=>{ const amt=Number($('goldContribution').value), g=read('gold_rate',{}),cc=$('goldCountry')?.value||read('gold_country','AE'); if(!validSuiteMoney(amt,false)) return toast('Enter a valid saving amount','error'); if(!(g.perGram>0)||g.cc!==cc) return toast('Refresh the gold rate for the selected market first','error'); const a=readList('gold_savings'); a.unshift({id:Date.now(),amount:amt,grams:amt/g.perGram,rate:g.perGram,cur:g.cur,cc:g.cc,date:new Date().toISOString(),localDate:localDateKey()}); write('gold_savings',a); $('goldContribution').value=''; {const gg=Number($('goldGoalGrams').value);write('gold_goal',Number.isFinite(gg)&&gg>0&&gg<=1000000?gg:10);} renderGold(); refreshNotifications(); toast('Gold saving recorded','success'); });
+    document.querySelectorAll('#goldRange button').forEach(b=>b.addEventListener('click',()=>{goldChartRange=b.dataset.goldRange||'1M';document.querySelectorAll('#goldRange button').forEach(x=>x.classList.toggle('active',x===b));drawGoldChart();}));
+    if(!bindGold._resizeBound){
+      bindGold._resizeBound=true;
+      let lastWidth=window.innerWidth;
+      window.addEventListener('resize',()=>{const width=window.innerWidth;if(Math.abs(width-lastWidth)<16)return;lastWidth=width;clearTimeout(bindGold._resizeTimer);bindGold._resizeTimer=setTimeout(()=>{if(document.getElementById('page-gold-saver')?.classList.contains('active'))drawGoldChart();},220);});
+    }
+    $('addGoldSaving')?.addEventListener('click',()=>{ const amt=Number($('goldContribution').value), g=read('gold_rate',{}),cc=$('goldCountry')?.value||read('gold_country','AE'); if(!validSuiteMoney(amt,false)) return toast('Enter a valid saving amount','error'); if(!(g.perGram>0)||g.cc!==cc) return toast('Live gold rate is still updating. Please wait a moment and try again.','error'); const a=readList('gold_savings'); a.unshift({id:Date.now(),amount:amt,grams:amt/g.perGram,rate:g.perGram,cur:g.cur,cc:g.cc,date:new Date().toISOString(),localDate:localDateKey()}); write('gold_savings',a); $('goldContribution').value=''; {const gg=Number($('goldGoalGrams').value);write('gold_goal',Number.isFinite(gg)&&gg>0&&gg<=1000000?gg:10);} renderGold(); refreshNotifications(); toast('Gold saving recorded','success'); });
     $('goldGoalGrams')?.addEventListener('change',()=>{const v=Number($('goldGoalGrams').value);write('gold_goal',Number.isFinite(v)&&v>0&&v<=1000000?v:10);renderGold();});
     $('saveGoldTarget')?.addEventListener('click',()=>{const cc=$('goldCountry')?.value||read('gold_country','AE'),cur=(countryMap[cc]||countryMap.AE).currency,v=Number($('goldTargetPrice').value),valid=validSuiteMoney(v,false);setGoldTargetFor(cur,v);toast(valid?`Gold price alert saved for ${cur}`:'Gold price alert cleared','success');refreshNotifications();});
   }
@@ -3656,11 +3882,50 @@ document.addEventListener('DOMContentLoaded',()=>{setupDashboardWallpaper();setu
     if(!$('goldSavedValue')) return; const a=readList('gold_savings'), g=read('gold_rate',{}), rawGoal=Number(read('gold_goal',10)), goal=Number.isFinite(rawGoal)&&rawGoal>0?rawGoal:10; $('goldGoalGrams').value=goal;
     let persistedCc=read('gold_country','AE');if(!countryMap[persistedCc])persistedCc='AE';if($('goldCountry').value!==persistedCc)$('goldCountry').value=persistedCc;
     const grams=a.reduce((s,x)=>s+Math.max(0,Number(x.grams)||0),0); const selectedCc=countryMap[$('goldCountry').value] ? $('goldCountry').value : 'AE'; const cur=countryMap[selectedCc].currency; const rateOk=Number(g.perGram)>0&&g.cc===selectedCc&&g.cur===cur; const current=grams*(rateOk?Number(g.perGram):0);
-    $('goldSavedValue').textContent=rateOk?money(current,cur):'—'; $('goldSavedGrams').textContent=`${grams.toFixed(3)} g`; $('goldGramRate').textContent=rateOk?money(g.perGram,cur):'—'; $('goldGoalProgress').textContent=`${Math.min(100,grams/goal*100).toFixed(0)}%`; $('goldMarketPrice').textContent=rateOk?`${money(g.perGram,cur)} / g`:'—'; $('goldTargetPrice').value=goldTargetFor(cur)||'';
+    $('goldSavedValue').textContent=rateOk?money(current,cur):'—'; $('goldSavedGrams').textContent=`${grams.toFixed(3)} g`; $('goldGramRate').textContent=rateOk?money(g.perGram,cur):'—'; $('goldGoalProgress').textContent=`${Math.min(100,grams/goal*100).toFixed(0)}%`; $('goldMarketPrice').textContent=rateOk?money(g.perGram,cur):'—'; $('goldTargetPrice').value=goldTargetFor(cur)||'';
+    if($('goldCurrentLabel')) $('goldCurrentLabel').textContent=`24K • 1 gram • ${cur}`;
+    if($('goldUpdated')){const at=rateOk&&Number(g.at)>0?new Date(Number(g.at)):null;$('goldUpdated').textContent=at&&Number.isFinite(at.getTime())?`Last updated: ${at.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}`:'Last updated: —';}
+
     $('goldHistory').innerHTML=a.length?a.slice(0,30).map((x,i)=>{const dt=x.date?new Date(x.date):null;const dateLabel=dt&&Number.isFinite(dt.getTime())?dt.toLocaleDateString():(x.localDate?new Date(x.localDate+'T12:00:00').toLocaleDateString():'Saved entry');return `<div class="v48-list-item"><div><strong>${Number(x.grams).toFixed(3)} g</strong><small>${dateLabel} • ${money(x.amount,x.cur)} @ ${money(x.rate,x.cur)}/g</small></div><button data-gold-del="${i}">Delete</button></div>`;}).join(''):empty('No gold savings recorded yet.');
     document.querySelectorAll('[data-gold-del]').forEach(b=>b.onclick=()=>removeItem('gold_savings',Number(b.dataset.goldDel),renderGold)); drawGoldChart();
   }
-  function drawGoldChart(){ const c=$('goldMiniChart'); if(!c||typeof AzretCharts==='undefined') return; const cc=$('goldCountry')?.value||read('gold_country','AE'),cur=(countryMap[cc]||countryMap.AE).currency; const pts=readList('gold_snapshots').filter(x=>x.cur===cur&&Number.isFinite(Number(x.rate))).slice(-30); AzretCharts.lineChart('goldMiniChart',pts.map(x=>new Date(Number(x.at)||Date.now()).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})),[{data:pts.map(x=>Number(x.rate))}]); }
+  function drawGoldChart(){
+    const canvas=$('goldMiniChart');if(!canvas)return;
+    const wrap=canvas.parentElement,cc=$('goldCountry')?.value||read('gold_country','AE'),cur=(countryMap[cc]||countryMap.AE).currency;
+    const rangeMs=GOLD_RANGE_MS[goldChartRange]||GOLD_RANGE_MS['1M'],now=Date.now(),cutoff=now-rangeMs;
+    const all=readList('gold_snapshots').filter(x=>x.cur===cur&&Number.isFinite(Number(x.rate))&&Number(x.rate)>0&&Number.isFinite(Number(x.at))).sort((a,b)=>Number(a.at)-Number(b.at));
+    const points=all.filter(x=>Number(x.at)>=cutoff);
+    const css=getComputedStyle(document.documentElement),dpr=Math.min(window.devicePixelRatio||1,2),w=Math.max(280,wrap.clientWidth||canvas.clientWidth||400),h=Math.max(190,wrap.clientHeight||260);
+    canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);canvas.style.width=w+'px';canvas.style.height=h+'px';
+    const ctx=canvas.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);
+    const muted=(css.getPropertyValue('--text-muted')||'#718096').trim(),gold=(css.getPropertyValue('--gold-500')||'#d4af6a').trim(),blue=(css.getPropertyValue('--blue-400')||'#4c8dff').trim();
+    const pad={l:18,r:18,t:18,b:30},plotW=w-pad.l-pad.r,plotH=h-pad.t-pad.b;
+    ctx.strokeStyle='rgba(127,150,190,.16)';ctx.lineWidth=1;for(let i=0;i<4;i++){const yy=pad.t+i*plotH/3;ctx.beginPath();ctx.moveTo(pad.l,yy);ctx.lineTo(w-pad.r,yy);ctx.stroke();}
+    const changeEl=$('goldChange');
+    if(!points.length){
+      ctx.fillStyle=muted;ctx.font='13px Manrope, sans-serif';ctx.textAlign='center';ctx.fillText('Gold trend will appear as live snapshots are collected.',w/2,h/2);ctx.textAlign='left';
+      if(changeEl){changeEl.textContent='—';changeEl.className='fx-change';}
+      return;
+    }
+    const vals=points.map(p=>Number(p.rate)),min=Math.min(...vals),max=Math.max(...vals),span=Math.max(max-min,Math.abs(max)*0.004,0.01);
+    const yMin=min-span*.20,yMax=max+span*.20,ySpan=Math.max(yMax-yMin,.01);
+    const x=i=>points.length===1?w/2:pad.l+(i/(points.length-1))*plotW;
+    const y=v=>pad.t+(1-(v-yMin)/ySpan)*plotH;
+    if(points.length===1){
+      const xx=x(0),yy=y(vals[0]);ctx.beginPath();ctx.arc(xx,yy,5,0,Math.PI*2);ctx.fillStyle=gold;ctx.shadowColor='rgba(212,175,106,.42)';ctx.shadowBlur=14;ctx.fill();ctx.shadowBlur=0;
+      ctx.fillStyle=muted;ctx.font='11px Manrope, sans-serif';ctx.textAlign='center';ctx.fillText('Collecting trend…',xx,h-8);ctx.textAlign='left';
+      if(changeEl){changeEl.textContent='—';changeEl.className='fx-change';}
+      return;
+    }
+    const fill=ctx.createLinearGradient(0,pad.t,0,h-pad.b);fill.addColorStop(0,'rgba(212,175,106,.25)');fill.addColorStop(.45,'rgba(76,141,255,.10)');fill.addColorStop(1,'rgba(76,141,255,0)');
+    ctx.beginPath();points.forEach((p,i)=>{const xx=x(i),yy=y(Number(p.rate));i?ctx.lineTo(xx,yy):ctx.moveTo(xx,yy);});ctx.lineTo(x(points.length-1),h-pad.b);ctx.lineTo(x(0),h-pad.b);ctx.closePath();ctx.fillStyle=fill;ctx.fill();
+    const stroke=ctx.createLinearGradient(pad.l,0,w-pad.r,0);stroke.addColorStop(0,blue);stroke.addColorStop(1,gold);ctx.beginPath();points.forEach((p,i)=>{const xx=x(i),yy=y(Number(p.rate));i?ctx.lineTo(xx,yy):ctx.moveTo(xx,yy);});ctx.strokeStyle=stroke;ctx.lineWidth=2.8;ctx.lineJoin='round';ctx.lineCap='round';ctx.shadowColor='rgba(76,141,255,.24)';ctx.shadowBlur=10;ctx.stroke();ctx.shadowBlur=0;
+    const last=points[points.length-1];ctx.beginPath();ctx.arc(x(points.length-1),y(Number(last.rate)),4.8,0,Math.PI*2);ctx.fillStyle=gold;ctx.shadowColor='rgba(212,175,106,.45)';ctx.shadowBlur=12;ctx.fill();ctx.shadowBlur=0;
+    const formatStamp=ts=>{const d=new Date(Number(ts));if(goldChartRange==='7D')return d.toLocaleDateString(undefined,{month:'short',day:'numeric'})+' '+d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});if(goldChartRange==='1Y')return d.toLocaleDateString(undefined,{month:'short',year:'2-digit'});return d.toLocaleDateString(undefined,{month:'short',day:'numeric'});};
+    ctx.fillStyle=muted;ctx.font='11px Manrope, sans-serif';ctx.textAlign='left';ctx.fillText(formatStamp(points[0].at),pad.l,h-8);const end=formatStamp(last.at);ctx.textAlign='right';ctx.fillText(end,w-pad.r,h-8);ctx.textAlign='left';
+    const firstRate=Number(points[0].rate),lastRate=Number(last.rate),change=firstRate>0?(lastRate-firstRate)/firstRate*100:0;
+    if(changeEl){changeEl.textContent=`${change>=0?'+':''}${change.toFixed(2)}%`;changeEl.className=`fx-change ${change>0?'up':change<0?'down':''}`;}
+  }
 
   function bindCalendar(){ $('addCalEvent')?.addEventListener('click',()=>{if(!$('calTitle').value.trim()||!$('calDate').value)return toast('Add a title and date','error');const a=readList('calendar');a.push({title:$('calTitle').value.trim(),date:$('calDate').value,type:$('calType').value});write('calendar',a);$('calTitle').value='';$('calDate').value='';renderCalendar();refreshNotifications();}); }
   function renderCalendar(){ if(!$('calendarList'))return;const a=readList('calendar').map((x,_idx)=>({...x,_idx})).sort((x,y)=>String(x.date||'').localeCompare(String(y.date||'')));const now=new Date(),configuredSalaryDay=Math.max(1,Math.min(31,Number(state.salaryCreditDay)||27));let sy=now.getFullYear(),sm=now.getMonth(),salaryDay=Math.min(configuredSalaryDay,new Date(sy,sm+1,0).getDate());if(now.getDate()>salaryDay){sm++;if(sm>11){sm=0;sy++;}salaryDay=Math.min(configuredSalaryDay,new Date(sy,sm+1,0).getDate());}const salaryDate=new Date(sy,sm,salaryDay);const auto=`<div class="v48-list-item"><div><strong>Salary credit day</strong><small>Automatic • ${salaryDate.toLocaleDateString()} • from Settings</small></div><span>↻</span></div>`;$('calendarList').innerHTML=auto+(a.length?a.map(x=>`<div class="v48-list-item"><div><strong>${h(x.title)}</strong><small>${h(x.type)} • ${new Date(x.date+'T12:00:00').toLocaleDateString()}</small></div><button data-cal-del="${x._idx}">Delete</button></div>`).join(''):empty('No extra reminders yet.'));document.querySelectorAll('[data-cal-del]').forEach(b=>b.onclick=()=>removeItem('calendar',Number(b.dataset.calDel),renderCalendar)); }

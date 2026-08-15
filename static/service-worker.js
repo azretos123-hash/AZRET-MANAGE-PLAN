@@ -7,7 +7,7 @@
    from being replayed after logout on the same device.
 */
 
-const CACHE_NAME = 'yarin-cache-v71';
+const CACHE_NAME = 'yarin-cache-v82';
 const STATIC_ASSETS = [
   '/manifest.json',
   '/static/css/style.css',
@@ -17,6 +17,22 @@ const STATIC_ASSETS = [
   '/static/icons/icon-512.png',
   '/static/icons/yarin-emblem.webp',
   '/static/icons/rizq-ai-wave.webp',
+  '/static/images/world/new-york.svg',
+  '/static/images/world/paris.svg',
+  '/static/images/world/tokyo.svg',
+  '/static/images/world/london.svg',
+  '/static/images/world/singapore.svg',
+  '/static/images/world/sydney.svg',
+  '/static/images/world/istanbul.svg',
+  '/static/images/world/cairo.svg',
+  '/static/images/world/rio.svg',
+  '/static/images/world/toronto.svg',
+  '/static/images/world/alps.svg',
+  '/static/images/world/maldives.svg',
+  '/static/images/world/rome.svg',
+  '/static/images/world/barcelona.svg',
+  '/static/images/world/seoul.svg',
+  '/static/images/world/cape-town.svg',
 ];
 
 self.addEventListener('install', (event) => {

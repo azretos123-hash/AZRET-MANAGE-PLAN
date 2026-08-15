@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="YARIN يارين">
 <link rel="icon" id="faviconLink" href="{{ url_for('static', filename='icons/icon-192.png') }}">
 <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/icon-192.png') }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=64">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=82">
 </head>
 <body data-theme="light">
 <script>window.START_SPLASH = {{ start_splash|tojson }};</script>
@@ -127,17 +127,9 @@
         <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.8 4.6a5.4 5.4 0 00-7.6 0L12 5.8l-1.2-1.2a5.4 5.4 0 00-7.6 7.6L12 21l8.8-8.8a5.4 5.4 0 000-7.6z"/><path d="M5.5 12h3l1.5-3 3 6 1.5-3h4"/></svg>
         <span>Financial Health</span>
       </button>
-      <button class="nav-item" data-page="calculator">
-        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8M8 11h1M12 11h1M16 11h1M8 15h1M12 15h1M16 15h1M8 19h1M12 19h1"/></svg>
-        <span>Calculator</span>
-      </button>
       <button class="nav-item" data-page="notes">
         <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h5"/></svg>
         <span>Notes</span>
-      </button>
-      <button class="nav-item" data-page="reports">
-        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 21V9M12 21V3M20 21v-6"/></svg>
-        <span>Reports</span>
       </button>
       <button class="nav-item" data-page="settings">
         <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.34 1.87l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.7 1.7 0 00-1.87-.34 1.7 1.7 0 00-1 1.55V21a2 2 0 01-4 0v-.09A1.7 1.7 0 009 19.4a1.7 1.7 0 00-1.87.34l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.7 1.7 0 004.6 15a1.7 1.7 0 00-1.55-1H3a2 2 0 010-4h.09A1.7 1.7 0 004.6 9a1.7 1.7 0 00-.34-1.87l-.06-.06a2 2 0 112.83-2.83l.06.06A1.7 1.7 0 009 4.6a1.7 1.7 0 001-1.55V3a2 2 0 014 0v.09a1.7 1.7 0 001 1.55 1.7 1.7 0 001.87-.34l.06-.06a2 2 0 112.83 2.83l-.06.06A1.7 1.7 0 0019.4 9c.24.62.82 1 1.55 1H21a2 2 0 010 4h-.09a1.7 1.7 0 00-1.51 1z"/></svg>
@@ -1067,31 +1059,6 @@
         </div>
       </section>
 
-      <!-- ============ REPORTS ============ -->
-      <section class="page" id="page-reports">
-        <div class="page-head"><h2>Reports</h2></div>
-        <div class="report-grid">
-          <div class="card glass report-card">
-            <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 21V9M12 21V3M20 21v-6"/></svg>
-            <h3>Monthly Report</h3>
-            <p>Full breakdown of this month's income, expenses and balances.</p>
-            <button class="btn-primary" data-report="monthly">Generate PDF</button>
-          </div>
-          <div class="card glass report-card">
-            <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>
-            <h3>Yearly Report</h3>
-            <p>Complete annual summary across every module.</p>
-            <button class="btn-primary" data-report="yearly">Generate PDF</button>
-          </div>
-          <div class="card glass report-card">
-            <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.9 6.6L22 9.3l-5 4.8L18.2 21 12 17.3 5.8 21 7 14.1 2 9.3l7.1-.7z"/></svg>
-            <h3>Complete Report</h3>
-            <p>Everything ever recorded, in one master document.</p>
-            <button class="btn-primary" data-report="complete">Generate PDF</button>
-          </div>
-        </div>
-      </section>
-
       <!-- ============ NOTES ============ -->
       <section class="page" id="page-notes">
         <div class="page-head"><h2>Notes</h2></div>
@@ -1129,7 +1096,7 @@
       <section class="page v66-suite-page" id="page-gold-saver">
         <div class="page-head"><div><p class="page-eyebrow">Precious Metal Planning</p><h2>Gold Saver</h2><p class="v48-sub">Save toward gold in small steps. Live spot reference is converted to the selected country currency.</p></div></div>
         <div class="v48-kpi-grid"><div class="card glass v48-kpi"><small>Saved Value</small><strong id="goldSavedValue">—</strong></div><div class="card glass v48-kpi"><small>Estimated Gold</small><strong id="goldSavedGrams">0.000 g</strong></div><div class="card glass v48-kpi"><small>24K Spot / gram</small><strong id="goldGramRate">—</strong></div><div class="card glass v48-kpi"><small>Goal Progress</small><strong id="goldGoalProgress">0%</strong></div></div>
-        <div class="module-grid v48-two v66-workspace-grid"><div class="card glass form-card v66-form-card"><h3>Add Gold Saving</h3><label>Country / market</label><select id="goldCountry"><option value="AE">UAE — AED</option><option value="IN">India — INR</option><option value="SA">Saudi Arabia — SAR</option><option value="QA">Qatar — QAR</option><option value="GB">United Kingdom — GBP</option><option value="US">United States — USD</option></select><label>Amount</label><input id="goldContribution" type="number" min="0" step="0.01" placeholder="Enter amount"><label>Gold goal (grams)</label><input id="goldGoalGrams" type="number" min="0" step="0.1" value="10"><button class="btn primary" type="button" id="addGoldSaving">Add to Gold Saver</button><p class="field-hint">Tracking only — YARIN does not execute gold trades. Weight is an estimate based on reference spot price.</p></div><div class="card glass v66-grow-card"><div class="v48-section-head"><div><p class="page-eyebrow">Gold Market</p><h3>Live XAU Reference</h3></div><button class="btn ghost small" id="refreshGoldRate" type="button">Refresh</button></div><div class="v48-market-price"><strong id="goldMarketPrice">—</strong><span id="goldMarketStatus">Loading…</span></div><canvas id="goldMiniChart" height="210"></canvas><div class="v48-row"><input id="goldTargetPrice" type="number" placeholder="Target price / gram"><button id="saveGoldTarget" class="btn secondary" type="button">Set Alert</button></div><p class="field-hint">Chart shows rate snapshots saved by this browser. Spot source: Gold API; currency conversion uses YARIN reference FX.</p></div></div>
+        <div class="module-grid v48-two v66-workspace-grid"><div class="card glass form-card v66-form-card"><h3>Add Gold Saving</h3><label>Country / market</label><select id="goldCountry"><option value="AE">UAE — AED</option><option value="IN">India — INR</option><option value="SA">Saudi Arabia — SAR</option><option value="QA">Qatar — QAR</option><option value="GB">United Kingdom — GBP</option><option value="US">United States — USD</option></select><label>Amount</label><input id="goldContribution" type="number" min="0" step="0.01" placeholder="Enter amount"><label>Gold goal (grams)</label><input id="goldGoalGrams" type="number" min="0" step="0.1" value="10"><button class="btn primary" type="button" id="addGoldSaving">Add to Gold Saver</button><p class="field-hint">Tracking only — YARIN does not execute gold trades. Weight is an estimate based on reference spot price.</p></div><div class="card glass v66-grow-card fx-card gold-market-card" id="goldMarketCard"><div class="fx-head gold-market-head"><div><p class="page-eyebrow">Gold Market</p><h3>Live XAU Reference Trend</h3><div class="fx-live-row"><span class="fx-live-dot gold-live-dot" aria-hidden="true"></span><span id="goldMarketStatus">Loading latest gold reference…</span></div></div><div class="gold-market-current-wrap"><div class="fx-current"><span id="goldCurrentLabel">24K • 1 gram • AED</span><strong id="goldMarketPrice">—</strong><span id="goldChange" class="fx-change">—</span></div></div></div><div class="fx-range gold-range" id="goldRange" aria-label="Gold chart range"><button type="button" data-gold-range="7D">7D</button><button type="button" data-gold-range="1M" class="active">1M</button><button type="button" data-gold-range="3M">3M</button><button type="button" data-gold-range="1Y">1Y</button></div><div class="fx-canvas-wrap gold-canvas-wrap"><canvas id="goldMiniChart" height="260" aria-label="Gold reference price trend chart"></canvas></div><div class="fx-foot gold-market-foot"><span id="goldUpdated">Last updated: —</span><span>Live XAU spot • Gold API + YARIN FX</span></div><div class="v48-row gold-alert-row"><input id="goldTargetPrice" type="number" min="0" step="0.01" placeholder="Target price / gram"><button id="saveGoldTarget" class="btn secondary" type="button">Set Alert</button></div><p class="field-hint gold-market-hint">Trend uses live snapshots collected by this browser. Target alerts are planning reminders only.</p></div></div>
         <div class="card glass v66-history-card"><h3>Gold Saving History</h3><div id="goldHistory" class="v48-list v66-list-fill"></div></div>
       </section>
 
@@ -1145,26 +1112,37 @@
       <section class="page v66-suite-page" id="page-health"><div class="page-head"><div><p class="page-eyebrow">Financial Wellness</p><h2>Financial Health Score</h2></div></div><div class="card glass v48-health-card v66-health-summary"><div class="v48-score-ring"><strong id="healthScore">—</strong><span>/ 100</span></div><div><h3 id="healthLabel">Calculating…</h3><p id="healthAdvice">Add financial data to receive a useful score.</p></div></div><div id="healthBreakdown" class="v48-health-grid v66-health-grid"></div></section>
       <!-- ============ CALCULATOR ============ -->
       <section class="page" id="page-calculator">
-        <div class="page-head"><h2>Calculator</h2></div>
+        <div class="page-head">
+          <div>
+            <p class="page-eyebrow">Quick Finance Tools</p>
+            <h2>Calculator</h2>
+            <p class="v48-sub">Use the floating calculator shortcut to jump directly to any calculator.</p>
+          </div>
+        </div>
         <div class="calc-grid">
-          <div class="card glass calc-card">
+          <div class="card glass calc-card calc-card-v82" id="calcCardSimple" data-calc-section="simple">
             <h3>Simple Calculator</h3>
             <div class="calc-display" id="calcDisplay">0</div>
             <div class="calc-buttons" id="calcButtons"></div>
           </div>
 
-          <div class="card glass calc-card">
+          <div class="card glass calc-card calc-card-v82" id="calcCardCurrency" data-calc-section="currency">
             <h3 id="currencyCalcTitle">AED ↔ INR Calculator</h3>
             <label>Amount</label>
             <input type="number" id="convAmount" value="100" step="0.01">
             <label>From</label>
             <select id="convFrom"><option value="AED">AED</option><option value="INR">INR</option></select>
+            <button id="convSwapCurrencies" class="currency-swap-btn-v82" type="button" aria-label="Swap currencies" title="Swap currencies">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M7 7h11l-3-3"/><path d="M17 17H6l3 3"/><path d="M18 7l-3 3"/><path d="M6 17l3-3"/>
+              </svg>
+            </button>
             <label>To</label>
             <select id="convTo"><option value="INR">INR</option><option value="AED">AED</option></select>
             <div class="calc-result" id="convResult">—</div>
           </div>
 
-          <div class="card glass calc-card">
+          <div class="card glass calc-card calc-card-v82" id="calcCardSavings" data-calc-section="savings">
             <h3>Savings Calculator</h3>
             <label>Monthly Contribution</label>
             <input type="number" id="savCalcMonthly" value="500" step="0.01">
@@ -1175,7 +1153,7 @@
             <div class="calc-result" id="savCalcResult">—</div>
           </div>
 
-          <div class="card glass calc-card">
+          <div class="card glass calc-card calc-card-v82" id="calcCardEmi" data-calc-section="emi">
             <h3>EMI Calculator</h3>
             <label>Loan Amount</label>
             <input type="number" id="emiCalcPrincipal" value="10000" step="0.01">
@@ -1191,17 +1169,26 @@
       <!-- ============ ABOUT ============ -->
       <section class="page" id="page-about">
         <div class="page-head"><h2>About &amp; Financial Advice</h2></div>
-        <div class="about-grid">
-          <div class="card glass about-card">
-            <h3>Financial Health</h3>
-            <div class="health-badge" id="healthBadge">—</div>
-            <p id="motivationalText" class="motivational-text"></p>
+        <div class="about-grid about-grid-v79">
+          <div class="card glass about-card about-advice-wide-v79">
+            <div class="about-health-panel-v79">
+              <p class="about-kicker-v79">DAILY FINANCIAL WELLNESS</p>
+              <h3>Financial Health</h3>
+              <div class="health-badge" id="healthBadge">—</div>
+              <p id="motivationalText" class="motivational-text"></p>
+            </div>
+            <div class="about-tips-panel-v79">
+              <div class="about-tips-head-v79">
+                <div>
+                  <p class="about-kicker-v79">PERSONALISED GUIDANCE</p>
+                  <h3>Smart Tips</h3>
+                </div>
+                <span id="tipsDateLabel" class="daily-tips-badge-v79">Today</span>
+              </div>
+              <ul id="tipsList" class="tips-list tips-list-v79"></ul>
+            </div>
           </div>
-          <div class="card glass about-card">
-            <h3>Smart Tips</h3>
-            <ul id="tipsList" class="tips-list"></ul>
-          </div>
-          <div class="card glass about-card">
+          <div class="card glass about-card about-brand-wide-v79">
             <div class="about-brand-lockup">
               <h3><span>YARIN</span> <b lang="ar" dir="rtl">يارين</b></h3>
               <div class="about-brand-motto">Your Money. Your Future.</div>
@@ -1239,23 +1226,32 @@
       <section class="page" id="page-settings">
         <div class="page-head"><h2>Settings</h2></div>
         <div class="settings-grid">
-          <div class="card glass">
-            <h3>Appearance</h3>
-            <div class="settings-row">
-              <span>Theme</span>
+          <div class="card glass settings-preferences-card">
+            <div class="settings-preferences-head">
+              <div>
+                <span class="settings-eyebrow">PERSONALIZATION &amp; PAY SCHEDULE</span>
+                <h3>Account Preferences</h3>
+                <p>Manage how YARIN looks, which currencies it uses, and when your monthly salary is credited.</p>
+              </div>
+            </div>
+
+            <div class="settings-preference-section settings-theme-section">
+              <div class="settings-section-copy">
+                <strong>Theme</strong>
+                <p>Choose the appearance you prefer across YARIN.</p>
+              </div>
               <div class="segmented" id="settingsThemeSwitch">
                 <button data-theme="light" class="active">Light</button>
                 <button data-theme="dark">Dark</button>
               </div>
             </div>
-            <div class="currency-settings-block">
-              <div class="currency-setting-head">
-                <div>
-                  <strong>Currency Pair</strong>
-                  <p class="field-hint">Choose the two currencies used across your account. The top switch, amount hints, calculator and exchange chart update automatically.</p>
-                </div>
+
+            <div class="settings-preference-section currency-settings-block">
+              <div class="settings-section-copy">
+                <strong>Currency Pair</strong>
+                <p>Choose the two currencies used across your account. The top switch, amount hints, calculator and exchange chart update automatically.</p>
               </div>
-              <form id="currencyPairForm">
+              <form id="currencyPairForm" class="settings-preference-form">
                 <div class="currency-select-grid">
                   <div>
                     <label for="primaryCurrencySelect">Primary Currency</label>
@@ -1271,62 +1267,135 @@
                 <p id="currencyPairMsg" class="form-error" style="display:none;"></p>
               </form>
             </div>
-          </div>
 
-          <div class="card glass">
-            <h3>Salary Credit Date</h3>
-            <form id="salaryDateForm">
-              <label for="salaryCreditDay">Salary day of each month</label>
-              <input type="number" id="salaryCreditDay" min="1" max="31" step="1" value="27" required>
-              <p class="field-hint">Set the day you normally receive your salary. The Dashboard countdown and salary reminder will use this date for your account. For shorter months, the last day of that month is used automatically.</p>
-              <div class="form-actions"><button type="submit" class="btn-primary">Save Salary Date</button></div>
-              <p id="salaryDateMsg" class="form-error" style="display:none;"></p>
-            </form>
-          </div>
-
-          <div class="card glass">
-            <h3>Data Management</h3>
-            <div class="settings-actions">
-              <button class="btn-secondary" id="btnBackup">Backup My Account</button>
-              <label class="btn-secondary file-label">Restore My Account
-                <input type="file" id="restoreFile" accept=".json" hidden>
-              </label>
-              <button class="btn-secondary" id="btnExport">Export Data (JSON)</button>
-              <label class="btn-secondary file-label">Import Data
-                <input type="file" id="importFile" accept=".json" hidden>
-              </label>
-              <button class="btn-danger" id="btnClearAll">Clear All Data</button>
+            <div class="settings-preference-section salary-preference-section">
+              <div class="settings-section-copy">
+                <strong>Salary Credit Schedule</strong>
+                <p>Set the day you normally receive your salary. The Dashboard countdown and salary reminder will use this date automatically.</p>
+              </div>
+              <form id="salaryDateForm" class="settings-preference-form">
+                <label for="salaryCreditDay">Salary day of each month</label>
+                <input type="number" id="salaryCreditDay" min="1" max="31" step="1" value="27" required>
+                <p class="field-hint">For shorter months, YARIN automatically uses the last valid day of that month.</p>
+                <div class="form-actions"><button type="submit" class="btn-primary">Save Salary Date</button></div>
+                <p id="salaryDateMsg" class="form-error" style="display:none;"></p>
+              </form>
             </div>
           </div>
 
-          <div class="card glass">
-            <h3>Profile</h3>
-            <form id="usernameForm">
-              <label>Username</label>
-              <input type="text" id="profileUsername" minlength="3" maxlength="40" required placeholder="Your username">
-              <div class="form-actions"><button type="submit" class="btn-primary">Save Username</button></div>
-              <p id="usernameMsg" class="form-error" style="display:none;"></p>
-            </form>
-            <form id="emailForm" style="margin-top:16px;">
-              <label>Email</label>
-              <input type="email" id="profileEmail" required placeholder="you@example.com">
-              <div class="form-actions"><button type="submit" class="btn-primary">Save Email</button></div>
-              <p id="emailMsg" class="form-error" style="display:none;"></p>
-            </form>
+          <div class="card glass settings-data-reports-card">
+            <div class="settings-data-reports-head">
+              <div>
+                <span class="settings-eyebrow">DATA, BACKUP &amp; INSIGHTS</span>
+                <h3>Data &amp; Reports</h3>
+                <p>Back up or restore your YARIN data, export records when needed, and generate financial reports from the same settings area.</p>
+              </div>
+            </div>
+
+            <div class="settings-data-reports-section">
+              <div class="settings-section-copy">
+                <strong>Data Management</strong>
+                <p>Protect your account data with backups and JSON exports. Restore or import only files you trust.</p>
+              </div>
+              <div class="settings-data-reports-content">
+                <div class="settings-actions settings-data-actions">
+                  <button class="btn-secondary" id="btnBackup">Backup My Account</button>
+                  <label class="btn-secondary file-label">Restore My Account
+                    <input type="file" id="restoreFile" accept=".json" hidden>
+                  </label>
+                  <button class="btn-secondary" id="btnExport">Export Data (JSON)</button>
+                  <label class="btn-secondary file-label">Import Data
+                    <input type="file" id="importFile" accept=".json" hidden>
+                  </label>
+                  <button class="btn-danger settings-clear-data" id="btnClearAll">Clear All Data</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-data-reports-section">
+              <div class="settings-section-copy">
+                <strong>Financial Reports</strong>
+                <p>Create a PDF summary for this month, the current year, or your complete YARIN history.</p>
+              </div>
+              <div class="settings-data-reports-content">
+                <div class="settings-report-grid">
+                  <div class="settings-report-option">
+                    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 21V9M12 21V3M20 21v-6"/></svg>
+                    <div>
+                      <h4>Monthly Report</h4>
+                      <p>Income, expenses and balances for this month.</p>
+                    </div>
+                    <button class="btn-primary" data-report="monthly">Generate PDF</button>
+                  </div>
+                  <div class="settings-report-option">
+                    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>
+                    <div>
+                      <h4>Yearly Report</h4>
+                      <p>Annual summary across your finance modules.</p>
+                    </div>
+                    <button class="btn-primary" data-report="yearly">Generate PDF</button>
+                  </div>
+                  <div class="settings-report-option">
+                    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.9 6.6L22 9.3l-5 4.8L18.2 21 12 17.3 5.8 21 7 14.1 2 9.3l7.1-.7z"/></svg>
+                    <div>
+                      <h4>Complete Report</h4>
+                      <p>One master PDF covering all recorded history.</p>
+                    </div>
+                    <button class="btn-primary" data-report="complete">Generate PDF</button>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div class="card glass">
-            <h3>Change Password</h3>
-            <form id="passwordForm">
-              <label>Current Password</label>
-              <input type="password" id="currentPassword" required>
-              <label>New Password</label>
-              <input type="password" id="newPassword" required minlength="8">
-              <div class="form-actions">
-                <button type="submit" class="btn-primary">Update Password</button>
+          <div class="card glass settings-account-card">
+            <div class="settings-account-head">
+              <div>
+                <span class="settings-eyebrow">IDENTITY &amp; SECURITY</span>
+                <h3>Account &amp; Security</h3>
+                <p>Keep your account details current and protect access to your YARIN account.</p>
               </div>
-              <p id="passwordMsg" class="form-error" style="display:none;"></p>
-            </form>
+            </div>
+
+            <div class="settings-account-section">
+              <div class="settings-section-copy">
+                <strong>Profile Information</strong>
+                <p>Update the username and email address linked to your account.</p>
+              </div>
+              <div class="settings-account-content">
+                <form id="usernameForm" class="settings-account-form">
+                  <label for="profileUsername">Username</label>
+                  <input type="text" id="profileUsername" minlength="3" maxlength="40" required placeholder="Your username">
+                  <div class="form-actions"><button type="submit" class="btn-primary">Save Username</button></div>
+                  <p id="usernameMsg" class="form-error" style="display:none;"></p>
+                </form>
+                <form id="emailForm" class="settings-account-form settings-account-form-separated">
+                  <label for="profileEmail">Email</label>
+                  <input type="email" id="profileEmail" required placeholder="you@example.com">
+                  <div class="form-actions"><button type="submit" class="btn-primary">Save Email</button></div>
+                  <p id="emailMsg" class="form-error" style="display:none;"></p>
+                </form>
+              </div>
+            </div>
+
+            <div class="settings-account-section">
+              <div class="settings-section-copy">
+                <strong>Password &amp; Security</strong>
+                <p>Use your current password to set a new password for this account.</p>
+              </div>
+              <div class="settings-account-content">
+                <form id="passwordForm" class="settings-account-form">
+                  <label for="currentPassword">Current Password</label>
+                  <input type="password" id="currentPassword" required autocomplete="current-password">
+                  <label for="newPassword">New Password</label>
+                  <input type="password" id="newPassword" required minlength="8" autocomplete="new-password">
+                  <div class="form-actions">
+                    <button type="submit" class="btn-primary">Update Password</button>
+                  </div>
+                  <p id="passwordMsg" class="form-error" style="display:none;"></p>
+                </form>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -1454,10 +1523,32 @@
   </div>
 </div>
 
+<!-- V82: draggable floating Calculator with quick shortcuts (sidebar Calculator removed) -->
+<button id="floatingCalculatorBtn" class="floating-calculator-v82" type="button" aria-label="Calculator shortcuts" aria-haspopup="menu" aria-expanded="false" title="Calculator shortcuts — drag to move">
+  <svg viewBox="0 0 24 24" width="25" height="25" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+    <rect x="4" y="2.5" width="16" height="19" rx="3"/>
+    <path d="M7.5 6.5h9M8 11h1M12 11h1M16 11h1M8 15h1M12 15h1M16 15h1M8 19h1M12 19h1M16 19h1"/>
+  </svg>
+  <span class="floating-calculator-grip-v82" aria-hidden="true">···</span>
+</button>
+<div id="floatingCalculatorMenu" class="floating-calculator-menu-v82" role="menu" aria-label="Calculator shortcuts" hidden>
+  <div class="floating-calculator-menu-head-v82">
+    <strong>Calculator</strong>
+    <span>Quick shortcuts</span>
+  </div>
+  <div class="floating-calculator-shortcuts-v82">
+    <button type="button" role="menuitem" data-calc-shortcut="simple"><span>⌗</span><b>Simple</b></button>
+    <button type="button" role="menuitem" data-calc-shortcut="currency"><span>⇄</span><b>Currency</b></button>
+    <button type="button" role="menuitem" data-calc-shortcut="savings"><span>＋</span><b>Savings</b></button>
+    <button type="button" role="menuitem" data-calc-shortcut="emi"><span>％</span><b>EMI</b></button>
+  </div>
+  <button type="button" class="floating-calculator-all-v82" data-calc-shortcut="all" role="menuitem">Open all calculators</button>
+</div>
+
 <div id="toast" class="toast"></div>
 
-<script src="{{ url_for('static', filename='js/charts.js') }}?v=64"></script>
-<script src="/static/js/app.js?v=64"></script>
+<script src="{{ url_for('static', filename='js/charts.js') }}?v=82"></script>
+<script src="/static/js/app.js?v=82"></script>
 
   <!-- Mobile bottom navigation -->
   <nav class="mobile-bottom-nav" id="mobileBottomNav" aria-label="Mobile navigation">

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 760" role="img" aria-label="Sydney, Australia scenic wallpaper">
+<defs>
+ <linearGradient id="sky" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#06203b"/><stop offset="1" stop-color="#1b5f87"/></linearGradient>
+ <linearGradient id="build" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffd98a"/><stop offset="1" stop-color="#f7f1d4" stop-opacity=".86"/></linearGradient>
+ <radialGradient id="glow"><stop stop-color="#ffd98a" stop-opacity=".52"/><stop offset="1" stop-color="#ffd98a" stop-opacity="0"/></radialGradient>
+</defs>
+<rect width="1280" height="760" fill="url(#sky)"/>
+<circle cx="965" cy="210" r="310" fill="url(#glow)"/>
+<circle cx="215" cy="120" r="180" fill="url(#glow)" opacity=".35"/>
+<g opacity=".45" fill="#fff"><circle cx="50" cy="40" r="1"/><circle cx="133" cy="87" r="2"/><circle cx="216" cy="134" r="3"/><circle cx="299" cy="181" r="1"/><circle cx="382" cy="228" r="2"/><circle cx="465" cy="275" r="3"/><circle cx="548" cy="62" r="1"/><circle cx="631" cy="109" r="2"/><circle cx="714" cy="156" r="3"/><circle cx="797" cy="203" r="1"/><circle cx="880" cy="250" r="2"/><circle cx="963" cy="297" r="3"/><circle cx="1046" cy="84" r="1"/><circle cx="1129" cy="131" r="2"/><circle cx="1212" cy="178" r="3"/><circle cx="125" cy="225" r="1"/><circle cx="208" cy="272" r="2"/><circle cx="291" cy="59" r="3"/><circle cx="374" cy="106" r="1"/><circle cx="457" cy="153" r="2"/><circle cx="540" cy="200" r="3"/><circle cx="623" cy="247" r="1"/><circle cx="706" cy="294" r="2"/><circle cx="789" cy="81" r="3"/><circle cx="872" cy="128" r="1"/><circle cx="955" cy="175" r="2"/><circle cx="1038" cy="222" r="3"/><circle cx="1121" cy="269" r="1"/></g>
+<g fill="url(#build)" opacity=".98"><path d="M310 620Q460 300 610 620Z"/><path d="M500 620Q700 210 870 620Z"/><path d="M720 620Q900 320 1040 620Z"/></g><rect x="260" y="620" width="840" height="70" rx="18" fill="#dff6ff" opacity=".85"/>
+<rect y="690" width="1280" height="70" fill="#020711" opacity=".38"/>
+<g font-family="Arial, Helvetica, sans-serif" fill="#fff"><text x="58" y="620" font-size="46" font-weight="700">Sydney</text><text x="60" y="656" font-size="20" letter-spacing="5" opacity=".78">AUSTRALIA</text></g>
+<path d="M0 0H1280V760H0Z" fill="none" stroke="#ffffff" stroke-opacity=".05" stroke-width="2"/>
+</svg>
