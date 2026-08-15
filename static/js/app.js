@@ -67,7 +67,7 @@ const SALARY_PALETTE = ['#4C8DFF', '#1E4DB7', '#1FAA59', '#F5A524', '#E5484D', '
 
 const CURRENCY_SYMBOL = { AED:'AED', INR:'₹', USD:'$', EUR:'€', GBP:'£', JPY:'¥', CNY:'¥', KRW:'₩', RUB:'₽', TRY:'₺', SAR:'SAR', QAR:'QAR', KWD:'KWD', BHD:'BHD', OMR:'OMR', CAD:'C$', AUD:'A$', CHF:'CHF', SGD:'S$', NZD:'NZ$' };
 
-// Primary flag for each currency. Multi-country/supranational currencies use
+// Primary country/region flag for the full right-half salary-card flag panel. Multi-country/supranational currencies use
 // the best-recognised regional flag; unsupported/metal/archive codes fall back
 // to a subtle currency-code watermark instead of showing the wrong country.
 const CURRENCY_FLAG_COUNTRY = {
@@ -3621,7 +3621,7 @@ document.addEventListener('DOMContentLoaded',()=>{setupDashboardWallpaper();setu
     suiteReady=true;
     // Existing logout item is also .nav-item; never route it to an undefined page.
     document.querySelectorAll('.nav-item:not([data-page])').forEach(b=>b.dataset.v48NoRoute='1');
-    bindGold(); bindCalendar(); bindNetWorth(); bindGoals(); bindBills(); bindVault(); bindNotifications();
+    bindGold(); bindCalendar(); bindNetWorth(); bindBills(); bindVault(); bindNotifications();
     renderAll(); refreshGold();
     setInterval(refreshNotifications, 60000); setTimeout(refreshNotifications, 1800);
     // Keep the Gold Saver reference fresh while the app remains open. The server
@@ -3668,8 +3668,6 @@ document.addEventListener('DOMContentLoaded',()=>{setupDashboardWallpaper();setu
   function bindNetWorth(){ $('addNetWorth')?.addEventListener('click',()=>{const n=$('nwName').value.trim(),v=Number($('nwAmount').value);if(!n||!validSuiteMoney(v,true))return toast('Enter item and a valid amount','error');const a=readList('networth');a.push({name:n,amount:v,type:$('nwType').value,cur:suiteCurrency()});write('networth',a);$('nwName').value='';$('nwAmount').value='';renderNetWorth();renderHealth();}); }
   function renderNetWorth(){if(!$('nwList'))return;const a=readList('networth'),base=suiteCurrency(),assetSum=sumSuiteConverted(a,'asset',base),liabSum=sumSuiteConverted(a,'liability',base),complete=assetSum.complete&&liabSum.complete,assets=assetSum.total,liab=liabSum.total;$('nwAssets').textContent=complete?money(assets,base):'—';$('nwLiabilities').textContent=complete?money(liab,base):'—';$('nwTotal').textContent=complete?money(assets-liab,base):'—';$('nwList').innerHTML=a.length?a.map((x,i)=>`<div class="v48-list-item"><div><strong>${h(x.name)}</strong><small>${x.type==='asset'?'Asset':'Liability'} • ${money(x.amount,x.cur||base)}</small></div><button data-nw-del="${i}">Delete</button></div>`).join(''):empty('Add assets and liabilities to calculate net worth.');if(!complete)$('nwList').insertAdjacentHTML('afterbegin','<div class="v48-empty">A saved currency rate is unavailable. Refresh exchange rates to calculate totals safely.</div>');document.querySelectorAll('[data-nw-del]').forEach(b=>b.onclick=()=>removeItem('networth',Number(b.dataset.nwDel),renderNetWorth));}
 
-  function bindGoals(){ $('addGoal')?.addEventListener('click',()=>{const n=$('goalName').value.trim(),t=Number($('goalTarget').value),sv=Number($('goalSaved').value||0);if(!n||!validSuiteMoney(t,false)||!validSuiteMoney(sv,true))return toast('Enter a valid goal name, target and saved amount','error');const a=readList('goals');a.push({name:n,target:t,saved:sv,date:$('goalDate').value,cur:suiteCurrency()});write('goals',a);['goalName','goalTarget','goalSaved','goalDate'].forEach(id=>$(id).value='');renderGoals();renderHealth();refreshNotifications();}); }
-  function renderGoals(){if(!$('goalsList'))return;const a=readList('goals');$('goalsList').innerHTML=a.length?a.map((x,i)=>{const p=Math.max(0,Math.min(100,Number(x.saved||0)/Math.max(1,Number(x.target)||1)*100));return `<div class="v48-list-item"><div style="flex:1"><strong>${h(x.name)} — ${p.toFixed(0)}%</strong><small>${money(x.saved,x.cur||suiteCurrency())} of ${money(x.target,x.cur||suiteCurrency())}${x.date?' • target '+new Date(x.date+'T12:00:00').toLocaleDateString():''}</small><div class="v48-progress"><i style="width:${p}%"></i></div></div><button data-goal-del="${i}">Delete</button></div>`}).join(''):empty('Create your first financial goal.');document.querySelectorAll('[data-goal-del]').forEach(b=>b.onclick=()=>removeItem('goals',Number(b.dataset.goalDel),renderGoals));}
 
   function bindBills(){ $('addBill')?.addEventListener('click',()=>{const n=$('billName').value.trim(),a=Number($('billAmount').value),d=Number($('billDay').value);if(!n||!validSuiteMoney(a,true)||!Number.isInteger(d)||d<1||d>31)return toast('Enter bill name, amount and valid due day','error');const v=readList('bills');v.push({name:n,amount:a,day:d,kind:$('billKind').value,cur:suiteCurrency()});write('bills',v);$('billName').value=$('billAmount').value=$('billDay').value='';renderBills();renderHealth();refreshNotifications();}); }
   function renderBills(){if(!$('billsList'))return;const a=readList('bills').map((x,_idx)=>({...x,_idx})).sort((x,y)=>Number(x.day)-Number(y.day));$('billsList').innerHTML=a.length?a.map(x=>`<div class="v48-list-item"><div><strong>${h(x.name)}</strong><small>${h(x.kind)} • ${money(x.amount,x.cur||suiteCurrency())} • due day ${Number(x.day)}</small></div><button data-bill-del="${x._idx}">Delete</button></div>`).join(''):empty('No recurring bills or subscriptions yet.');document.querySelectorAll('[data-bill-del]').forEach(b=>b.onclick=()=>removeItem('bills',Number(b.dataset.billDel),renderBills));}
@@ -3683,29 +3681,32 @@ document.addEventListener('DOMContentLoaded',()=>{setupDashboardWallpaper();setu
   async function vaultDelete(id){const db=await vaultDb(),tx=db.transaction('docs','readwrite');tx.objectStore('docs').delete(id);tx.oncomplete=()=>{db.close();renderVault();};tx.onerror=()=>db.close();}
 
   function healthData(){
-    const nw=readList('networth'),goals=readList('goals'),bills=readList('bills'),gold=readList('gold_savings'),calendar=readList('calendar'),dash=state.dashboard||{};
+    const nw=readList('networth'),bills=readList('bills'),gold=readList('gold_savings'),calendar=readList('calendar'),dash=state.dashboard||{};
     const base=suiteCurrency(),assetSum=sumSuiteConverted(nw,'asset',base),liabSum=sumSuiteConverted(nw,'liability',base),conversionComplete=assetSum.complete&&liabSum.complete,assets=Math.max(0,assetSum.total),liab=Math.max(0,liabSum.total);
     const debt=Math.max(0,liab),ratio=conversionComplete?(assets>0?debt/assets:debt?1:0):0;
-    const goalProgress=goals.length?goals.reduce((s,x)=>s+Math.min(1,Math.max(0,Number(x.saved)||0)/Math.max(1,Number(x.target)||1)),0)/goals.length:0;
+    // Goals Center was removed in V65. Use the existing Savings page goal instead,
+    // so Financial Health still reflects the user's real savings target.
+    const savingsGoal=Math.max(0,Number(dash.savings_goal)||0),totalSavings=Math.max(0,Number(dash.total_savings)||0);
+    const goalProgress=savingsGoal>0?Math.min(1,totalSavings/savingsGoal):0;
     const income=Math.max(0,Number(dash.monthly_income)||0),savings=Math.max(0,Number(dash.monthly_savings)||0),savingsRate=income>0?Math.min(1,savings/income):0;
-    const evidence=(nw.length?1:0)+(goals.length?1:0)+(bills.length?1:0)+(gold.length?1:0)+(calendar.length?1:0)+(income>0?1:0);
-    if(!evidence)return{score:0,ratio:0,goalProgress:0,assets:0,liab:0,savingsRate:0,hasData:false};
+    const evidence=(nw.length?1:0)+(bills.length?1:0)+(gold.length?1:0)+(calendar.length?1:0)+(income>0?1:0)+(savingsGoal>0||totalSavings>0?1:0);
+    if(!evidence)return{score:0,ratio:0,goalProgress:0,assets:0,liab:0,savingsRate:0,hasData:false,savingsGoal:0};
     let score=20;
     score+=conversionComplete?Math.round((1-Math.min(1,ratio))*25):0;
     score+=Math.round(goalProgress*20);
     score+=Math.round(savingsRate*15);
-    score+=Math.min(10,((assets>0?1:0)+(gold.length?1:0)+(goals.length?1:0))*4);
+    score+=Math.min(10,((assets>0?1:0)+(gold.length?1:0)+(savingsGoal>0?1:0))*4);
     score+=bills.length?5:0; score+=calendar.length?5:0;
     score=Math.max(0,Math.min(100,score));
-    return{score,ratio,goalProgress,assets,liab,savingsRate,hasData:true,conversionComplete};
+    return{score,ratio,goalProgress,assets,liab,savingsRate,hasData:true,conversionComplete,savingsGoal};
   }
   function renderHealth(){
     if(!$('healthScore'))return; const h=healthData();
     $('healthScore').textContent=h.hasData?h.score:'—'; document.querySelector('.v48-score-ring')?.style.setProperty('--score',(h.hasData?h.score:0)+'%');
-    if(!h.hasData){$('healthLabel').textContent='Add data to calculate your score';$('healthAdvice').textContent='Record income, assets, goals, bills or gold savings to build a meaningful financial health score.';$('healthBreakdown').innerHTML='<div class="v48-health-chip">Status<b>Waiting for financial data</b></div>';return;}
+    if(!h.hasData){$('healthLabel').textContent='Add data to calculate your score';$('healthAdvice').textContent='Record income, assets, savings, bills or gold savings to build a meaningful financial health score.';$('healthBreakdown').innerHTML='<div class="v48-health-chip">Status<b>Waiting for financial data</b></div>';return;}
     $('healthLabel').textContent=h.score>=80?'Strong financial foundation':h.score>=60?'Healthy — keep improving':h.score>=40?'Building momentum':'Needs attention';
-    $('healthAdvice').textContent=h.conversionComplete===false?'Refresh exchange rates to include all saved currencies in your Net Worth score.':h.ratio>.6?'Liabilities are high relative to recorded assets. Focus on debt reduction and emergency savings.':h.goalProgress<.3?'Your debt position looks manageable; increase regular goal contributions to improve the score.':'Good progress. Keep bills planned, goals funded and records current.';
-    $('healthBreakdown').innerHTML=`<div class="v48-health-chip">Debt / Asset ratio<b>${(h.ratio*100).toFixed(0)}%</b></div><div class="v48-health-chip">Average goal progress<b>${(h.goalProgress*100).toFixed(0)}%</b></div><div class="v48-health-chip">Savings rate<b>${(h.savingsRate*100).toFixed(0)}%</b></div><div class="v48-health-chip">Recorded net worth<b>${money(h.assets-h.liab)}</b></div>`;
+    $('healthAdvice').textContent=h.conversionComplete===false?'Refresh exchange rates to include all saved currencies in your Net Worth score.':h.ratio>.6?'Liabilities are high relative to recorded assets. Focus on debt reduction and emergency savings.':h.savingsGoal>0&&h.goalProgress<.3?'Your debt position looks manageable; increase regular savings contributions toward your Savings Goal.':'Good progress. Keep bills planned, savings growing and records current.';
+    $('healthBreakdown').innerHTML=`<div class="v48-health-chip">Debt / Asset ratio<b>${(h.ratio*100).toFixed(0)}%</b></div><div class="v48-health-chip">Savings goal progress<b>${(h.goalProgress*100).toFixed(0)}%</b></div><div class="v48-health-chip">Savings rate<b>${(h.savingsRate*100).toFixed(0)}%</b></div><div class="v48-health-chip">Recorded net worth<b>${money(h.assets-h.liab)}</b></div>`;
   }
 
 
@@ -3791,19 +3792,6 @@ document.addEventListener('DOMContentLoaded',()=>{setupDashboardWallpaper();setu
       });
     }
 
-    readList('goals').forEach(x=>{
-      if(!x.date)return;
-      const days=daysFromToday(new Date(x.date+'T12:00:00'),now);
-      const p=Number(x.saved||0)/Math.max(1,Number(x.target)||1);
-      if(days>=0&&days<=30&&p<1){
-        out.push({
-          id:`goal:${String(x.name||'')}|${String(x.date||'')}|${String(x.target||0)}`,
-          page:'goals',
-          text:`${x.name} target date is approaching`,
-          sub:`${Math.round(p*100)}% funded • ${days} days left`
-        });
-      }
-    });
     return out;
   }
   const notificationKey = x => String(x.id||`${String(x.page||'general')}|${String(x.text||'')}`);
@@ -3829,7 +3817,7 @@ document.addEventListener('DOMContentLoaded',()=>{setupDashboardWallpaper();setu
     }
     document.querySelectorAll('[data-v54-notif]').forEach(b=>b.onclick=()=>{const x=visible[Number(b.dataset.v54Notif)];if(!x)return;const seen=notificationReadSet();seen.add(notificationKey(x));saveNotificationReadSet(seen);refreshNotifications();document.querySelector(`.nav-item[data-page="${x.page}"]`)?.click();closeNotifications();});
   }
-  function renderAll(){document.querySelectorAll('.suite-cur-unit').forEach(el=>el.textContent=suiteCurrency());renderGold();renderCalendar();renderNetWorth();renderGoals();renderBills();renderVault();renderHealth();refreshNotifications();}
+  function renderAll(){document.querySelectorAll('.suite-cur-unit').forEach(el=>el.textContent=suiteCurrency());renderGold();renderCalendar();renderNetWorth();renderBills();renderVault();renderHealth();refreshNotifications();}
 
   window.refreshYarinFinanceSuite=()=>{if(suiteReady)renderAll();};
   window.prepareYarinSuiteServerAction=async({flush=false}={})=>{
@@ -3865,7 +3853,7 @@ document.addEventListener('DOMContentLoaded',()=>{setupDashboardWallpaper();setu
   window.addEventListener('yarin-suite-refresh',e=>{window.reloadYarinFinanceSuite?.(!!e.detail?.forceRemote);});
 
   // Add personal coach context from the new suite to every AI request without exposing files.
-  const originalFetch=window.fetch.bind(window);window.fetch=async function(input,init){try{if(typeof input==='string'&&input==='/api/ai-assistant'&&init?.body){const body=JSON.parse(init.body);const h=healthData();body.coach_context={financial_health_score:h.score,net_worth:h.assets-h.liab,goal_count:readList('goals').length,bill_count:readList('bills').length,gold_saved_grams:Number(readList('gold_savings').reduce((s,x)=>s+Number(x.grams||0),0).toFixed(3)),upcoming_alerts:notifications().slice(0,5).map(x=>x.text)};init={...init,body:JSON.stringify(body)};}}catch(_){}return originalFetch(input,init);};
+  const originalFetch=window.fetch.bind(window);window.fetch=async function(input,init){try{if(typeof input==='string'&&input==='/api/ai-assistant'&&init?.body){const body=JSON.parse(init.body);const h=healthData();body.coach_context={financial_health_score:h.score,net_worth:h.assets-h.liab,goal_count:Number((state.dashboard||{}).savings_goal)>0?1:0,bill_count:readList('bills').length,gold_saved_grams:Number(readList('gold_savings').reduce((s,x)=>s+Number(x.grams||0),0).toFixed(3)),upcoming_alerts:notifications().slice(0,5).map(x=>x.text)};init={...init,body:JSON.stringify(body)};}}catch(_){}return originalFetch(input,init);};
 
   document.addEventListener('DOMContentLoaded',initSuite);
 })();
