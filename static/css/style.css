@@ -5559,3 +5559,181 @@ html[data-visual-theme="premium"] .auth-v91 .auth-v91-live-dot{background:#ffae4
   .auth-v91 .remember-row,.auth-v91 .forgot-password-link{font-size:.7rem!important;}
 }
 @media(prefers-reduced-motion:reduce){.auth-v91 .auth-bg-slide-v47{animation:none!important;transition:opacity .45s ease!important;}}
+
+/* ==========================================================
+   V92 — cinematic soft-focus authentication wallpaper
+   Keep the nature scene readable while the account UI stays crisp.
+   ========================================================== */
+.auth-v91 .auth-bg-slide-v47{
+  filter:blur(4.5px) saturate(1.18) contrast(1.055) brightness(.74)!important;
+  transform:scale(1.085)!important;
+  transform-origin:center center!important;
+  will-change:opacity,transform,filter;
+}
+.auth-v91 .auth-cinematic-bg:before{
+  background:
+    radial-gradient(circle at 16% 18%,rgba(61,223,209,.12),transparent 30%),
+    radial-gradient(circle at 78% 18%,rgba(75,123,235,.10),transparent 30%),
+    radial-gradient(circle at 48% 92%,rgba(18,36,61,.16),transparent 38%)!important;
+}
+.auth-v91 .auth-cinematic-bg:after{
+  background:
+    linear-gradient(90deg,rgba(2,9,16,.29) 0%,rgba(2,9,16,.35) 43%,rgba(3,8,15,.74) 62%,rgba(3,7,13,.92) 100%),
+    linear-gradient(180deg,rgba(2,8,14,.10),rgba(2,8,15,.39))!important;
+}
+.auth-v91 .auth-shell-v26{
+  box-shadow:0 34px 110px rgba(0,0,0,.50),0 0 0 1px rgba(255,255,255,.035)!important;
+}
+.auth-v91 .auth-hero-v26{
+  text-shadow:0 2px 18px rgba(0,0,0,.24);
+}
+html[data-visual-theme="premium"] .auth-v91 .auth-cinematic-bg:before{
+  background:
+    radial-gradient(circle at 18% 16%,rgba(255,156,54,.13),transparent 30%),
+    radial-gradient(circle at 82% 20%,rgba(255,102,31,.08),transparent 32%),
+    radial-gradient(circle at 50% 96%,rgba(74,30,8,.18),transparent 40%)!important;
+}
+html[data-visual-theme="premium"] .auth-v91 .auth-cinematic-bg:after{
+  background:
+    linear-gradient(90deg,rgba(10,5,2,.30) 0%,rgba(13,6,2,.35) 43%,rgba(10,5,3,.74) 62%,rgba(5,3,2,.93) 100%),
+    linear-gradient(180deg,rgba(7,3,2,.09),rgba(7,3,2,.43))!important;
+}
+@media(max-width:760px){
+  .auth-v91 .auth-bg-slide-v47{
+    filter:blur(3px) saturate(1.14) contrast(1.04) brightness(.70)!important;
+    transform:scale(1.075)!important;
+  }
+  .auth-v91 .auth-cinematic-bg:after{
+    background:
+      linear-gradient(180deg,rgba(2,8,14,.22) 0%,rgba(2,8,14,.40) 31%,rgba(3,8,15,.82) 58%,rgba(3,8,15,.96) 100%)!important;
+  }
+  html[data-visual-theme="premium"] .auth-v91 .auth-cinematic-bg:after{
+    background:
+      linear-gradient(180deg,rgba(8,4,2,.22) 0%,rgba(8,4,2,.41) 31%,rgba(7,3,2,.84) 58%,rgba(5,3,2,.97) 100%)!important;
+  }
+}
+@media(prefers-reduced-motion:reduce){
+  .auth-v91 .auth-bg-slide-v47{will-change:auto;}
+}
+
+/* ==========================================================
+   V93 — live image-particle layer for cinematic authentication
+   Wallpaper remains blurred; particles inherit the active scene colours.
+   ========================================================== */
+.auth-v91 .auth-particle-canvas{
+  position:absolute;
+  inset:0;
+  z-index:2;
+  width:100%;
+  height:100%;
+  display:block;
+  pointer-events:none;
+  opacity:.48;
+  mix-blend-mode:screen;
+  filter:blur(.15px) saturate(1.12);
+  -webkit-mask-image:linear-gradient(90deg,#000 0%,rgba(0,0,0,.96) 47%,rgba(0,0,0,.56) 72%,rgba(0,0,0,.18) 100%);
+  mask-image:linear-gradient(90deg,#000 0%,rgba(0,0,0,.96) 47%,rgba(0,0,0,.56) 72%,rgba(0,0,0,.18) 100%);
+}
+.auth-v91 .auth-cinematic-bg:after{z-index:3!important;}
+.auth-v91 .auth-shell-v26{z-index:4!important;}
+html[data-visual-theme="premium"] .auth-v91 .auth-particle-canvas{
+  opacity:.52;
+  filter:blur(.12px) saturate(1.18) sepia(.05);
+}
+@media(max-width:760px){
+  .auth-v91 .auth-particle-canvas{
+    opacity:.28;
+    filter:none;
+    -webkit-mask-image:linear-gradient(180deg,#000 0%,rgba(0,0,0,.78) 44%,rgba(0,0,0,.22) 82%,transparent 100%);
+    mask-image:linear-gradient(180deg,#000 0%,rgba(0,0,0,.78) 44%,rgba(0,0,0,.22) 82%,transparent 100%);
+  }
+}
+@media(prefers-reduced-motion:reduce){
+  .auth-v91 .auth-particle-canvas{display:none!important;}
+}
+
+
+/* ==========================================================================\n   V94 — Azret AI Orb redesign: no human avatar, theme-aware live assistant\n   ========================================================================== */
+:root{
+  --v94-ai-a:#2fd8ff;
+  --v94-ai-b:#4c8dff;
+  --v94-ai-c:#d8b36c;
+  --v94-ai-ready:#43dc7f;
+}
+html[data-visual-theme="premium"]{
+  --v94-ai-a:#ffbf57;
+  --v94-ai-b:#ff7a12;
+  --v94-ai-c:#ff9a2b;
+}
+.rizq-ai-dock.v94-ai-launcher{
+  border-color:color-mix(in srgb,var(--v94-ai-b) 28%,transparent)!important;
+  background:linear-gradient(135deg,rgba(10,18,37,.92),rgba(12,20,42,.72))!important;
+  box-shadow:0 18px 46px rgba(4,12,32,.22),inset 0 1px 0 rgba(255,255,255,.055)!important;
+}
+html[data-visual-theme="premium"] .rizq-ai-dock.v94-ai-launcher{
+  background:linear-gradient(135deg,rgba(23,15,9,.96),rgba(13,10,8,.86))!important;
+  box-shadow:0 20px 50px rgba(0,0,0,.34),0 0 32px rgba(255,120,18,.06)!important;
+}
+.rizq-ai-dock .rizq-ai-avatar-wrap.v94-ai-orb{
+  overflow:visible!important;border:0!important;background:transparent!important;box-shadow:none!important;
+  display:grid;place-items:center;isolation:isolate;animation:v94OrbFloat 4.8s ease-in-out infinite!important;
+}
+.rizq-ai-dock .rizq-ai-halo{opacity:.48!important;filter:blur(2px)!important;background:conic-gradient(from 10deg,transparent,var(--v94-ai-a),transparent 32%,var(--v94-ai-c),transparent 70%,var(--v94-ai-b),transparent)!important;}
+.v94-ai-orb-core{
+  position:absolute;inset:12%;border-radius:50%;display:grid;place-items:center;z-index:4;
+  color:#fff;background:
+    radial-gradient(circle at 32% 24%,rgba(255,255,255,.28),transparent 16%),
+    radial-gradient(circle at 50% 60%,color-mix(in srgb,var(--v94-ai-a) 20%,transparent),transparent 52%),
+    linear-gradient(145deg,#111927 10%,#07101f 52%,#0b1220);
+  border:1px solid color-mix(in srgb,var(--v94-ai-a) 42%,transparent);
+  box-shadow:inset 0 0 22px rgba(255,255,255,.05),0 0 22px color-mix(in srgb,var(--v94-ai-b) 28%,transparent),0 10px 30px rgba(0,0,0,.35);
+}
+html[data-visual-theme="premium"] .v94-ai-orb-core{background:radial-gradient(circle at 32% 24%,rgba(255,255,255,.23),transparent 16%),radial-gradient(circle at 50% 60%,rgba(255,138,22,.18),transparent 52%),linear-gradient(145deg,#1c130d,#0d0a08 58%,#15100c);}
+.v94-ai-orb-mark{width:54%;height:54%;filter:drop-shadow(0 0 9px var(--v94-ai-a));color:var(--v94-ai-c);animation:v94MarkPulse 2.6s ease-in-out infinite;}
+.v94-ai-orb-ring{position:absolute;border-radius:50%;pointer-events:none;z-index:2;border:1px solid color-mix(in srgb,var(--v94-ai-a) 48%,transparent);}
+.v94-ai-orb-ring.ring-a{inset:3%;animation:v94Orbit 7s linear infinite;box-shadow:0 0 14px color-mix(in srgb,var(--v94-ai-a) 16%,transparent)}
+.v94-ai-orb-ring.ring-b{inset:-5%;border-style:dashed;border-color:color-mix(in srgb,var(--v94-ai-c) 36%,transparent);animation:v94Orbit 11s linear infinite reverse;}
+.v94-ai-orb-status,.v94-hero-status{position:absolute;right:5%;bottom:5%;width:15px;height:15px;border-radius:50%;z-index:9;background:var(--v94-ai-ready);border:2px solid #0b1220;box-shadow:0 0 0 4px rgba(67,220,127,.12),0 0 14px rgba(67,220,127,.52);}
+.rizq-ai-dock .rizq-ai-copy{gap:4px!important;}
+.rizq-ai-dock .rizq-ai-hello{width:auto!important;max-width:none!important;overflow:visible!important;border:0!important;animation:none!important;font-family:var(--font-ui)!important;font-size:20px!important;letter-spacing:-.015em;color:var(--text)!important;white-space:normal!important;}
+.rizq-ai-dock .rizq-ai-hello b{color:var(--v94-ai-c);font-weight:850;}
+.rizq-ai-dock .rizq-ai-sub{max-width:126px!important;font-weight:600!important;line-height:1.35!important;}
+.v94-ai-ready{display:flex;align-items:center;gap:6px;margin-top:2px;font-size:9.5px;font-weight:800;color:var(--v94-ai-ready);letter-spacing:.01em;}
+.v94-ai-ready i{width:7px;height:7px;border-radius:50%;background:currentColor;box-shadow:0 0 0 3px rgba(67,220,127,.1);}
+
+/* Large orb in the assistant window */
+.v34-avatar-button.v94-hero-orb{width:230px!important;height:230px!important;border-radius:50%!important;display:grid;place-items:center!important;}
+.v34-avatar-button.v94-hero-orb:hover{transform:translateY(-4px) scale(1.025)!important;}
+.v94-hero-orb .v34-avatar-halo{inset:-4%!important;border-radius:50%!important;background:conic-gradient(from 0deg,transparent 0 12%,var(--v94-ai-a) 20%,transparent 31% 48%,var(--v94-ai-c) 58%,transparent 70% 83%,var(--v94-ai-b) 91%,transparent)!important;filter:blur(3px)!important;opacity:.74!important;animation:v94Orbit 8.5s linear infinite!important;}
+.v94-hero-orb .v34-avatar-halo:after{display:none!important;}
+.v94-hero-orb-core{position:absolute;inset:14%;border-radius:50%;display:grid;place-items:center;color:var(--v94-ai-c);z-index:4;background:radial-gradient(circle at 32% 24%,rgba(255,255,255,.25),transparent 17%),radial-gradient(circle at 50% 58%,color-mix(in srgb,var(--v94-ai-a) 18%,transparent),transparent 48%),linear-gradient(145deg,#111a2b,#07101f 60%,#0c1423);border:1px solid color-mix(in srgb,var(--v94-ai-a) 40%,transparent);box-shadow:inset 0 0 35px rgba(255,255,255,.04),0 0 36px color-mix(in srgb,var(--v94-ai-b) 24%,transparent),0 24px 50px rgba(0,0,0,.35);}
+html[data-visual-theme="premium"] .v94-hero-orb-core{background:radial-gradient(circle at 32% 24%,rgba(255,255,255,.22),transparent 17%),radial-gradient(circle at 50% 58%,rgba(255,138,22,.18),transparent 48%),linear-gradient(145deg,#21150e,#0c0907 60%,#16100c);}
+.v94-hero-orb-mark{width:48%;height:48%;filter:drop-shadow(0 0 16px var(--v94-ai-a));animation:v94MarkPulse 2.5s ease-in-out infinite;}
+.v94-hero-orbit{position:absolute;border-radius:50%;z-index:2;pointer-events:none;}
+.v94-hero-orbit.orbit-a{inset:7%;border:1px solid color-mix(in srgb,var(--v94-ai-a) 36%,transparent);animation:v94Orbit 10s linear infinite;}
+.v94-hero-orbit.orbit-b{inset:-2%;border:1px dashed color-mix(in srgb,var(--v94-ai-c) 35%,transparent);animation:v94Orbit 14s linear infinite reverse;}
+.v94-hero-orb-spark{position:absolute;width:5px;height:5px;border-radius:50%;background:var(--v94-ai-c);box-shadow:0 0 10px currentColor;animation:v94Spark 2.9s ease-in-out infinite;}
+.v94-hero-orb-spark.s1{left:20%;top:26%}.v94-hero-orb-spark.s2{right:18%;top:40%;animation-delay:.7s}.v94-hero-orb-spark.s3{left:42%;bottom:16%;animation-delay:1.35s}
+.v94-hero-orb .v34-avatar-glow{left:50%!important;bottom:5%!important;width:62%!important;background:radial-gradient(ellipse,color-mix(in srgb,var(--v94-ai-a) 34%,transparent),transparent 70%)!important;}
+.v94-hero-orb .v94-hero-status{right:15%;bottom:17%;width:18px;height:18px;}
+.v34-avatar-copy h3 strong{color:var(--v94-ai-c);font-weight:850;}
+html[data-visual-theme="premium"] .v34-avatar-copy .v34-help-line{color:#ffbb63!important;}
+
+@keyframes v94OrbFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+@keyframes v94Orbit{to{transform:rotate(360deg)}}
+@keyframes v94MarkPulse{0%,100%{transform:scale(1);filter:drop-shadow(0 0 9px var(--v94-ai-a))}50%{transform:scale(1.08);filter:drop-shadow(0 0 18px var(--v94-ai-a))}}
+@keyframes v94Spark{0%,100%{opacity:.18;transform:scale(.7)}45%{opacity:1;transform:scale(1.3)}65%{opacity:.45}}
+
+@media(max-width:760px){
+  .v34-avatar-button.v94-hero-orb{width:158px!important;height:158px!important;}
+  .v34-ai-avatar-pane{padding-top:18px!important;}
+  .v34-avatar-copy h3{font-size:19px!important;}
+}
+@media(max-width:620px){
+  #page-dashboard>.rizq-ai-dock.v94-ai-launcher{padding-left:86px!important;min-height:86px!important;}
+  #page-dashboard>.rizq-ai-dock .rizq-ai-hello{font-size:18px!important;}
+  #page-dashboard>.rizq-ai-dock .rizq-ai-sub{font-size:10.5px!important;max-width:none!important;}
+  #page-dashboard>.rizq-ai-dock .v94-ai-ready{font-size:9px;}
+  #page-dashboard>.rizq-ai-dock .rizq-ai-avatar-wrap{width:64px!important;height:64px!important;}
+}
+@media(prefers-reduced-motion:reduce){.v94-ai-orb,.v94-ai-orb-ring,.v94-ai-orb-mark,.v94-hero-orb .v34-avatar-halo,.v94-hero-orbit,.v94-hero-orb-mark,.v94-hero-orb-spark{animation:none!important}}

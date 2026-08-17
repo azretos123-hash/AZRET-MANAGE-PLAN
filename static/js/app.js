@@ -252,6 +252,10 @@ function updateGreetingClock() {
   if (mobileGreetingEl) mobileGreetingEl.textContent = greeting;
   const mobileNameEl = document.getElementById('mobileGreetingName');
   if (mobileNameEl) mobileNameEl.textContent = state.username || 'User';
+  const azretGreetingName = document.getElementById('azretGreetingName');
+  if (azretGreetingName) azretGreetingName.textContent = state.username || 'User';
+  const azretModalGreetingName = document.getElementById('azretModalGreetingName');
+  if (azretModalGreetingName) azretModalGreetingName.textContent = state.username || 'User';
 
   const timeText = now.toLocaleTimeString(undefined, {
     hour: '2-digit', minute: '2-digit', second: '2-digit'
@@ -1021,7 +1025,7 @@ function setupVoiceAssistant() {
   // Gemini Live Call Setup
   setupGeminiLiveCall();
 
-  // The girl herself is the natural voice trigger. Opening the window never starts the microphone.
+  // The Azret AI orb is the natural voice trigger. Opening the window never starts the microphone.
   const liveAvatar = document.getElementById('liveOrb');
   const heroAvatar = document.getElementById('aiHeroAvatar');
   const triggerVoice = () => {

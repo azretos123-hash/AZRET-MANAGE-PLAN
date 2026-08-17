@@ -9,7 +9,7 @@
   <meta name="theme-color" content="#06101f">
   <link rel="icon" id="faviconLink" href="{{ url_for('static', filename='icons/icon-192.png') }}">
   <script>try{document.documentElement.dataset.visualTheme=localStorage.getItem('yarin_visual_theme')||'classic';}catch(_){document.documentElement.dataset.visualTheme='classic';}</script>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=91">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=93">
   <link rel="preload" as="image" href="/static/images/nature/misty-mountains.svg">
 </head>
 <body class="auth-body auth-v26 auth-v91">
@@ -34,6 +34,7 @@
       <div class="auth-bg-slide-v47" data-place="Bamboo Mist" style="background-image:url('/static/images/nature/bamboo-mist.svg')"></div>
       <div class="auth-bg-slide-v47" data-place="Island Sunset" style="background-image:url('/static/images/nature/island-sunset.svg')"></div>
     </div>
+    <canvas id="authParticleCanvas" class="auth-particle-canvas" aria-hidden="true"></canvas>
     <div class="auth-aurora auth-aurora-blue"></div>
     <div class="auth-aurora auth-aurora-gold"></div>
     <div class="auth-stars"></div>
@@ -378,6 +379,11 @@ document.getElementById('registerForm').addEventListener('submit',e=>{
       slide.classList.toggle('active',active);
       slide.setAttribute('aria-hidden',active?'false':'true');
     });
+    const raw=slides[index]?.style?.backgroundImage||'';
+    const match=raw.match(/url\(["']?(.*?)["']?\)/i);
+    if(match?.[1]){
+      window.dispatchEvent(new CustomEvent('yarin:auth-wallpaper',{detail:{url:match[1],index}}));
+    }
   };
   const advance=()=>{
     state.last=state.order[state.pos];
@@ -408,5 +414,6 @@ document.getElementById('registerForm').addEventListener('submit',e=>{
 
 if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('/service-worker.js',{updateViaCache:'none'}).catch(()=>{}));}
 </script>
+<script src="/static/js/auth-particles.js?v=93"></script>
 </body>
 </html>

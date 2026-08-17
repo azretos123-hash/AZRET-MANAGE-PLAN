@@ -7,12 +7,13 @@
    from being replayed after logout on the same device.
 */
 
-const CACHE_NAME = 'yarin-cache-v91';
+const CACHE_NAME = 'yarin-cache-v94';
 const STATIC_ASSETS = [
   '/manifest.json',
   '/static/css/style.css',
   '/static/js/app.js',
   '/static/js/charts.js',
+  '/static/js/auth-particles.js',
   '/static/icons/icon-192.png',
   '/static/icons/icon-512.png',
   '/static/icons/yarin-emblem.webp',
