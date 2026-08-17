@@ -8,14 +8,26 @@ const AzretCharts = (function () {
 
   function getColors() {
     const dark = document.body.getAttribute('data-theme') === 'dark';
+    const premium = document.documentElement.getAttribute('data-visual-theme') === 'premium' || document.body.getAttribute('data-visual-theme') === 'premium';
+    if (premium) {
+      return {
+        grid: dark ? 'rgba(255,166,92,0.13)' : 'rgba(126,65,22,0.11)',
+        text: dark ? '#B9A896' : '#765F4C',
+        blue: '#FF8A1F',
+        blueDark: '#B94E08',
+        success: '#27C978',
+        danger: '#FF625F',
+        palette: ['#FF8A1F', '#FFB14A', '#27C978', '#F7D154', '#FF625F', '#A98970', '#7A3510', '#73D8A6'],
+      };
+    }
     return {
-      grid: dark ? 'rgba(232,169,127,0.15)' : 'rgba(138,122,108,0.12)',
-      text: dark ? '#C9A98F' : '#8A7A6C',
-      blue: '#FF8A3D',
-      blueDark: '#B84D02',
-      success: '#16B356',
+      grid: dark ? 'rgba(146,163,196,0.15)' : 'rgba(90,107,135,0.12)',
+      text: dark ? '#92A3C4' : '#5A6B87',
+      blue: '#4C8DFF',
+      blueDark: '#1E4DB7',
+      success: '#1FAA59',
       danger: '#E5484D',
-      palette: ['#FF8A3D', '#B84D02', '#16B356', '#F5A524', '#E5484D', '#A89684', '#2B1204', '#3FE28A'],
+      palette: ['#4C8DFF', '#1E4DB7', '#1FAA59', '#F5A524', '#E5484D', '#7C8AA5', '#0F2A5E', '#6EDB9A'],
     };
   }
 
@@ -274,7 +286,7 @@ const AzretCharts = (function () {
       return;
     }
 
-    const strokeColor = document.body.getAttribute('data-theme') === 'dark' ? '#1A0D04' : '#FFFFFF';
+    const strokeColor = document.body.getAttribute('data-theme') === 'dark' ? '#0E1D3B' : '#FFFFFF';
 
     let start = -Math.PI / 2;
     values.forEach((val, i) => {

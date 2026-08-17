@@ -6,12 +6,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>YARIN يارين — Sign In</title>
   <link rel="manifest" href="/manifest.json">
-  <meta name="theme-color" content="#0F0703">
+  <meta name="theme-color" content="#06101f">
   <link rel="icon" id="faviconLink" href="{{ url_for('static', filename='icons/icon-192.png') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=88">
+  <script>try{document.documentElement.dataset.visualTheme=localStorage.getItem('yarin_visual_theme')||'classic';}catch(_){document.documentElement.dataset.visualTheme='classic';}</script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=91">
   <link rel="preload" as="image" href="/static/images/nature/misty-mountains.svg">
 </head>
-<body class="auth-body auth-v26">
+<body class="auth-body auth-v26 auth-v91">
   <div class="auth-cinematic-bg" aria-hidden="true">
     <div class="auth-bg-slides-v47" id="authWallpaperRotator" data-interval="60000">
       <div class="auth-bg-slide-v47" data-place="Misty Mountains" style="background-image:url('/static/images/nature/misty-mountains.svg')"></div>
@@ -43,25 +44,34 @@
 
   <main class="auth-shell-v26">
     <section class="auth-hero-v26" aria-label="YARIN brand introduction">
-      <div class="yarin-emblem-shell" aria-hidden="true"><img src="{{ url_for('static', filename='icons/yarin-emblem.webp') }}" alt=""></div>
-      <div class="rizq-title-lockup yarin-title-v45" aria-label="YARIN يارين">
-        <h1 class="rizq-word-en">YARIN</h1>
-        <div class="yarin-name-separator" aria-hidden="true"></div>
-        <div class="rizq-word-ar" lang="ar" dir="rtl">يارين</div>
+      <div class="auth-v91-brand">
+        <div class="yarin-emblem-shell" aria-hidden="true"><img src="{{ url_for('static', filename='icons/yarin-emblem.webp') }}" alt=""></div>
+        <div class="auth-v91-brand-copy">
+          <strong>YARIN <span lang="ar" dir="rtl">يارين</span></strong>
+          <small>Your Money. Your Future.</small>
+        </div>
       </div>
 
-      <p class="hero-money-line">Your Money. Your Future.</p>
-      <p class="hero-smart-line">Tomorrow Starts Today.</p>
-      <div class="hero-mini-divider" aria-hidden="true"><span></span><b>✦</b><span></span></div>
-      <p class="hero-public-copy">Plan with clarity. Manage with confidence.<br class="desktop-only"> Build the future you want.</p>
+      <div class="auth-v91-welcome">
+        <span class="auth-v91-eyebrow">PERSONAL FINANCE · SIMPLIFIED</span>
+        <h1>Welcome to<br>your financial home.</h1>
+        <p>Plan clearly, save consistently and understand your money from one secure place.</p>
+        <div class="auth-v91-trust">
+          <span>✓ Private by account</span><span>✓ Secure sign-in</span><span>✓ Works on every device</span>
+        </div>
+      </div>
+
+      <div class="auth-v91-scene-meta" aria-hidden="true">
+        <span class="auth-v91-live-dot"></span> Nature view changes automatically every minute
+      </div>
     </section>
 
     <section class="auth-card-v26" aria-label="Account access">
       <div class="auth-card-scan" aria-hidden="true"></div>
       <header class="auth-card-header">
-        <div class="auth-section-kicker"><span></span><strong>SIGN IN</strong><span></span></div>
-        <h2>Welcome Back!</h2>
-        <div class="auth-title-ornament" aria-hidden="true"><span></span><b>◇</b><span></span></div>
+        <div class="auth-section-kicker"><strong>WELCOME BACK</strong></div>
+        <h2>Sign In</h2>
+        <p class="auth-v91-card-intro">Continue to your YARIN financial workspace.</p>
       </header>
 
       <section id="loginPanel" class="auth-panel-v26">
@@ -185,8 +195,9 @@ function setAuthPanel(which){
   const login=which==='login';
   loginPanel.hidden=!login;
   registerPanel.hidden=login;
-  document.querySelector('.auth-section-kicker strong').textContent=login?'SIGN IN':'CREATE ACCOUNT';
-  document.querySelector('.auth-card-header h2').textContent=login?'Welcome Back!':'Join YARIN';
+  document.querySelector('.auth-section-kicker strong').textContent=login?'WELCOME BACK':'NEW ACCOUNT';
+  document.querySelector('.auth-card-header h2').textContent=login?'Sign In':'Create Account';
+  const intro=document.querySelector('.auth-v91-card-intro'); if(intro) intro.textContent=login?'Continue to your YARIN financial workspace.':'Create your secure YARIN account in a few steps.';
 }
 showRegisterBtn.addEventListener('click',()=>setAuthPanel('register'));
 backToLoginBtn.addEventListener('click',()=>setAuthPanel('login'));
