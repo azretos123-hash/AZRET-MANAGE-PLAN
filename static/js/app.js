@@ -257,6 +257,13 @@ function updateGreetingClock() {
   const azretModalGreetingName = document.getElementById('azretModalGreetingName');
   if (azretModalGreetingName) azretModalGreetingName.textContent = state.username || 'User';
 
+  // V101 topbar identity frame. Keep it synced with Profile changes and greeting.
+  const topbarUserName = document.getElementById('topbarUserName');
+  const topbarUserInitial = document.getElementById('topbarUserInitial');
+  const topbarName = String(state.username || 'User').trim() || 'User';
+  if (topbarUserName) topbarUserName.textContent = topbarName;
+  if (topbarUserInitial) topbarUserInitial.textContent = (topbarName.match(/[\p{L}\p{N}]/u)?.[0] || 'U').toUpperCase();
+
   const timeText = now.toLocaleTimeString(undefined, {
     hour: '2-digit', minute: '2-digit', second: '2-digit'
   });
@@ -272,6 +279,15 @@ function updateGreetingClock() {
   if (dateEl) dateEl.textContent = dateText;
   const mobileDateEl = document.getElementById('mobileClockDate');
   if (mobileDateEl) mobileDateEl.textContent = dateText;
+
+  const salaryTimeEl = document.getElementById('salaryLiveTime');
+  if (salaryTimeEl) salaryTimeEl.textContent = now.toLocaleTimeString(undefined, {
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true
+  });
+  const salaryDateEl = document.getElementById('salaryLiveDate');
+  if (salaryDateEl) salaryDateEl.textContent = now.toLocaleDateString(undefined, {
+    weekday: 'short', day: '2-digit', month: 'short', year: 'numeric'
+  });
 }
 
 /** Fetches the current username and syncs it everywhere it's displayed:
@@ -347,7 +363,8 @@ function setupSidebar() {
   const logoutBtn = document.getElementById('logoutBtn');
   if (logoutBtn) logoutBtn.addEventListener('click', performLogout);
 
-  document.getElementById('themeToggle').addEventListener('click', () => {
+  const themeToggle = document.getElementById('themeToggle');
+  if (themeToggle) themeToggle.addEventListener('click', () => {
     setTheme(state.theme === 'light' ? 'dark' : 'light');
   });
 }
@@ -387,27 +404,42 @@ function setupTopbar() {
   const resultsBox = document.getElementById('globalSearchResults');
   const mobileSearchToggle = document.getElementById('mobileSearchToggle');
   const mobileSearchClose = document.getElementById('mobileSearchClose');
+  const searchBackdrop = document.getElementById('globalSearchBackdrop');
   const isMobileSearch = () => window.matchMedia('(max-width: 767px)').matches;
+  const openSearchFocus = () => {
+    document.body.classList.add('global-search-open');
+    searchBackdrop?.setAttribute('aria-hidden', 'false');
+  };
+  const closeSearchFocus = ({ clear = false } = {}) => {
+    document.body.classList.remove('global-search-open', 'mobile-search-open');
+    searchBackdrop?.setAttribute('aria-hidden', 'true');
+    resultsBox?.classList.remove('show');
+    if (clear && searchInput) searchInput.value = '';
+    searchInput?.blur();
+  };
   const openMobileSearch = () => {
     if (!isMobileSearch()) return;
     document.body.classList.add('mobile-search-open');
+    openSearchFocus();
     mobileSearchToggle?.setAttribute('aria-label', 'Search');
     window.setTimeout(() => searchInput?.focus({ preventScroll: true }), 40);
   };
-  const closeMobileSearch = () => {
-    document.body.classList.remove('mobile-search-open');
-    resultsBox?.classList.remove('show');
-    searchInput?.blur();
-  };
+  const closeMobileSearch = () => closeSearchFocus();
   mobileSearchToggle?.addEventListener('click', (event) => {
     event.preventDefault();
     if (!isMobileSearch()) { searchInput?.focus(); return; }
     openMobileSearch();
   });
-  mobileSearchClose?.addEventListener('click', (event) => { event.preventDefault(); closeMobileSearch(); });
-  searchInput?.addEventListener('focus', () => { if (isMobileSearch()) document.body.classList.add('mobile-search-open'); });
-  searchInput?.addEventListener('keydown', (event) => { if (event.key === 'Escape' && isMobileSearch()) closeMobileSearch(); });
-  window.addEventListener('resize', () => { if (!isMobileSearch()) document.body.classList.remove('mobile-search-open'); }, { passive: true });
+  mobileSearchClose?.addEventListener('click', (event) => { event.preventDefault(); closeSearchFocus(); });
+  searchInput?.addEventListener('focus', () => {
+    openSearchFocus();
+    if (isMobileSearch()) document.body.classList.add('mobile-search-open');
+  });
+  searchInput?.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeSearchFocus(); });
+  searchBackdrop?.addEventListener('click', () => closeSearchFocus());
+  window.addEventListener('resize', () => {
+    if (!isMobileSearch()) document.body.classList.remove('mobile-search-open');
+  }, { passive: true });
   let searchTimer;
   searchInput.addEventListener('input', () => {
     clearTimeout(searchTimer);
@@ -416,13 +448,14 @@ function setupTopbar() {
     searchTimer = setTimeout(() => runGlobalSearch(q), 300);
   });
   document.addEventListener('click', (e) => {
-    if (!e.target.closest('.topbar-search')) {
-      resultsBox.classList.remove('show');
-      if (isMobileSearch() && document.body.classList.contains('mobile-search-open')) closeMobileSearch();
+    if (!e.target.closest('.topbar-search') && !e.target.closest('#globalSearchBackdrop')) {
+      resultsBox?.classList.remove('show');
+      if (document.body.classList.contains('global-search-open')) closeSearchFocus();
     }
   });
 
-  document.getElementById('refreshRate').addEventListener('click', () => refreshExchangeRate(false));
+  const refreshRateBtn = document.getElementById('refreshRate');
+  if (refreshRateBtn) refreshRateBtn.addEventListener('click', () => refreshExchangeRate(false));
 }
 
 async function runGlobalSearch(q) {
@@ -646,8 +679,12 @@ function setTheme(theme) {
 
 function applyTheme(theme, rerender) {
   document.body.setAttribute('data-theme', theme);
-  document.getElementById('themeIconSun').style.display = theme === 'dark' ? 'none' : 'block';
-  document.getElementById('themeIconMoon').style.display = theme === 'dark' ? 'block' : 'none';
+  // V98: the old header theme icon was intentionally removed in V96.
+  // Keep these references optional so Settings Light/Dark switching remains live.
+  const themeIconSun = document.getElementById('themeIconSun');
+  const themeIconMoon = document.getElementById('themeIconMoon');
+  if (themeIconSun) themeIconSun.style.display = theme === 'dark' ? 'none' : 'block';
+  if (themeIconMoon) themeIconMoon.style.display = theme === 'dark' ? 'block' : 'none';
   document.querySelectorAll('#settingsThemeSwitch button').forEach(b => {
     b.classList.toggle('active', b.dataset.theme === theme);
   });
@@ -3711,6 +3748,30 @@ function currencyPairRate(base = state.primaryCurrency, quote = state.secondaryC
   const b = rateFromAED(base), q = rateFromAED(quote);
   return Number.isFinite(b) && b > 0 && Number.isFinite(q) && q > 0 ? q / b : NaN;
 }
+
+function syncDashboardMarketPeek(rateOverride) {
+  const pairEl = document.getElementById('dashboardFxPair');
+  const rateEl = document.getElementById('dashboardFxRate');
+  const captionEl = document.getElementById('dashboardFxCaption');
+  const base = state.primaryCurrency || 'AED';
+  const quote = state.secondaryCurrency || 'INR';
+  const rate = Number.isFinite(Number(rateOverride)) ? Number(rateOverride) : currencyPairRate(base, quote);
+  if (pairEl) pairEl.textContent = `${base} → ${quote}`;
+  if (rateEl) {
+    const next = Number.isFinite(rate)
+      ? `1 ${base} = ${currencySymbol(quote)} ${rate.toLocaleString(undefined,{maximumFractionDigits:5})}`
+      : `1 ${base} = ${currencySymbol(quote)} —`;
+    if (rateEl.textContent !== next) {
+      rateEl.textContent = next;
+      rateEl.classList.remove('v99-rate-pop');
+      void rateEl.offsetWidth;
+      rateEl.classList.add('v99-rate-pop');
+    }
+  }
+  if (captionEl) captionEl.textContent = Number.isFinite(rate)
+    ? 'Reference rate • auto-updating'
+    : 'Reference rate temporarily unavailable';
+}
 function otherCurrency(code = state.currency) {
   return code === state.primaryCurrency ? state.secondaryCurrency : state.primaryCurrency;
 }
@@ -3722,12 +3783,26 @@ function syncCurrencyPairUI() {
   if (switchEl) {
     const buttons = [...switchEl.querySelectorAll('.cur-opt')];
     buttons.slice(0,2).forEach((btn, i) => {
-      btn.dataset.currency = pair[i]; btn.textContent = pair[i];
-      btn.classList.toggle('active', state.currency === pair[i]);
+      const code = pair[i];
+      const flag = countryFlagEmoji(CURRENCY_FLAG_COUNTRY[code]);
+      btn.dataset.currency = code;
+      btn.replaceChildren();
+      if (flag) {
+        const flagSpan = document.createElement('span');
+        flagSpan.className = 'v101-cur-flag';
+        flagSpan.setAttribute('aria-hidden', 'true');
+        flagSpan.textContent = flag;
+        btn.appendChild(flagSpan);
+      }
+      const codeSpan = document.createElement('span');
+      codeSpan.textContent = code;
+      btn.appendChild(codeSpan);
+      btn.classList.toggle('active', state.currency === code);
     });
   }
   const pairLabel = document.getElementById('exchangePairLabel');
   if (pairLabel) pairLabel.textContent = `${state.primaryCurrency} → ${state.secondaryCurrency}`;
+  syncDashboardMarketPeek();
   const title = document.getElementById('fxTitle');
   if (title) title.textContent = `${state.primaryCurrency} / ${state.secondaryCurrency} Exchange Trend`;
   const curLabel = document.getElementById('fxCurrentLabel');
@@ -3886,6 +3961,7 @@ async function refreshExchangeRate(silent=false) {
     await refreshCurrencyRates();
     state.fxLastRefreshAt=Date.now();
     const rate=currencyPairRate();
+    syncDashboardMarketPeek(rate);
     const rateEl=document.getElementById('rateValue');
     if(rateEl) rateEl.textContent=Number.isFinite(rate)?`1 ${state.primaryCurrency} = ${currencySymbol(state.secondaryCurrency)} ${rate.toLocaleString(undefined,{maximumFractionDigits:4})}`:'Exchange rate unavailable';
     if(!silent) toast('Exchange reference rate updated','success');
@@ -3965,7 +4041,7 @@ function drawFxChart(points) {
 }
 async function refreshFxChart(range='1M') {
   state.fxRange=range;document.querySelectorAll('#fxRange button').forEach(b=>b.classList.toggle('active',b.dataset.range===range));const status=document.getElementById('fxStatus');if(status)status.textContent='Updating reference market data…';
-  try{const r=await fetch(`/api/fx/series?base=${state.primaryCurrency}&quote=${state.secondaryCurrency}&range=${range}`,{cache:'no-store'});const d=await r.json();if(!r.ok)throw new Error(d.error||'Exchange history unavailable');const pts=Array.isArray(d.points)?d.points:[];if(!pts.length)throw new Error('No exchange history available');drawFxChart(pts);const pair=currencyPairRate();const current=document.getElementById('fxCurrentRate');if(current)current.textContent=Number.isFinite(pair)?`${currencySymbol(state.secondaryCurrency)} ${pair.toLocaleString(undefined,{maximumFractionDigits:5})}`:'—';let change=0;if(pts.length>1){const first=Number(pts[0].rate),last=Number(pts[pts.length-1].rate);if(first)change=(last-first)/first*100;}const ch=document.getElementById('fxChange');if(ch){ch.textContent=`${change>=0?'+':''}${change.toFixed(2)}%`;ch.className=`fx-change ${change>0?'up':change<0?'down':''}`;}if(status)status.textContent='Latest central-bank reference trend';const upd=document.getElementById('fxUpdated');if(upd){const refDate=pts.length?pts[pts.length-1].date:'';const refreshed=new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});upd.textContent=refDate?`Reference: ${refDate} • refreshed ${refreshed}`:`Refreshed ${refreshed}`;}}catch(e){drawFxChart([]);if(status)status.textContent='Reference history temporarily unavailable';const upd=document.getElementById('fxUpdated');if(upd)upd.textContent='Last update unavailable';}
+  try{const r=await fetch(`/api/fx/series?base=${state.primaryCurrency}&quote=${state.secondaryCurrency}&range=${range}`,{cache:'no-store'});const d=await r.json();if(!r.ok)throw new Error(d.error||'Exchange history unavailable');const pts=Array.isArray(d.points)?d.points:[];if(!pts.length)throw new Error('No exchange history available');drawFxChart(pts);const pair=currencyPairRate();syncDashboardMarketPeek(pair);const current=document.getElementById('fxCurrentRate');if(current)current.textContent=Number.isFinite(pair)?`${currencySymbol(state.secondaryCurrency)} ${pair.toLocaleString(undefined,{maximumFractionDigits:5})}`:'—';let change=0;if(pts.length>1){const first=Number(pts[0].rate),last=Number(pts[pts.length-1].rate);if(first)change=(last-first)/first*100;}const ch=document.getElementById('fxChange');if(ch){ch.textContent=`${change>=0?'+':''}${change.toFixed(2)}%`;ch.className=`fx-change ${change>0?'up':change<0?'down':''}`;}if(status)status.textContent='Latest central-bank reference trend';const upd=document.getElementById('fxUpdated');if(upd){const refDate=pts.length?pts[pts.length-1].date:'';const refreshed=new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});upd.textContent=refDate?`Reference: ${refDate} • refreshed ${refreshed}`:`Refreshed ${refreshed}`;}}catch(e){drawFxChart([]);if(status)status.textContent='Reference history temporarily unavailable';const upd=document.getElementById('fxUpdated');if(upd)upd.textContent='Last update unavailable';}
 }
 
 function setupFxAutoRefresh(){
@@ -4393,7 +4469,7 @@ document.addEventListener('DOMContentLoaded',()=>{setupDashboardWallpaper();setu
   function refreshNotifications(){
     const count=$('financeNotifCount'),list=$('financeNotifList');if(!count||!list)return;
     const a=notifications(),readSet=notificationReadSet(),unread=a.filter(x=>!readSet.has(notificationKey(x))).length,visible=a.slice(0,100);
-    count.textContent=unread>99?'99+':String(unread);count.hidden=unread===0;
+    count.textContent=String(unread);count.hidden=unread===0;
     $('financeNotifBtn')?.classList.toggle('has-unread',unread>0);
     if(!a.length){
       list.innerHTML='<div class="v54-notif-empty"><span>✓</span><strong>You are all caught up.</strong><small>No financial reminders need your attention right now.</small></div>';
