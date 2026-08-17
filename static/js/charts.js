@@ -9,13 +9,13 @@ const AzretCharts = (function () {
   function getColors() {
     const dark = document.body.getAttribute('data-theme') === 'dark';
     return {
-      grid: dark ? 'rgba(146,163,196,0.15)' : 'rgba(90,107,135,0.12)',
-      text: dark ? '#92A3C4' : '#5A6B87',
-      blue: '#4C8DFF',
-      blueDark: '#1E4DB7',
-      success: '#1FAA59',
+      grid: dark ? 'rgba(232,169,127,0.15)' : 'rgba(138,122,108,0.12)',
+      text: dark ? '#C9A98F' : '#8A7A6C',
+      blue: '#FF8A3D',
+      blueDark: '#B84D02',
+      success: '#16B356',
       danger: '#E5484D',
-      palette: ['#4C8DFF', '#1E4DB7', '#1FAA59', '#F5A524', '#E5484D', '#7C8AA5', '#0F2A5E', '#6EDB9A'],
+      palette: ['#FF8A3D', '#B84D02', '#16B356', '#F5A524', '#E5484D', '#A89684', '#2B1204', '#3FE28A'],
     };
   }
 
@@ -274,7 +274,7 @@ const AzretCharts = (function () {
       return;
     }
 
-    const strokeColor = document.body.getAttribute('data-theme') === 'dark' ? '#0E1D3B' : '#FFFFFF';
+    const strokeColor = document.body.getAttribute('data-theme') === 'dark' ? '#1A0D04' : '#FFFFFF';
 
     let start = -Math.PI / 2;
     values.forEach((val, i) => {

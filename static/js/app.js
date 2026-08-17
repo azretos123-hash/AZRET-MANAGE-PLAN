@@ -63,7 +63,7 @@ function localDateISO(date = new Date()) {
   return `${y}-${m}-${d}`;
 }
 
-const SALARY_PALETTE = ['#4C8DFF', '#1E4DB7', '#1FAA59', '#F5A524', '#E5484D', '#7C8AA5', '#0F2A5E', '#6EDB9A'];
+const SALARY_PALETTE = ['#FF8A3D', '#B84D02', '#16B356', '#F5A524', '#E5484D', '#A89684', '#2B1204', '#3FE28A'];
 
 const CURRENCY_SYMBOL = { AED:'AED', INR:'₹', USD:'$', EUR:'€', GBP:'£', JPY:'¥', CNY:'¥', KRW:'₩', RUB:'₽', TRY:'₺', SAR:'SAR', QAR:'QAR', KWD:'KWD', BHD:'BHD', OMR:'OMR', CAD:'C$', AUD:'A$', CHF:'CHF', SGD:'S$', NZD:'NZ$' };
 
@@ -813,13 +813,13 @@ const DAILY_REFLECTIONS = [
 // a rotating gradient rather than an external image, so it always renders
 // instantly and works fully offline.
 const DAILY_VISUAL_GRADIENTS = [
-  "linear-gradient(135deg, #1E4DB7, #4C8DFF)",
-  "linear-gradient(135deg, #0F2A5E, #1FAA59)",
-  "linear-gradient(135deg, #D4AF6A, #1E4DB7)",
-  "linear-gradient(135deg, #1FAA59, #6EDB9A)",
-  "linear-gradient(135deg, #7C8AA5, #1E4DB7)",
-  "linear-gradient(135deg, #E5484D, #D4AF6A)",
-  "linear-gradient(135deg, #4C8DFF, #0F2A5E)",
+  "linear-gradient(135deg, #B84D02, #FF8A3D)",
+  "linear-gradient(135deg, #2B1204, #16B356)",
+  "linear-gradient(135deg, #E8A23D, #B84D02)",
+  "linear-gradient(135deg, #16B356, #3FE28A)",
+  "linear-gradient(135deg, #A89684, #B84D02)",
+  "linear-gradient(135deg, #E5484D, #E8A23D)",
+  "linear-gradient(135deg, #FF8A3D, #2B1204)",
 ];
 
 function dayOfYear(d) {
@@ -1746,11 +1746,11 @@ function renderDashboard(d) {
   });
 
   AzretCharts.barChart('chartIncomeExpense', monthLabels, [
-    { data: d.chart_income, color: '#1FAA59' },
+    { data: d.chart_income, color: '#16B356' },
     { data: d.chart_expense, color: '#E5484D' },
   ]);
   AzretCharts.lineChart('chartSavingsGrowth', monthLabels, [
-    { data: d.chart_savings_growth, color: '#4C8DFF' },
+    { data: d.chart_savings_growth, color: '#FF8A3D' },
   ]);
   AzretCharts.donutChart('chartCategories', d.chart_categories, d.chart_category_totals);
 
@@ -3907,15 +3907,15 @@ function setupCurrencyPairSettings() {
 function dateLabel(d){try{return new Date(d+'T00:00:00').toLocaleDateString(undefined,{month:'short',day:'numeric'});}catch(_){return d;}}
 function drawFxChart(points) {
   const canvas=document.getElementById('fxChart');if(!canvas)return;const wrap=canvas.parentElement;const dpr=Math.min(window.devicePixelRatio||1,2),w=Math.max(280,wrap.clientWidth),h=Math.max(180,wrap.clientHeight);canvas.width=w*dpr;canvas.height=h*dpr;const ctx=canvas.getContext('2d');ctx.scale(dpr,dpr);ctx.clearRect(0,0,w,h);
-  if(!points||points.length<2){ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--text-muted')||'#718096';ctx.font='13px Manrope, sans-serif';ctx.fillText('Exchange history will appear when reference data is available.',18,h/2);return;}
+  if(!points||points.length<2){ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--text-muted')||'#8A7A6C';ctx.font='13px Manrope, sans-serif';ctx.fillText('Exchange history will appear when reference data is available.',18,h/2);return;}
   const pad={l:16,r:16,t:18,b:28},vals=points.map(p=>Number(p.rate)),min=Math.min(...vals),max=Math.max(...vals),span=Math.max(max-min,Math.abs(max)*0.006,0.0001);
   const x=i=>pad.l+(i/(points.length-1))*(w-pad.l-pad.r),y=v=>pad.t+(1-(v-(min-span*.12))/(span*1.24))*(h-pad.t-pad.b);
-  const css=getComputedStyle(document.documentElement),accent=(css.getPropertyValue('--gold-500')||'#d4af6a').trim(),blue=(css.getPropertyValue('--blue-400')||'#4c8dff').trim();
-  ctx.strokeStyle='rgba(127,150,190,.16)';ctx.lineWidth=1;for(let i=0;i<4;i++){const yy=pad.t+i*(h-pad.t-pad.b)/3;ctx.beginPath();ctx.moveTo(pad.l,yy);ctx.lineTo(w-pad.r,yy);ctx.stroke();}
-  const grad=ctx.createLinearGradient(0,pad.t,0,h-pad.b);grad.addColorStop(0,'rgba(76,141,255,.28)');grad.addColorStop(1,'rgba(76,141,255,0)');ctx.beginPath();points.forEach((p,i)=>{const xx=x(i),yy=y(Number(p.rate));i?ctx.lineTo(xx,yy):ctx.moveTo(xx,yy);});ctx.lineTo(x(points.length-1),h-pad.b);ctx.lineTo(x(0),h-pad.b);ctx.closePath();ctx.fillStyle=grad;ctx.fill();
-  ctx.beginPath();points.forEach((p,i)=>{const xx=x(i),yy=y(Number(p.rate));i?ctx.lineTo(xx,yy):ctx.moveTo(xx,yy);});ctx.strokeStyle=blue;ctx.lineWidth=2.6;ctx.lineJoin='round';ctx.lineCap='round';ctx.shadowColor='rgba(76,141,255,.28)';ctx.shadowBlur=10;ctx.stroke();ctx.shadowBlur=0;
+  const css=getComputedStyle(document.documentElement),accent=(css.getPropertyValue('--gold-500')||'#e8a23d').trim(),blue=(css.getPropertyValue('--blue-400')||'#ff8a3d').trim();
+  ctx.strokeStyle='rgba(180,140,110,.16)';ctx.lineWidth=1;for(let i=0;i<4;i++){const yy=pad.t+i*(h-pad.t-pad.b)/3;ctx.beginPath();ctx.moveTo(pad.l,yy);ctx.lineTo(w-pad.r,yy);ctx.stroke();}
+  const grad=ctx.createLinearGradient(0,pad.t,0,h-pad.b);grad.addColorStop(0,'rgba(255,138,61,.28)');grad.addColorStop(1,'rgba(255,138,61,0)');ctx.beginPath();points.forEach((p,i)=>{const xx=x(i),yy=y(Number(p.rate));i?ctx.lineTo(xx,yy):ctx.moveTo(xx,yy);});ctx.lineTo(x(points.length-1),h-pad.b);ctx.lineTo(x(0),h-pad.b);ctx.closePath();ctx.fillStyle=grad;ctx.fill();
+  ctx.beginPath();points.forEach((p,i)=>{const xx=x(i),yy=y(Number(p.rate));i?ctx.lineTo(xx,yy):ctx.moveTo(xx,yy);});ctx.strokeStyle=blue;ctx.lineWidth=2.6;ctx.lineJoin='round';ctx.lineCap='round';ctx.shadowColor='rgba(255,138,61,.28)';ctx.shadowBlur=10;ctx.stroke();ctx.shadowBlur=0;
   const last=points[points.length-1];ctx.beginPath();ctx.arc(x(points.length-1),y(Number(last.rate)),4.5,0,Math.PI*2);ctx.fillStyle=accent;ctx.fill();
-  ctx.fillStyle=css.getPropertyValue('--text-muted')||'#718096';ctx.font='11px Manrope, sans-serif';ctx.fillText(dateLabel(points[0].date),pad.l,h-7);const end=dateLabel(last.date);ctx.fillText(end,w-pad.r-ctx.measureText(end).width,h-7);
+  ctx.fillStyle=css.getPropertyValue('--text-muted')||'#8A7A6C';ctx.font='11px Manrope, sans-serif';ctx.fillText(dateLabel(points[0].date),pad.l,h-7);const end=dateLabel(last.date);ctx.fillText(end,w-pad.r-ctx.measureText(end).width,h-7);
   canvas._fx={points,x,y,w,h};
 }
 async function refreshFxChart(range='1M') {
@@ -4173,9 +4173,9 @@ document.addEventListener('DOMContentLoaded',()=>{setupDashboardWallpaper();setu
     const css=getComputedStyle(document.documentElement),dpr=Math.min(window.devicePixelRatio||1,2),w=Math.max(280,wrap.clientWidth||canvas.clientWidth||400),h=Math.max(190,wrap.clientHeight||260);
     canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);canvas.style.width=w+'px';canvas.style.height=h+'px';
     const ctx=canvas.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);
-    const muted=(css.getPropertyValue('--text-muted')||'#718096').trim(),gold=(css.getPropertyValue('--gold-500')||'#d4af6a').trim(),blue=(css.getPropertyValue('--blue-400')||'#4c8dff').trim();
+    const muted=(css.getPropertyValue('--text-muted')||'#8A7A6C').trim(),gold=(css.getPropertyValue('--gold-500')||'#e8a23d').trim(),blue=(css.getPropertyValue('--blue-400')||'#ff8a3d').trim();
     const pad={l:18,r:18,t:18,b:30},plotW=w-pad.l-pad.r,plotH=h-pad.t-pad.b;
-    ctx.strokeStyle='rgba(127,150,190,.16)';ctx.lineWidth=1;for(let i=0;i<4;i++){const yy=pad.t+i*plotH/3;ctx.beginPath();ctx.moveTo(pad.l,yy);ctx.lineTo(w-pad.r,yy);ctx.stroke();}
+    ctx.strokeStyle='rgba(180,140,110,.16)';ctx.lineWidth=1;for(let i=0;i<4;i++){const yy=pad.t+i*plotH/3;ctx.beginPath();ctx.moveTo(pad.l,yy);ctx.lineTo(w-pad.r,yy);ctx.stroke();}
     const changeEl=$('goldChange');
     if(!points.length){
       ctx.fillStyle=muted;ctx.font='13px Manrope, sans-serif';ctx.textAlign='center';ctx.fillText('Gold trend will appear as live snapshots are collected.',w/2,h/2);ctx.textAlign='left';
@@ -4192,9 +4192,9 @@ document.addEventListener('DOMContentLoaded',()=>{setupDashboardWallpaper();setu
       if(changeEl){changeEl.textContent='—';changeEl.className='fx-change';}
       return;
     }
-    const fill=ctx.createLinearGradient(0,pad.t,0,h-pad.b);fill.addColorStop(0,'rgba(212,175,106,.25)');fill.addColorStop(.45,'rgba(76,141,255,.10)');fill.addColorStop(1,'rgba(76,141,255,0)');
+    const fill=ctx.createLinearGradient(0,pad.t,0,h-pad.b);fill.addColorStop(0,'rgba(212,175,106,.25)');fill.addColorStop(.45,'rgba(255,145,76,.10)');fill.addColorStop(1,'rgba(255,138,61,0)');
     ctx.beginPath();points.forEach((p,i)=>{const xx=x(i),yy=y(Number(p.rate));i?ctx.lineTo(xx,yy):ctx.moveTo(xx,yy);});ctx.lineTo(x(points.length-1),h-pad.b);ctx.lineTo(x(0),h-pad.b);ctx.closePath();ctx.fillStyle=fill;ctx.fill();
-    const stroke=ctx.createLinearGradient(pad.l,0,w-pad.r,0);stroke.addColorStop(0,blue);stroke.addColorStop(1,gold);ctx.beginPath();points.forEach((p,i)=>{const xx=x(i),yy=y(Number(p.rate));i?ctx.lineTo(xx,yy):ctx.moveTo(xx,yy);});ctx.strokeStyle=stroke;ctx.lineWidth=2.8;ctx.lineJoin='round';ctx.lineCap='round';ctx.shadowColor='rgba(76,141,255,.24)';ctx.shadowBlur=10;ctx.stroke();ctx.shadowBlur=0;
+    const stroke=ctx.createLinearGradient(pad.l,0,w-pad.r,0);stroke.addColorStop(0,blue);stroke.addColorStop(1,gold);ctx.beginPath();points.forEach((p,i)=>{const xx=x(i),yy=y(Number(p.rate));i?ctx.lineTo(xx,yy):ctx.moveTo(xx,yy);});ctx.strokeStyle=stroke;ctx.lineWidth=2.8;ctx.lineJoin='round';ctx.lineCap='round';ctx.shadowColor='rgba(255,145,76,.24)';ctx.shadowBlur=10;ctx.stroke();ctx.shadowBlur=0;
     const last=points[points.length-1];ctx.beginPath();ctx.arc(x(points.length-1),y(Number(last.rate)),4.8,0,Math.PI*2);ctx.fillStyle=gold;ctx.shadowColor='rgba(212,175,106,.45)';ctx.shadowBlur=12;ctx.fill();ctx.shadowBlur=0;
     const formatStamp=ts=>{const d=new Date(Number(ts));if(goldChartRange==='7D')return d.toLocaleDateString(undefined,{month:'short',day:'numeric'})+' '+d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});if(goldChartRange==='1Y')return d.toLocaleDateString(undefined,{month:'short',year:'2-digit'});return d.toLocaleDateString(undefined,{month:'short',day:'numeric'});};
     ctx.fillStyle=muted;ctx.font='11px Manrope, sans-serif';ctx.textAlign='left';ctx.fillText(formatStamp(points[0].at),pad.l,h-8);const end=formatStamp(last.at);ctx.textAlign='right';ctx.fillText(end,w-pad.r,h-8);ctx.textAlign='left';
