@@ -526,7 +526,24 @@ def get_profile():
     if not user:
         session.clear()
         return jsonify({'error': 'unauthorized'}), 401
-    return jsonify({'user_id': user['id'], 'username': user['username'], 'email': user.get('email', '')})
+    settings = db.get_settings(session['user_id'])
+    try:
+        last_saved_at = int(settings.get('finance_suite_updated_at') or 0)
+    except (TypeError, ValueError):
+        last_saved_at = 0
+    created_at = user.get('created_at')
+    if hasattr(created_at, 'isoformat'):
+        created_at = created_at.isoformat()
+    elif created_at is not None:
+        created_at = str(created_at)
+    return jsonify({
+        'user_id': user['id'],
+        'username': user['username'],
+        'email': user.get('email', ''),
+        'created_at': created_at or '',
+        'last_saved_at': last_saved_at,
+        'online': True,
+    })
 
 
 @app.route('/api/update-username', methods=['POST'])

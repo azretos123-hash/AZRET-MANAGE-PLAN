@@ -67,10 +67,9 @@
         </span>
         <span id="azretGreetingName" hidden>User</span>
       </button>
-      <div class="sidebar-brand-text">
-        <strong class="brand-name-bilingual" aria-label="YARIN يارين"><span>YARIN</span><b lang="ar" dir="rtl">يارين</b></strong>
-        <small class="brand-motto-en">Your Money. Your Future.</small>
-        <em class="brand-tagline-en">Tomorrow Starts Today.</em>
+      <div class="sidebar-brand-text v105-ai-brand-copy">
+        <strong class="v105-ai-brand" aria-label="Azret AI Assistant"><span>AZRET AI</span><b>Assistant</b></strong>
+        <small class="v105-ai-brand-sub">Smart finance companion</small>
       </div>
     </div>
 
@@ -153,16 +152,12 @@
       </button>
     </nav>
 
-    <button id="logoutBtn" class="sidebar-logout">
-      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
-      <span>Sign Out</span>
-    </button>
   </aside>
   <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
   <!-- Main -->
   <div class="main-area">
-    <header class="topbar glass v101-topbar">
+    <header class="topbar glass v101-topbar v102-topbar">
       <button id="menuToggle" class="icon-btn menu-toggle" aria-label="Open menu">
         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
       </button>
@@ -177,10 +172,14 @@
 
       <div class="v101-topbar-spacer" aria-hidden="true"></div>
 
-      <!-- V101: user identity replaces the old clock/currency area. -->
-      <div class="v101-user-frame" aria-label="Signed in user">
-        <span class="v101-user-avatar" aria-hidden="true"><span id="topbarUserInitial">U</span></span>
-        <span class="v101-user-copy"><small>ACCOUNT</small><strong id="topbarUserName">User</strong></span>
+      <!-- V102: Search moves into the former user-frame position. -->
+      <div class="topbar-search v101-topbar-search v102-topbar-search" id="topbarSearchShell">
+        <button type="button" class="mobile-search-toggle-v87" id="mobileSearchToggle" aria-label="Open search" aria-controls="globalSearch">
+          <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        </button>
+        <input type="text" id="globalSearch" placeholder="Search everything…" autocomplete="off">
+        <button type="button" class="mobile-search-close-v87" id="mobileSearchClose" aria-label="Close search">×</button>
+        <div id="globalSearchResults" class="global-search-results"></div>
       </div>
 
       <button type="button" id="themeToggle" class="v101-topbar-tool" aria-label="Switch day or night mode" title="Day / Night mode">
@@ -198,15 +197,40 @@
         <span id="financeNotifCount" class="v54-notif-count" hidden>0</span>
       </button>
 
-      <!-- V101: Search is the last control. Focus opens a cinematic blur layer. -->
-      <div class="topbar-search v101-topbar-search" id="topbarSearchShell">
-        <button type="button" class="mobile-search-toggle-v87" id="mobileSearchToggle" aria-label="Open search" aria-controls="globalSearch">
-          <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-        </button>
-        <input type="text" id="globalSearch" placeholder="Search everything…" autocomplete="off">
-        <button type="button" class="mobile-search-close-v87" id="mobileSearchClose" aria-label="Close search">×</button>
-        <div id="globalSearchResults" class="global-search-results"></div>
-      </div>
+      <!-- V103: User identity opens the per-account profile menu. -->
+      <button type="button" id="accountMenuBtn" class="v101-user-frame v102-user-frame v103-account-trigger" aria-label="Open account menu" aria-controls="accountMenuPanel" aria-expanded="false">
+        <span class="v101-user-avatar" aria-hidden="true"><span id="topbarUserInitial">U</span></span>
+        <span class="v101-user-copy"><small>ACCOUNT</small><strong id="topbarUserName">User</strong></span>
+        <svg class="v103-account-chevron" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg>
+      </button>
+
+      <section id="accountMenuPanel" class="v103-account-menu" aria-label="Account details" hidden>
+        <div class="v103-account-head">
+          <span class="v103-account-avatar"><span id="accountMenuInitial">U</span><i aria-hidden="true"></i></span>
+          <div class="v103-account-title">
+            <small>MY YARIN ACCOUNT</small>
+            <strong id="accountMenuName">User</strong>
+            <span><i class="v103-online-dot" aria-hidden="true"></i> Online now</span>
+          </div>
+        </div>
+        <div class="v103-account-details">
+          <div class="v103-account-row"><span>Email</span><strong id="accountMenuEmail">—</strong></div>
+          <div class="v103-account-row"><span>User ID</span><strong id="accountMenuUserId">—</strong></div>
+          <div class="v103-account-row"><span>Last saved</span><strong id="accountMenuLastSaved">—</strong></div>
+          <div class="v103-account-row"><span>Member since</span><strong id="accountMenuMemberSince">—</strong></div>
+          <div class="v103-account-row"><span>Currency pair</span><strong id="accountMenuCurrency">AED → INR</strong></div>
+        </div>
+        <div class="v103-account-actions">
+          <button type="button" id="accountSettingsBtn" class="v103-account-settings">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.34 1.87l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.7 1.7 0 00-1.87-.34 1.7 1.7 0 00-1 1.55V21a2 2 0 01-4 0v-.09A1.7 1.7 0 009 19.4a1.7 1.7 0 00-1.87.34l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.7 1.7 0 004.6 15a1.7 1.7 0 00-1.55-1H3a2 2 0 010-4h.09A1.7 1.7 0 004.6 9a1.7 1.7 0 00-.34-1.87l-.06-.06a2 2 0 112.83-2.83l.06.06A1.7 1.7 0 009 4.6a1.7 1.7 0 001-1.55V3a2 2 0 014 0v.09a1.7 1.7 0 001 1.55 1.7 1.7 0 001.87-.34l.06-.06a2 2 0 112.83 2.83l-.06.06A1.7 1.7 0 0019.4 9c.24.62.82 1 1.55 1H21a2 2 0 010 4h-.09A1.7 1.7 0 0019.4 15z"/></svg>
+            Account Settings
+          </button>
+          <button type="button" id="accountLogoutBtn" class="v103-account-logout">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+            Sign Out
+          </button>
+        </div>
+      </section>
     </header>
     <div id="globalSearchBackdrop" class="v101-search-backdrop" aria-hidden="true"></div>
 
@@ -238,22 +262,19 @@
 
 
 
-        <div class="page-head dashboard-hero-head v99-dashboard-hero v100-dashboard-hero">
-          <div class="v99-dashboard-intro v100-dashboard-intro">
-            <p class="page-eyebrow">YARIN يارين • Your Money. Your Future.</p>
-            <h2>Dashboard</h2>
+        <div class="page-head dashboard-hero-head v99-dashboard-hero v100-dashboard-hero v104-dashboard-hero">
+          <div class="v99-dashboard-intro v100-dashboard-intro v104-dashboard-intro">
+            <h2 class="v104-dashboard-title">Dashboard</h2>
           </div>
-          <aside class="v100-greeting-card" aria-label="Current greeting">
-            <span class="v100-greeting-orb" aria-hidden="true"></span>
-            <div class="v100-greeting-copy">
-              <small>WELCOME BACK</small>
-              <div class="v100-greeting-line">
+          <aside class="v100-greeting-card v104-welcome-block" aria-label="Current greeting">
+            <div class="v100-greeting-copy v104-welcome-copy">
+              <div class="v104-welcome-brand">WELCOME BACK <span aria-hidden="true">—</span> <b>YARIN</b> <b class="v104-arabic-brand" lang="ar" dir="rtl">يارين</b></div>
+              <div class="v100-greeting-line v104-greeting-line">
                 <span id="greetingText">Good Evening</span>, <strong id="greetingName">User</strong>
-                <span class="v99-greeting-spark" aria-hidden="true">✦</span>
+                <span class="v99-greeting-spark v104-greeting-spark" aria-hidden="true">✦</span>
               </div>
-              <span class="v100-greeting-sub">Your financial day is ready.</span>
+              <span class="v100-greeting-sub v104-greeting-sub">Your financial day is ready.</span>
             </div>
-            <span class="v100-greeting-wave" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
           </aside>
         </div>
 
@@ -284,8 +305,7 @@
                   <h3 class="countdown-title">Until the <span id="countdownDayOfMonth">27th</span></h3>
                   <p class="countdown-date" id="countdownDate">—</p>
                 </div>
-                <aside class="v99-digital-clock v100-digital-clock" aria-label="Current local time and date">
-                  <span class="v100-clock-flag" aria-hidden="true"></span>
+                <aside class="v99-digital-clock v100-digital-clock v102-inline-clock" aria-label="Current local time and date">
                   <div class="v100-clock-content">
                     <div class="v99-clock-label"><span class="v99-clock-live-dot" aria-hidden="true"></span>LOCAL TIME</div>
                     <time class="v99-clock-time" id="salaryLiveTime">--:--:--</time>
@@ -305,8 +325,8 @@
               </svg>
             </div>
             <div class="daily-reminder-text">
-              <p class="daily-reminder-label">Daily Reflection</p>
-              <p class="daily-reminder-quote" id="dailyReminderQuote">Ease follows hardship — trust the process and keep moving forward with patience.</p>
+              <p class="daily-reminder-label">Daily Reflection <span class="v105-reflection-tag" id="dailyReflectionTag">Personal insight</span></p>
+              <p class="daily-reminder-quote v105-financial-reflection" id="dailyReminderQuote">Reviewing your recent financial activity…</p>
             </div>
           </div>
 

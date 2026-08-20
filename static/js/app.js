@@ -47,6 +47,9 @@ const state = {
   emiFullyPaidAlertShown: false,
   username: 'User',        // display name, kept in sync with the users table
   userId: null,             // authenticated account id; used to namespace device-local preferences
+  profileEmail: '',
+  accountCreatedAt: '',
+  accountLastSavedAt: 0,
   primaryCurrency: localStorage.getItem('rizq_primary_currency') || 'AED',
   secondaryCurrency: localStorage.getItem('rizq_secondary_currency') || 'INR',
   aedRates: { AED: 1 },
@@ -263,6 +266,7 @@ function updateGreetingClock() {
   const topbarName = String(state.username || 'User').trim() || 'User';
   if (topbarUserName) topbarUserName.textContent = topbarName;
   if (topbarUserInitial) topbarUserInitial.textContent = (topbarName.match(/[\p{L}\p{N}]/u)?.[0] || 'U').toUpperCase();
+  renderAccountMenuProfile();
 
   const timeText = now.toLocaleTimeString(undefined, {
     hour: '2-digit', minute: '2-digit', second: '2-digit'
@@ -293,11 +297,42 @@ function updateGreetingClock() {
 /** Fetches the current username and syncs it everywhere it's displayed:
  *  the topbar greeting, the Settings > Profile field, and (implicitly,
  *  server-side) the AI assistant's system prompt on its next request. */
+function formatAccountDate(value, withTime = false) {
+  if (!value) return 'Not available';
+  let date;
+  if (typeof value === 'number' || /^\d+$/.test(String(value))) {
+    const n = Number(value);
+    date = new Date(n < 1e12 ? n * 1000 : n);
+  } else {
+    date = new Date(value);
+  }
+  if (Number.isNaN(date.getTime())) return 'Not available';
+  return date.toLocaleString(undefined, withTime
+    ? { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }
+    : { day:'2-digit', month:'short', year:'numeric' });
+}
+
+function renderAccountMenuProfile() {
+  const name = String(state.username || 'User').trim() || 'User';
+  const initial = (name.match(/[\p{L}\p{N}]/u)?.[0] || 'U').toUpperCase();
+  const setText = (id, value) => { const el = document.getElementById(id); if (el) el.textContent = value; };
+  setText('accountMenuName', name);
+  setText('accountMenuInitial', initial);
+  setText('accountMenuEmail', state.profileEmail || 'No email added');
+  setText('accountMenuUserId', state.userId ? `YRN-${String(state.userId).padStart(6, '0')}` : '—');
+  setText('accountMenuLastSaved', state.accountLastSavedAt ? formatAccountDate(state.accountLastSavedAt, true) : 'No recent save');
+  setText('accountMenuMemberSince', formatAccountDate(state.accountCreatedAt, false));
+  setText('accountMenuCurrency', `${state.primaryCurrency || 'AED'} → ${state.secondaryCurrency || 'INR'}`);
+}
+
 async function loadProfile() {
   try {
     const res = await fetch('/api/profile');
     const data = await res.json();
     if (data.user_id != null) state.userId = String(data.user_id);
+    state.profileEmail = data.email || '';
+    state.accountCreatedAt = data.created_at || '';
+    state.accountLastSavedAt = Number(data.last_saved_at || 0);
     if (data.username) {
       state.username = data.username;
       updateGreetingClock();
@@ -306,6 +341,7 @@ async function loadProfile() {
     }
     const emailInput = document.getElementById('profileEmail');
     if (emailInput && data.email && document.activeElement !== emailInput) emailInput.value = data.email;
+    renderAccountMenuProfile();
   } catch (e) { /* offline: keep local/default username */ }
 }
 
@@ -452,6 +488,47 @@ function setupTopbar() {
       resultsBox?.classList.remove('show');
       if (document.body.classList.contains('global-search-open')) closeSearchFocus();
     }
+  });
+
+  // V103 account popup: per-user identity, status, save metadata and sign-out.
+  const accountMenuBtn = document.getElementById('accountMenuBtn');
+  const accountMenuPanel = document.getElementById('accountMenuPanel');
+  const closeAccountMenu = () => {
+    if (!accountMenuPanel) return;
+    accountMenuPanel.hidden = true;
+    accountMenuBtn?.setAttribute('aria-expanded', 'false');
+    document.body.classList.remove('account-menu-open');
+  };
+  const openAccountMenu = async () => {
+    if (!accountMenuPanel) return;
+    closeSearchFocus();
+    await loadProfile();
+    renderAccountMenuProfile();
+    accountMenuPanel.hidden = false;
+    accountMenuBtn?.setAttribute('aria-expanded', 'true');
+    document.body.classList.add('account-menu-open');
+  };
+  accountMenuBtn?.addEventListener('click', async (event) => {
+    event.stopPropagation();
+    if (accountMenuPanel && !accountMenuPanel.hidden) closeAccountMenu();
+    else await openAccountMenu();
+  });
+  accountMenuPanel?.addEventListener('click', event => event.stopPropagation());
+  document.addEventListener('click', event => {
+    if (!event.target.closest('#accountMenuBtn') && !event.target.closest('#accountMenuPanel')) closeAccountMenu();
+  });
+  document.addEventListener('keydown', event => { if (event.key === 'Escape') closeAccountMenu(); });
+  document.getElementById('accountSettingsBtn')?.addEventListener('click', () => {
+    closeAccountMenu();
+    document.querySelectorAll('.nav-item').forEach(b => b.classList.toggle('active', b.dataset.page === 'settings'));
+    loadPage('settings');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+  document.getElementById('accountLogoutBtn')?.addEventListener('click', async () => {
+    const logoutButton = document.getElementById('accountLogoutBtn');
+    if (logoutButton) { logoutButton.disabled = true; logoutButton.classList.add('is-loading'); }
+    try { await fetch('/api/logout', { method: 'POST' }); } catch (_) {}
+    window.location.href = '/login';
   });
 
   const refreshRateBtn = document.getElementById('refreshRate');
@@ -854,67 +931,98 @@ function animateCountdownNumber(el, target) {
 }
 
 /* ---------------------------------------------------------------------- */
-/* Daily rotating Islamic reminder + visual (Salary Credited banner)      */
+/* V105 — Personal Daily Financial Reflection                              */
 /* ---------------------------------------------------------------------- */
-// Short, original daily reflections inspired by Islamic values of peace,
-// patience, gratitude and quiet confidence — not verbatim scripture quotes,
-// so nothing here risks mis-citing a specific verse/hadith translation.
-const DAILY_REFLECTIONS = [
-  "Ease follows hardship — trust the process and keep moving forward with patience.",
-  "A grateful heart finds peace even in a busy day. Pause and give thanks.",
-  "Speak kindly — gentle words are a quiet form of charity.",
-  "Trust in Allah, but tie your camel: plan wisely, then have faith in the outcome.",
-  "Every sunrise is a fresh chance to start again with a clean heart.",
-  "Patience isn't waiting quietly — it's staying graceful while working toward your goal.",
-  "Contentment is true wealth. Be thankful for what today has already given you.",
-  "A calm heart makes wiser decisions — take a breath before you react.",
-  "Small good deeds done consistently mean more than big ones done rarely.",
-  "Whoever is grateful for little will be trusted with more.",
-  "Your worth isn't measured by wealth, but by the good you bring to others.",
-  "Difficulties are temporary — resilience and trust make them easier to carry.",
-  "Kindness toward family reflects the peace already living in your heart.",
-  "Ask for help with patience and prayer; both steady the mind for what's ahead.",
-  "Every act of honesty in your finances is also an act of faith.",
-  "Confidence grows quietly when you keep your word, even in small promises.",
-  "The best provision is a thankful heart — carry it into every decision today.",
-  "Hardship is never wasted; it always leaves you a little stronger, a little wiser.",
-  "Be gentle with yourself — growth, like faith, takes patient and steady effort.",
-  "A peaceful home starts with a peaceful heart. Guard yours today.",
-];
-
-// Daily-changing colour theme for the little visual beside the reflection —
-// a rotating gradient rather than an external image, so it always renders
-// instantly and works fully offline.
-const DAILY_VISUAL_GRADIENTS = [
-  "linear-gradient(135deg, #1E4DB7, #4C8DFF)",
-  "linear-gradient(135deg, #0F2A5E, #1FAA59)",
-  "linear-gradient(135deg, #D4AF6A, #1E4DB7)",
-  "linear-gradient(135deg, #1FAA59, #6EDB9A)",
-  "linear-gradient(135deg, #7C8AA5, #1E4DB7)",
-  "linear-gradient(135deg, #E5484D, #D4AF6A)",
-  "linear-gradient(135deg, #4C8DFF, #0F2A5E)",
-];
-
-function dayOfYear(d) {
-  const start = new Date(d.getFullYear(), 0, 0);
-  const diff = d - start;
-  return Math.floor(diff / 86400000);
-}
-
+// The reflection is generated only from the signed-in user's already-loaded
+// dashboard totals. It never compares one user with another and does not send
+// extra data to a third party. The goal is one short, actionable observation —
+// not a generic quote and not a financial diagnosis.
 function setupDailyReminder() {
   const quoteEl = document.getElementById('dailyReminderQuote');
   const visualEl = document.getElementById('dailyReminderVisual');
+  const tagEl = document.getElementById('dailyReflectionTag');
   if (!quoteEl || !visualEl) return;
+  quoteEl.textContent = 'Reviewing your recent financial activity…';
+  if (tagEl) tagEl.textContent = 'Personal insight';
+  visualEl.dataset.tone = 'neutral';
+}
 
-  const doy = dayOfYear(new Date());
-  const quote = DAILY_REFLECTIONS[doy % DAILY_REFLECTIONS.length];
-  // Offset the gradient index so the colour and the quote don't always
-  // change in perfect lock-step across the year.
-  const gradient = DAILY_VISUAL_GRADIENTS[(doy + 3) % DAILY_VISUAL_GRADIENTS.length];
+function updateDailyFinancialReflection(d) {
+  const quoteEl = document.getElementById('dailyReminderQuote');
+  const visualEl = document.getElementById('dailyReminderVisual');
+  const tagEl = document.getElementById('dailyReflectionTag');
+  if (!quoteEl || !visualEl || !d) return;
 
-  quoteEl.textContent = quote;
-  visualEl.style.setProperty('--daily-gradient', gradient);
-  visualEl.style.background = gradient;
+  const n = (value) => {
+    const x = Number(value);
+    return Number.isFinite(x) ? x : 0;
+  };
+  const income = Math.max(0, n(d.monthly_income));
+  const expenses = Math.max(0, n(d.monthly_expense));
+  const savings = Math.max(0, n(d.monthly_savings));
+  const family = Math.max(0, n(d.monthly_family_transfer));
+  const emiPaid = Math.max(0, n(d.monthly_emi_payments));
+  const debtPaid = Math.max(0, n(d.monthly_debt_payments));
+  const available = n(d.monthly_available);
+  const outstandingDebt = Math.max(0, n(d.outstanding_debt));
+  const totalSavings = Math.max(0, n(d.total_savings));
+  const emiPending = Math.max(0, n(d.emi_pending));
+  const activeEmis = Math.max(0, Math.round(n(d.active_emi_count)));
+  const outflow = expenses + family + emiPaid + debtPaid;
+  const spendRate = income > 0 ? expenses / income : 0;
+  const savingRate = income > 0 ? savings / income : 0;
+
+  let tone = 'good';
+  let tag = 'On track';
+  let message = 'Your recorded cash flow looks balanced today. Keep expenses intentional and continue building savings consistently.';
+
+  const hasAnyData = income > 0 || expenses > 0 || savings > 0 || family > 0 || emiPaid > 0 || debtPaid > 0 || outstandingDebt > 0;
+  if (!hasAnyData) {
+    tone = 'neutral';
+    tag = 'Start here';
+    message = 'There is not enough financial activity recorded yet. Add this month’s income and expenses so YARIN can point out a useful pattern here.';
+  } else if (income <= 0 && outflow > 0) {
+    tone = 'danger';
+    tag = 'Income gap';
+    message = `You have ${fmt(outflow)} of recorded outflow this month but no income recorded. Check whether income is missing before trusting your monthly balance.`;
+  } else if (income > 0 && available < 0) {
+    tone = 'danger';
+    tag = 'Cash-flow warning';
+    message = `This month’s recorded outflows are ${fmt(Math.abs(available))} above income. Review non-essential spending and upcoming commitments before adding new expenses.`;
+  } else if (income > 0 && spendRate >= 0.80) {
+    tone = 'warning';
+    tag = 'High spending';
+    message = `Expenses are about ${Math.round(spendRate * 100)}% of this month’s income. That leaves little room for savings or unexpected costs, so review the largest avoidable expenses first.`;
+  } else if (income > 0 && savings <= 0) {
+    tone = 'warning';
+    tag = 'Savings gap';
+    message = `Income is recorded this month, but no savings entry is recorded yet. Even a small planned transfer can stop the full month’s surplus from being absorbed by spending.`;
+  } else if (income > 0 && savingRate < 0.10) {
+    tone = 'warning';
+    tag = 'Low savings rate';
+    message = `Your recorded savings are about ${Math.round(savingRate * 100)}% of monthly income. Consider protecting a slightly larger amount before discretionary spending.`;
+  } else if (outstandingDebt > 0 && totalSavings > 0 && outstandingDebt > totalSavings * 1.5) {
+    tone = 'warning';
+    tag = 'Debt pressure';
+    message = `Outstanding debt (${fmt(outstandingDebt)}) is well above recorded savings (${fmt(totalSavings)}). Keep an emergency buffer, then prioritize a steady repayment plan.`;
+  } else if (activeEmis > 0 && emiPending > 0 && income > 0 && available < income * 0.15) {
+    tone = 'warning';
+    tag = 'Commitment pressure';
+    message = `${activeEmis} active EMI${activeEmis === 1 ? '' : 's'} still have ${fmt(emiPending)} pending, while this month’s free cash is tight. Avoid taking on another fixed payment unless the budget has room.`;
+  } else if (income > 0 && savingRate >= 0.20 && available >= 0) {
+    tone = 'good';
+    tag = 'Strong habit';
+    message = `You have recorded roughly ${Math.round(savingRate * 100)}% of this month’s income as savings and your cash flow remains positive. Keep that consistency without letting lifestyle spending creep up.`;
+  } else if (outstandingDebt > 0) {
+    tone = 'neutral';
+    tag = 'Stay deliberate';
+    message = `Your cash flow is currently positive, but ${fmt(outstandingDebt)} of debt remains outstanding. Keep repayments predictable while preserving a cash buffer.`;
+  }
+
+  quoteEl.textContent = message;
+  if (tagEl) tagEl.textContent = tag;
+  visualEl.dataset.tone = tone;
+  quoteEl.dataset.tone = tone;
 }
 
 function setupVoiceSynthesis() {
@@ -1840,6 +1948,8 @@ function renderDashboard(d) {
     <div class="qs-row"><span>Active EMIs</span><span>${d.active_emi_count}</span></div>
     <div class="qs-row"><span>This Month's Balance</span><span>${fmt(Number.isFinite(Number(d.monthly_available)) ? Number(d.monthly_available) : (Number(d.monthly_income||0)-Number(d.monthly_expense||0)))}</span></div>
   `;
+
+  updateDailyFinancialReflection(d);
 
   if (d.total_emi > 0 && d.emi_pending <= 0 && !state.emiFullyPaidAlertShown) {
     toast('Congratulations! EMI Fully Paid!', 'success');
