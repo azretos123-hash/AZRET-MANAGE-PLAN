@@ -6825,71 +6825,117 @@ html[data-visual-theme="premium"] .v104-greeting-sub{
   .v104-greeting-spark{animation:none!important;}
 }
 
-
 /* ========================================================================== 
-   V105 — Azret AI sidebar identity + personal financial reflection
+   V105 — Azret AI sidebar identity + personalised Daily Reflection
    ========================================================================== */
-.sidebar .v105-ai-brand-copy{
+.sidebar .sidebar-ai-identity{
   position:relative!important;
   overflow:visible!important;
   gap:3px!important;
 }
-.v105-ai-brand{
-  display:flex;align-items:baseline;gap:6px;min-width:0;
-  font-family:var(--font-elegant);font-weight:950;line-height:1;
-  letter-spacing:-.025em;white-space:nowrap;
+.sidebar .sidebar-ai-identity .azret-ai-brand-title{
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:flex-start!important;
+  gap:1px!important;
+  width:max-content!important;
+  max-width:100%!important;
+  line-height:.96!important;
+  white-space:nowrap!important;
+  text-transform:uppercase!important;
+  letter-spacing:.085em!important;
+  background:linear-gradient(100deg,#26d9ff 0%,#6a8cff 28%,#bd67ff 52%,#ff8c3d 76%,#26d9ff 100%)!important;
+  background-size:260% 100%!important;
+  -webkit-background-clip:text!important;
+  background-clip:text!important;
+  color:transparent!important;
+  animation:v105AiIdentityFlow 6.5s linear infinite!important;
+  filter:drop-shadow(0 0 8px rgba(75,151,255,.14));
 }
-.v105-ai-brand span,
-.v105-ai-brand b{
-  color:transparent;
-  background:linear-gradient(110deg,var(--v94-ai-a),var(--v94-ai-c),var(--v94-ai-b),var(--v94-ai-c),var(--v94-ai-a));
-  background-size:280% 280%;
-  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
-  animation:v105AiBrandFlow 6.8s ease-in-out infinite;
-  filter:drop-shadow(0 0 8px color-mix(in srgb,var(--v94-ai-a) 18%,transparent));
+.sidebar .sidebar-ai-identity .azret-ai-brand-title span,
+.sidebar .sidebar-ai-identity .azret-ai-brand-title b{
+  color:transparent!important;
+  font-family:inherit!important;
+  letter-spacing:inherit!important;
+  line-height:inherit!important;
+  background:inherit!important;
+  -webkit-background-clip:text!important;
+  background-clip:text!important;
 }
-.v105-ai-brand span{font-size:16px;letter-spacing:.045em;}
-.v105-ai-brand b{font-size:13px;font-weight:850;letter-spacing:.015em;animation-delay:-1.6s;}
-.v105-ai-brand-sub{
-  display:block!important;margin:0!important;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-  font-size:9px!important;line-height:1.2!important;font-weight:750!important;letter-spacing:.055em!important;
-  color:var(--text-muted)!important;opacity:.82;
-  animation:v105AiSubtlePulse 4.2s ease-in-out infinite;
+.sidebar .sidebar-ai-identity .azret-ai-brand-title span{
+  font-size:15px!important;
+  font-weight:950!important;
 }
-@keyframes v105AiBrandFlow{0%,100%{background-position:0% 50%;filter:drop-shadow(0 0 6px color-mix(in srgb,var(--v94-ai-a) 12%,transparent))}50%{background-position:100% 50%;filter:drop-shadow(0 0 11px color-mix(in srgb,var(--v94-ai-b) 27%,transparent))}}
-@keyframes v105AiSubtlePulse{0%,100%{opacity:.58;transform:translateX(0)}50%{opacity:.96;transform:translateX(2px)}}
-html[data-visual-theme="premium"] .v105-ai-brand span,
-html[data-visual-theme="premium"] .v105-ai-brand b{filter:drop-shadow(0 0 9px rgba(255,141,34,.18));}
+.sidebar .sidebar-ai-identity .azret-ai-brand-title b{
+  font-size:8px!important;
+  font-weight:900!important;
+  letter-spacing:.22em!important;
+  opacity:.9!important;
+}
+.sidebar .sidebar-ai-identity .azret-ai-brand-subtitle{
+  display:block!important;
+  max-width:150px!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  color:var(--text-muted)!important;
+  font-size:7.2px!important;
+  font-weight:750!important;
+  letter-spacing:.035em!important;
+  white-space:nowrap!important;
+  animation:v105AiSubtitlePulse 4.6s ease-in-out infinite!important;
+}
+.sidebar .sidebar-ai-identity .azret-ai-brand-status{display:none!important;}
+html[data-visual-theme="premium"] .sidebar .sidebar-ai-identity .azret-ai-brand-title{
+  background-image:linear-gradient(100deg,#ffd36b 0%,#ff8a24 28%,#ff5e35 52%,#ffdca1 76%,#ffd36b 100%)!important;
+  filter:drop-shadow(0 0 9px rgba(255,145,36,.17));
+}
+[data-theme="dark"] .sidebar .sidebar-ai-identity .azret-ai-brand-subtitle{color:rgba(226,237,255,.72)!important;}
+@keyframes v105AiIdentityFlow{to{background-position:260% 50%;}}
+@keyframes v105AiSubtitlePulse{0%,100%{opacity:.58}50%{opacity:1}}
 
-/* Reflection remains part of the salary card, but now explains the user's
-   own recorded financial pattern instead of displaying a generic quote. */
-.countdown-daily-reminder .v105-reflection-tag{
-  display:inline-flex;align-items:center;margin-left:7px;padding:2px 7px;border-radius:999px;
-  font-size:8px;font-weight:900;letter-spacing:.055em;text-transform:none;vertical-align:middle;
-  color:var(--text-muted);background:color-mix(in srgb,var(--surface-solid) 46%,transparent);
-  border:1px solid color-mix(in srgb,var(--border) 72%,transparent);
+.daily-reflection-personal{
+  font-size:.86em;
+  letter-spacing:.075em;
+  opacity:.62;
+  white-space:nowrap;
 }
-.v105-financial-reflection{font-style:normal!important;font-weight:620;letter-spacing:-.005em;}
-.daily-reminder-visual[data-tone="danger"]{--daily-gradient:linear-gradient(135deg,#ff5c67,#b91f3a);background:var(--daily-gradient)!important;box-shadow:0 7px 20px rgba(220,55,76,.24);}
-.daily-reminder-visual[data-tone="warning"]{--daily-gradient:linear-gradient(135deg,#ffb342,#d66b11);background:var(--daily-gradient)!important;box-shadow:0 7px 20px rgba(214,107,17,.22);}
-.daily-reminder-visual[data-tone="good"]{--daily-gradient:linear-gradient(135deg,#21c77a,#087f64);background:var(--daily-gradient)!important;box-shadow:0 7px 20px rgba(14,154,107,.22);}
-.daily-reminder-visual[data-tone="neutral"]{--daily-gradient:linear-gradient(135deg,var(--v94-ai-a),var(--v94-ai-b));background:var(--daily-gradient)!important;}
-.daily-reminder-visual{transition:background .35s ease,box-shadow .35s ease,transform .35s ease!important;}
-.countdown-daily-reminder:hover .daily-reminder-visual{transform:translateY(-1px) rotate(-2deg);}
+#dailyReminderRow{
+  transition:border-color .3s ease,filter .3s ease;
+}
+#dailyReminderRow .daily-reminder-quote{
+  font-style:normal!important;
+  font-weight:600!important;
+  line-height:1.52!important;
+  max-width:920px;
+}
+#dailyReminderRow[data-reflection-tone="danger"] .daily-reminder-label{color:#e5484d!important;}
+#dailyReminderRow[data-reflection-tone="danger"] .daily-reminder-visual{
+  background:linear-gradient(135deg,#7f1d1d,#ef4444)!important;
+  box-shadow:0 6px 18px rgba(229,72,77,.24)!important;
+}
+#dailyReminderRow[data-reflection-tone="attention"] .daily-reminder-label{color:#e99b19!important;}
+#dailyReminderRow[data-reflection-tone="attention"] .daily-reminder-visual{
+  background:linear-gradient(135deg,#8c4b09,#f5a524)!important;
+  box-shadow:0 6px 18px rgba(245,165,36,.22)!important;
+}
+#dailyReminderRow[data-reflection-tone="focus"] .daily-reminder-label{color:#4c8dff!important;}
+#dailyReminderRow[data-reflection-tone="positive"] .daily-reminder-label{color:#1faa59!important;}
+#dailyReminderRow[data-reflection-tone="positive"] .daily-reminder-visual{
+  background:linear-gradient(135deg,#0d6f3b,#2fc878)!important;
+  box-shadow:0 6px 18px rgba(31,170,89,.22)!important;
+}
+html[data-visual-theme="premium"] #dailyReminderRow[data-reflection-tone="danger"] .daily-reminder-label{color:#ff716c!important;}
+html[data-visual-theme="premium"] #dailyReminderRow[data-reflection-tone="attention"] .daily-reminder-label{color:#ffad45!important;}
+html[data-visual-theme="premium"] #dailyReminderRow[data-reflection-tone="positive"] .daily-reminder-label{color:#43d68a!important;}
 
-@media(max-width:1100px){
-  .v105-ai-brand span{font-size:15px;}
-  .v105-ai-brand b{font-size:12px;}
-  .v105-ai-brand-sub{font-size:8.5px!important;}
-}
 @media(max-width:760px){
-  .v105-ai-brand{gap:5px;}
-  .v105-ai-brand span{font-size:15.5px;}
-  .v105-ai-brand b{font-size:12.5px;}
-  .countdown-daily-reminder .v105-reflection-tag{display:none;}
-  .v105-financial-reflection{font-size:11.5px!important;line-height:1.45!important;}
+  .sidebar .sidebar-ai-identity .azret-ai-brand-title span{font-size:14.5px!important;}
+  .sidebar .sidebar-ai-identity .azret-ai-brand-title b{font-size:7.6px!important;}
+  .sidebar .sidebar-ai-identity .azret-ai-brand-subtitle{font-size:6.9px!important;max-width:135px!important;}
+  .daily-reflection-personal{display:none;}
+  #dailyReminderRow .daily-reminder-quote{font-size:11.4px!important;line-height:1.46!important;}
 }
 @media(prefers-reduced-motion:reduce){
-  .v105-ai-brand span,.v105-ai-brand b,.v105-ai-brand-sub{animation:none!important;}
-  .countdown-daily-reminder:hover .daily-reminder-visual{transform:none;}
+  .sidebar .sidebar-ai-identity .azret-ai-brand-title,
+  .sidebar .sidebar-ai-identity .azret-ai-brand-subtitle{animation:none!important;}
 }

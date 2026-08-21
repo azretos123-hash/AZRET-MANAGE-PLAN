@@ -931,98 +931,155 @@ function animateCountdownNumber(el, target) {
 }
 
 /* ---------------------------------------------------------------------- */
-/* V105 — Personal Daily Financial Reflection                              */
+/* Daily Reflection — personalised financial attention point               */
 /* ---------------------------------------------------------------------- */
-// The reflection is generated only from the signed-in user's already-loaded
-// dashboard totals. It never compares one user with another and does not send
-// extra data to a third party. The goal is one short, actionable observation —
-// not a generic quote and not a financial diagnosis.
-function setupDailyReminder() {
-  const quoteEl = document.getElementById('dailyReminderQuote');
-  const visualEl = document.getElementById('dailyReminderVisual');
-  const tagEl = document.getElementById('dailyReflectionTag');
-  if (!quoteEl || !visualEl) return;
-  quoteEl.textContent = 'Reviewing your recent financial activity…';
-  if (tagEl) tagEl.textContent = 'Personal insight';
-  visualEl.dataset.tone = 'neutral';
+// The visual accent still rotates once per day, but the reflection itself is
+// driven by the signed-in user's recorded dashboard data. This keeps the copy
+// useful instead of showing a generic quote. No data means no guessing.
+const DAILY_VISUAL_GRADIENTS = [
+  "linear-gradient(135deg, #1E4DB7, #4C8DFF)",
+  "linear-gradient(135deg, #0F2A5E, #1FAA59)",
+  "linear-gradient(135deg, #D4AF6A, #1E4DB7)",
+  "linear-gradient(135deg, #1FAA59, #6EDB9A)",
+  "linear-gradient(135deg, #7C8AA5, #1E4DB7)",
+  "linear-gradient(135deg, #E5484D, #D4AF6A)",
+  "linear-gradient(135deg, #4C8DFF, #0F2A5E)",
+];
+
+function dayOfYear(d) {
+  const start = new Date(d.getFullYear(), 0, 0);
+  const diff = d - start;
+  return Math.floor(diff / 86400000);
 }
 
-function updateDailyFinancialReflection(d) {
-  const quoteEl = document.getElementById('dailyReminderQuote');
-  const visualEl = document.getElementById('dailyReminderVisual');
-  const tagEl = document.getElementById('dailyReflectionTag');
-  if (!quoteEl || !visualEl || !d) return;
+function finiteMoney(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.max(0, n) : 0;
+}
 
-  const n = (value) => {
-    const x = Number(value);
-    return Number.isFinite(x) ? x : 0;
-  };
-  const income = Math.max(0, n(d.monthly_income));
-  const expenses = Math.max(0, n(d.monthly_expense));
-  const savings = Math.max(0, n(d.monthly_savings));
-  const family = Math.max(0, n(d.monthly_family_transfer));
-  const emiPaid = Math.max(0, n(d.monthly_emi_payments));
-  const debtPaid = Math.max(0, n(d.monthly_debt_payments));
-  const available = n(d.monthly_available);
-  const outstandingDebt = Math.max(0, n(d.outstanding_debt));
-  const totalSavings = Math.max(0, n(d.total_savings));
-  const emiPending = Math.max(0, n(d.emi_pending));
-  const activeEmis = Math.max(0, Math.round(n(d.active_emi_count)));
-  const outflow = expenses + family + emiPaid + debtPaid;
-  const spendRate = income > 0 ? expenses / income : 0;
-  const savingRate = income > 0 ? savings / income : 0;
-
-  let tone = 'good';
-  let tag = 'On track';
-  let message = 'Your recorded cash flow looks balanced today. Keep expenses intentional and continue building savings consistently.';
-
-  const hasAnyData = income > 0 || expenses > 0 || savings > 0 || family > 0 || emiPaid > 0 || debtPaid > 0 || outstandingDebt > 0;
-  if (!hasAnyData) {
-    tone = 'neutral';
-    tag = 'Start here';
-    message = 'There is not enough financial activity recorded yet. Add this month’s income and expenses so YARIN can point out a useful pattern here.';
-  } else if (income <= 0 && outflow > 0) {
-    tone = 'danger';
-    tag = 'Income gap';
-    message = `You have ${fmt(outflow)} of recorded outflow this month but no income recorded. Check whether income is missing before trusting your monthly balance.`;
-  } else if (income > 0 && available < 0) {
-    tone = 'danger';
-    tag = 'Cash-flow warning';
-    message = `This month’s recorded outflows are ${fmt(Math.abs(available))} above income. Review non-essential spending and upcoming commitments before adding new expenses.`;
-  } else if (income > 0 && spendRate >= 0.80) {
-    tone = 'warning';
-    tag = 'High spending';
-    message = `Expenses are about ${Math.round(spendRate * 100)}% of this month’s income. That leaves little room for savings or unexpected costs, so review the largest avoidable expenses first.`;
-  } else if (income > 0 && savings <= 0) {
-    tone = 'warning';
-    tag = 'Savings gap';
-    message = `Income is recorded this month, but no savings entry is recorded yet. Even a small planned transfer can stop the full month’s surplus from being absorbed by spending.`;
-  } else if (income > 0 && savingRate < 0.10) {
-    tone = 'warning';
-    tag = 'Low savings rate';
-    message = `Your recorded savings are about ${Math.round(savingRate * 100)}% of monthly income. Consider protecting a slightly larger amount before discretionary spending.`;
-  } else if (outstandingDebt > 0 && totalSavings > 0 && outstandingDebt > totalSavings * 1.5) {
-    tone = 'warning';
-    tag = 'Debt pressure';
-    message = `Outstanding debt (${fmt(outstandingDebt)}) is well above recorded savings (${fmt(totalSavings)}). Keep an emergency buffer, then prioritize a steady repayment plan.`;
-  } else if (activeEmis > 0 && emiPending > 0 && income > 0 && available < income * 0.15) {
-    tone = 'warning';
-    tag = 'Commitment pressure';
-    message = `${activeEmis} active EMI${activeEmis === 1 ? '' : 's'} still have ${fmt(emiPending)} pending, while this month’s free cash is tight. Avoid taking on another fixed payment unless the budget has room.`;
-  } else if (income > 0 && savingRate >= 0.20 && available >= 0) {
-    tone = 'good';
-    tag = 'Strong habit';
-    message = `You have recorded roughly ${Math.round(savingRate * 100)}% of this month’s income as savings and your cash flow remains positive. Keep that consistency without letting lifestyle spending creep up.`;
-  } else if (outstandingDebt > 0) {
-    tone = 'neutral';
-    tag = 'Stay deliberate';
-    message = `Your cash flow is currently positive, but ${fmt(outstandingDebt)} of debt remains outstanding. Keep repayments predictable while preserving a cash buffer.`;
+function buildFinancialReflection(d) {
+  if (!d || typeof d !== 'object') {
+    return { tone: 'neutral', text: 'Add your income and spending records to unlock a personal daily reflection.' };
   }
 
-  quoteEl.textContent = message;
-  if (tagEl) tagEl.textContent = tag;
-  visualEl.dataset.tone = tone;
-  quoteEl.dataset.tone = tone;
+  const income = finiteMoney(d.monthly_income);
+  const expenses = finiteMoney(d.monthly_expense);
+  const savings = finiteMoney(d.monthly_savings);
+  const family = finiteMoney(d.monthly_family_transfer);
+  const emi = finiteMoney(d.monthly_emi_payments);
+  const debtPayment = finiteMoney(d.monthly_debt_payments);
+  const outstandingDebt = finiteMoney(d.outstanding_debt);
+  const savingsGoal = finiteMoney(d.savings_goal);
+  const totalSavings = finiteMoney(d.total_savings);
+  const cashOutflow = expenses + family + emi + debtPayment;
+  const availableRaw = Number(d.monthly_available);
+  const available = Number.isFinite(availableRaw) ? availableRaw : income - cashOutflow;
+  const hasActivity = income > 0 || cashOutflow > 0 || savings > 0 || outstandingDebt > 0 || totalSavings > 0;
+
+  if (!hasActivity) {
+    return {
+      tone: 'neutral',
+      text: 'No financial mistake is flagged yet because this month has very little recorded data. Add income, expenses and savings for a useful reflection.'
+    };
+  }
+
+  if (income <= 0 && cashOutflow > 0) {
+    return {
+      tone: 'attention',
+      text: `You have ${fmt(cashOutflow)} of recorded outflow this month but no income recorded. Add your income first so YARIN can judge your cash flow correctly.`
+    };
+  }
+
+  if (income > 0 && available < 0) {
+    return {
+      tone: 'danger',
+      text: `Your recorded outflows are ${fmt(Math.abs(available))} above this month's income. The main issue is a cash-flow deficit — reduce non-essential spending or commitments before adding new ones.`
+    };
+  }
+
+  if (income > 0) {
+    const expenseRatio = expenses / income;
+    const commitmentRatio = (emi + debtPayment) / income;
+    const totalOutflowRatio = cashOutflow / income;
+    const savingsRate = savings / income;
+
+    if (expenseRatio >= 0.90) {
+      return {
+        tone: 'danger',
+        text: `Expenses are using about ${Math.round(expenseRatio * 100)}% of this month's income. That leaves very little breathing room; review the largest discretionary expenses before they become a repeated pattern.`
+      };
+    }
+
+    if (commitmentRatio >= 0.40) {
+      return {
+        tone: 'attention',
+        text: `EMI and debt repayments are taking about ${Math.round(commitmentRatio * 100)}% of monthly income. Avoid adding another fixed commitment until this burden comes down.`
+      };
+    }
+
+    if (totalOutflowRatio >= 0.85) {
+      return {
+        tone: 'attention',
+        text: `About ${Math.round(totalOutflowRatio * 100)}% of this month's income is already committed to expenses, family transfers and repayments. Protect the remaining buffer from impulse spending.`
+      };
+    }
+
+    if (savings <= 0) {
+      return {
+        tone: 'attention',
+        text: `Income is recorded, but no savings are recorded this month. Even a small planned transfer can stop the whole remaining balance from being absorbed by day-to-day spending.`
+      };
+    }
+
+    if (savingsRate < 0.10) {
+      return {
+        tone: 'attention',
+        text: `Your recorded savings rate is about ${Math.round(savingsRate * 100)}% this month. The weak spot is consistency — try increasing savings before expanding flexible spending.`
+      };
+    }
+  }
+
+  if (outstandingDebt > 0 && totalSavings < outstandingDebt * 0.15) {
+    return {
+      tone: 'attention',
+      text: `Outstanding debt is ${fmt(outstandingDebt)} while your recorded savings buffer is still relatively small. Build a cash cushion while continuing scheduled debt payments.`
+    };
+  }
+
+  if (savingsGoal > 0) {
+    const goalProgress = Math.min(1, totalSavings / savingsGoal);
+    if (goalProgress < 0.25) {
+      return {
+        tone: 'focus',
+        text: `Your savings goal is about ${Math.round(goalProgress * 100)}% complete. Nothing critical is flagged today; the clearest improvement is making regular contributions toward that goal.`
+      };
+    }
+  }
+
+  return {
+    tone: 'positive',
+    text: `No major warning is showing in your recorded monthly cash flow today. Keep expenses controlled, savings consistent and avoid adding unnecessary fixed commitments.`
+  };
+}
+
+function updateDailyFinancialReflection(d = state.dashboard) {
+  const quoteEl = document.getElementById('dailyReminderQuote');
+  const rowEl = document.getElementById('dailyReminderRow');
+  if (!quoteEl || !rowEl) return;
+  const reflection = buildFinancialReflection(d);
+  quoteEl.textContent = reflection.text;
+  rowEl.dataset.reflectionTone = reflection.tone;
+}
+
+function setupDailyReminder() {
+  const visualEl = document.getElementById('dailyReminderVisual');
+  if (!visualEl) return;
+
+  const doy = dayOfYear(new Date());
+  const gradient = DAILY_VISUAL_GRADIENTS[(doy + 3) % DAILY_VISUAL_GRADIENTS.length];
+  visualEl.style.setProperty('--daily-gradient', gradient);
+  visualEl.style.background = gradient;
+  updateDailyFinancialReflection(state.dashboard);
 }
 
 function setupVoiceSynthesis() {
@@ -1897,6 +1954,7 @@ async function loadDashboard() {
 }
 
 function renderDashboard(d) {
+  updateDailyFinancialReflection(d);
   const standardCards = [
     { label: 'Total Income', value: d.total_income, icon: iconTrendUp(), cls: 'positive' },
     { label: 'Total Expenses', value: d.total_expenses, icon: iconTrendDown(), cls: 'negative' },
@@ -1948,8 +2006,6 @@ function renderDashboard(d) {
     <div class="qs-row"><span>Active EMIs</span><span>${d.active_emi_count}</span></div>
     <div class="qs-row"><span>This Month's Balance</span><span>${fmt(Number.isFinite(Number(d.monthly_available)) ? Number(d.monthly_available) : (Number(d.monthly_income||0)-Number(d.monthly_expense||0)))}</span></div>
   `;
-
-  updateDailyFinancialReflection(d);
 
   if (d.total_emi > 0 && d.emi_pending <= 0 && !state.emiFullyPaidAlertShown) {
     toast('Congratulations! EMI Fully Paid!', 'success');
